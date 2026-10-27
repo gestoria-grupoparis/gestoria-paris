@@ -10,7 +10,8 @@ create table public.empresas (
 create table public.sucursales (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
-  provincia text not null
+  provincia text not null,
+  unique (nombre, provincia)
 );
 
 create table public.tipos_tramite (

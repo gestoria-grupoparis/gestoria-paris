@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs'
+import pg from 'pg'
 import { beforeEach, expect, test } from 'vitest'
+// @ts-expect-error módulo ESM sin tipos
+import { ADMIN_URL, aplicarEsquema, listarMigracionesCatalogo, urlDeBase } from '../../scripts/test-db.mjs'
 import { comoUsuario, crearUsuario, resetDb, sqlAdmin } from './helpers'
 
 beforeEach(resetDb)
@@ -47,7 +51,55 @@ test('tiene_alcance es false para otra empresa', async () => {
   expect(await tieneAlcance(id, 'Paris Motor', 'San Juan')).toBe(false)
 })
 
-test('el seed crea Paris Autos, Paris Cars y Paris Motor', async () => {
+const CATALOGOS = {
+  empresas: ['Paris Autos', 'Paris Cars', 'Paris Motor'],
+  sucursales: [
+    { nombre: 'San Juan', provincia: 'San Juan' },
+    { nombre: 'San Luis', provincia: 'San Luis' },
+  ],
+  tipos: ['patentamiento_0km', 'transferencia_parte_pago', 'transferencia_usado'],
+}
+
+const leerCatalogos = async (q: (sql: string) => Promise<Record<string, unknown>[]>) => ({
+  empresas: (await q('select nombre from public.empresas order by nombre')).map((r) => r.nombre),
+  sucursales: await q('select nombre, provincia from public.sucursales order by nombre'),
+  tipos: (await q('select codigo from public.tipos_tramite order by codigo')).map((r) => r.codigo),
+})
+
+// `supabase db push` aplica solo migraciones: los catálogos tienen que existir sin seed.sql.
+test('las migraciones solas (sin seed) crean los catálogos y son idempotentes', async () => {
+  const nombre = 'gestoria_sin_seed'
+  const admin = new pg.Client({ connectionString: ADMIN_URL })
+  await admin.connect()
+  try {
+    await admin.query(`drop database if exists ${nombre} with (force)`)
+    await admin.query(`create database ${nombre}`)
+    const c = new pg.Client({ connectionString: urlDeBase(nombre) })
+    await c.connect()
+    try {
+      await aplicarEsquema(c)
+      const q = (sql: string) => c.query(sql).then((r) => r.rows)
+      expect(await leerCatalogos(q)).toEqual(CATALOGOS)
+
+      // Re-ejecutar la migración de catálogos no duplica filas.
+      for (const f of listarMigracionesCatalogo() as string[]) await c.query(readFileSync(f, 'utf8'))
+      expect(await leerCatalogos(q)).toEqual(CATALOGOS)
+    } finally {
+      await c.end()
+    }
+  } finally {
+    await admin.query(`drop database if exists ${nombre} with (force)`)
+    await admin.end()
+  }
+})
+
+test('sucursales no admite dos filas con el mismo nombre y provincia', async () => {
+  await expect(
+    sqlAdmin(`insert into public.sucursales (nombre, provincia) values ('San Luis', 'San Luis')`),
+  ).rejects.toThrow(/duplicate key/)
+})
+
+test('los catálogos iniciales incluyen Paris Autos, Paris Cars y Paris Motor', async () => {
   const empresas = await sqlAdmin('select nombre from public.empresas order by nombre')
   expect(empresas.map((r) => r.nombre)).toEqual(['Paris Autos', 'Paris Cars', 'Paris Motor'])
 

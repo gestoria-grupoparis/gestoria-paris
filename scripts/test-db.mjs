@@ -27,7 +27,19 @@ export function listarMigraciones() {
     .map((f) => join(dir, f))
 }
 
+// Migraciones de datos de catálogo (idempotentes). resetDb las vuelve a aplicar porque el TRUNCATE las borra.
+export const listarMigracionesCatalogo = () => listarMigraciones().filter((f) => f.endsWith('_catalogos.sql'))
+
 const rutaSeed = () => join(ROOT, 'supabase', 'seed.sql')
+
+// Aplica el stub de auth y todas las migraciones en orden (lo mismo que `supabase db push`, sin seed).
+export async function aplicarEsquema(client) {
+  await client.query(leer(join(ROOT, 'db', 'test-support', 'auth_stub.sql')))
+  for (const f of listarMigraciones()) await client.query(leer(f))
+}
+
+export const urlDeBase = (nombre) => `postgres://${USER}:${PASSWORD}@localhost:${PORT}/${nombre}`
+export { ADMIN_URL }
 
 async function aplicarSeed(client) {
   if (existsSync(rutaSeed())) await client.query(leer(rutaSeed()))
@@ -59,8 +71,7 @@ export async function startDb() {
     const client = new pg.Client({ connectionString: TEST_DB_URL })
     await client.connect()
     try {
-      await client.query(leer(join(ROOT, 'db', 'test-support', 'auth_stub.sql')))
-      for (const f of listarMigraciones()) await client.query(leer(f))
+      await aplicarEsquema(client)
       await aplicarSeed(client)
     } finally {
       await client.end()
@@ -78,7 +89,8 @@ export async function startDb() {
   }
 }
 
-// Vacia todas las tablas de public y auth.users, reinicia todas las secuencias de public y reaplica el seed.
+// Vacia todas las tablas de public y auth.users, reinicia todas las secuencias de public y reaplica
+// los catálogos (migraciones *_catalogos.sql) y el seed.
 export async function resetDb(url = TEST_DB_URL) {
   const client = new pg.Client({ connectionString: url })
   await client.connect()
@@ -98,6 +110,7 @@ export async function resetDb(url = TEST_DB_URL) {
         end loop;
       end $$;
     `)
+    for (const f of listarMigracionesCatalogo()) await client.query(leer(f))
     await aplicarSeed(client)
   } finally {
     await client.end()
