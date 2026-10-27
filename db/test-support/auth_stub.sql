@@ -25,10 +25,15 @@ create table if not exists auth.users (
   created_at timestamptz not null default now()
 );
 
+-- Misma definición que Supabase: tolera claims vacías ('' queda en la sesión tras un set_config
+-- local de una transacción anterior en la misma conexión del pool).
 create or replace function auth.uid() returns uuid
 language sql stable
 as $$
-  select nullif(current_setting('request.jwt.claims', true)::json->>'sub', '')::uuid
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+  )::uuid
 $$;
 
 grant usage on schema public to anon, authenticated, service_role;
