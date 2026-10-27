@@ -198,3 +198,15 @@ test('las vistas filtran por usuario: gestora solo sus trámites autorizados; sa
   expect(await ver(contableSL, 'v_saldos')).toEqual([])
   expect((await ver(f.gerencia, 'v_saldos')).map((r) => r.empresa)).toEqual(['Paris Autos'])
 })
+
+test('desvío porcentual extremo no rompe v_tramite_finanzas ni v_saldos', async () => {
+  const f = await preparar()
+  await f.carga(100000000n)
+  const t = await f.tramite(100n)
+  await f.pago(t, 10000000n, true)
+
+  const r = await f.finanzas(t)
+  expect([r.presupuesto_cents, r.pagado_cents, r.desvio_cents, r.desvio_pct, r.situacion])
+    .toEqual([100n, 10000000n, 9999900n, '9999900.00', 'pagado'])
+  expect(await f.saldo()).toEqual([90000000n, 0n, 90000000n])
+})

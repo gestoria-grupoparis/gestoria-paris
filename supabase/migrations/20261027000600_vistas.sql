@@ -130,7 +130,7 @@ select a.tramite_id,
        case when a.pago_final_at is not null then a.pagado_cents - a.presupuesto_cents end as desvio_cents,
        case when a.pago_final_at is not null and a.presupuesto_cents > 0
             then round((a.pagado_cents - a.presupuesto_cents)::numeric * 100 / a.presupuesto_cents, 2)
-       end::numeric(7, 2) as desvio_pct,
+       end::numeric(24, 2) as desvio_pct, -- numeric(7,2) desbordaba con desvíos >= 100000%; 24 dígitos cubre todo el rango bigint
        case
          when a.pago_final_at is not null then 'pagado'
          when a.comprometido_cents > 0
