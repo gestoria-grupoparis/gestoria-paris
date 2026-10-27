@@ -92,9 +92,35 @@ create policy movimientos_select on public.movimientos for select to authenticat
 create policy excepciones_fondos_select on public.excepciones_fondos for select to authenticated
   using (public.mi_rol() in ('gerencia', 'contable') and public.puede_ver_tramite(tramite_id));
 
--- Historial: gerencia y contable todo; la gestora, los eventos de los trámites que ve.
+-- Historial: gerencia y contable ven los eventos de las entidades que podrían ver (mismo
+-- alcance que la tabla de origen, resuelto desde la foto antes/después); perfiles y alcances
+-- quedan abiertos para ellos. La gestora, los eventos de los trámites que ve.
 create policy eventos_select on public.eventos for select to authenticated
-  using (public.mi_rol() in ('gerencia', 'contable') or public.puede_ver_tramite(entidad_id));
+  using (
+    case
+      when public.mi_rol() in ('gerencia', 'contable') then
+        case entidad
+          when 'perfiles' then true
+          when 'alcances' then true
+          when 'tramites' then public.puede_ver_tramite(entidad_id)
+          when 'tramite_marcas' then public.puede_ver_tramite(entidad_id)
+          when 'excepciones_fondos' then public.puede_ver_tramite(entidad_id)
+          when 'presupuestos' then public.puede_ver_tramite(
+            (coalesce(despues, antes) ->> 'tramite_id')::uuid)
+          when 'operaciones' then public.tiene_alcance(
+            (coalesce(despues, antes) ->> 'empresa_id')::uuid,
+            (coalesce(despues, antes) ->> 'sucursal_id')::uuid)
+          when 'cuentas' then public.tiene_alcance(
+            (coalesce(despues, antes) ->> 'empresa_id')::uuid, null)
+          when 'movimientos' then exists (
+            select 1 from public.cuentas c
+             where c.id = (coalesce(eventos.despues, eventos.antes) ->> 'cuenta_id')::uuid
+               and public.tiene_alcance(c.empresa_id, null))
+          else false
+        end
+      else public.puede_ver_tramite(entidad_id)
+    end
+  );
 
 -- Sin políticas INSERT/UPDATE/DELETE: authenticated no escribe tablas.
 

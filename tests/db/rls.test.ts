@@ -134,6 +134,40 @@ test('contable con alcance San Luis/Paris Autos no ve trámites de Paris Cars', 
   expect((await filas(contable, 'select id from public.perfiles')).length).toBe(4)
 })
 
+test('contable con alcance Paris Autos no ve el historial (eventos) de Paris Cars', async () => {
+  const f = await preparar()
+  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+
+  expect(await filas(contable, 'select id from public.eventos where entidad_id = $1', [f.deCars])).toEqual([])
+  const tram = await filas(contable, `select despues from public.eventos where entidad = 'tramites'`)
+  expect(tram.length).toBeGreaterThan(0)
+  expect(tram.every((r) => r.despues === null || r.despues.empresa_id !== f.cars)).toBe(true)
+  const pres = await filas(contable, `select coalesce(despues, antes) as s from public.eventos where entidad = 'presupuestos'`)
+  expect(pres.every((r) => r.s.tramite_id !== f.deCars)).toBe(true)
+  // Sin alcance de empresa entera no ve cuentas ni movimientos, tampoco en el historial.
+  expect(await filas(contable, `select id from public.eventos where entidad in ('movimientos', 'cuentas')`)).toEqual([])
+  // Perfiles siguen abiertos.
+  expect((await filas(contable, `select id from public.eventos where entidad = 'perfiles'`)).length).toBeGreaterThan(0)
+
+  // Contable con Paris Autos entera ve movimientos/cuentas de Paris Autos, nunca los de Paris Cars.
+  await rpc(f.gerencia, 'registrar_carga', { p_idem: randomUUID(), p_empresa: f.cars, p_importe: 5000000n, p_fecha: FECHA })
+  const contableEmpresa = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
+  const movs = await filas(contableEmpresa,
+    `select coalesce(despues, antes) as s from public.eventos where entidad = 'movimientos'`)
+  expect(movs.length).toBeGreaterThan(0)
+  const cuentaCars = (await filas(f.gerencia, 'select id from public.cuentas where empresa_id = $1', [f.cars]))[0].id
+  expect(movs.every((r) => r.s.cuenta_id !== cuentaCars)).toBe(true)
+  const ctas = await filas(contableEmpresa, `select coalesce(despues, antes) as s from public.eventos where entidad = 'cuentas'`)
+  expect(ctas.every((r) => r.s.empresa_id === f.autos)).toBe(true)
+  expect((await filas(f.gerencia,
+    `select id from public.eventos where entidad = 'movimientos' and despues ->> 'cuenta_id' = $1`, [cuentaCars])).length)
+    .toBeGreaterThan(0)
+
+  // Gerencia de todo el grupo sí ve el historial de Paris Cars.
+  expect((await filas(f.gerencia, 'select id from public.eventos where entidad_id = $1', [f.deCars])).length)
+    .toBeGreaterThan(0)
+})
+
 test('anon no puede ejecutar ninguna RPC', async () => {
   const sinPermiso = await sqlAdmin(`
     select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
