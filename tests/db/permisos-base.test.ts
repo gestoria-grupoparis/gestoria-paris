@@ -58,12 +58,18 @@ const CATALOGOS = {
     { nombre: 'San Luis', provincia: 'San Luis' },
   ],
   tipos: ['patentamiento_0km', 'transferencia_parte_pago', 'transferencia_usado'],
+  cuentas: ['Habitualista Paris Autos', 'Habitualista Paris Cars', 'Habitualista Paris Motor'],
 }
 
 const leerCatalogos = async (q: (sql: string) => Promise<Record<string, unknown>[]>) => ({
   empresas: (await q('select nombre from public.empresas order by nombre')).map((r) => r.nombre),
   sucursales: await q('select nombre, provincia from public.sucursales order by nombre'),
   tipos: (await q('select codigo from public.tipos_tramite order by codigo')).map((r) => r.codigo),
+  cuentas: (
+    await q(`select c.nombre from public.cuentas c
+               join public.empresas e on e.id = c.empresa_id and c.nombre = 'Habitualista ' || e.nombre
+              order by c.nombre`)
+  ).map((r) => r.nombre),
 })
 
 // `supabase db push` aplica solo migraciones: los catálogos tienen que existir sin seed.sql.
