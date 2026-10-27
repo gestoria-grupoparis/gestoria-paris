@@ -6,7 +6,8 @@ import { resetDb as resetDbScript, TEST_DB_URL } from '../../scripts/test-db.mjs
 // int8 se devuelve como bigint de JS (los importes en centimos dependen de ello)
 pg.types.setTypeParser(20, BigInt)
 
-export type Rol = string
+export type Rol = 'gerencia' | 'contable' | 'gestora' | 'comercial' | 'admin'
+export type Alcance = { empresa: string; sucursal?: string }
 
 const url: string = process.env.TEST_DB_URL ?? TEST_DB_URL
 let pool: pg.Pool | undefined
@@ -16,16 +17,41 @@ export async function resetDb(): Promise<void> {
   await resetDbScript(url)
 }
 
-// En esta tarea solo inserta en auth.users; la Tarea 2 la extiende con perfiles/alcances.
-export async function crearUsuario(
-  _rol: Rol,
-  _alcances: { empresa: string; sucursal?: string }[],
-): Promise<string> {
-  const r = await getPool().query(
-    `insert into auth.users (email) values ($1) returning id`,
-    [`u${Math.random().toString(36).slice(2)}@test.local`],
-  )
-  return r.rows[0].id
+// Consulta directa como dueño de las tablas (sin rol authenticated), para preparar datos y verificar.
+export async function sqlAdmin(sql: string, params: unknown[] = []) {
+  return (await getPool().query(sql, params)).rows
+}
+
+// Crea auth.users + perfil activo con el rol dado + sus alcances (nombres resueltos contra el seed).
+// Sin sucursal => sucursal_id null (todas las sucursales de esa empresa).
+export async function crearUsuario(rol: Rol, alcances: Alcance[]): Promise<string> {
+  const c = await getPool().connect()
+  try {
+    await c.query('begin')
+    const corto = Math.random().toString(36).slice(2, 8)
+    const id: string = (
+      await c.query(`insert into auth.users (email) values ($1) returning id`, [`${rol}-${corto}@test.local`])
+    ).rows[0].id
+    await c.query(`insert into public.perfiles (id, nombre, rol) values ($1, $2, $3)`, [id, `${rol} ${corto}`, rol])
+    for (const a of alcances) {
+      const r = await c.query(
+        `insert into public.alcances (perfil_id, empresa_id, sucursal_id)
+         select $1, e.id, s.id
+           from public.empresas e
+           left join public.sucursales s on s.nombre = $3
+          where e.nombre = $2 and ($3::text is null or s.id is not null)`,
+        [id, a.empresa, a.sucursal ?? null],
+      )
+      if (r.rowCount !== 1) throw new Error(`Alcance inexistente en el seed: ${JSON.stringify(a)}`)
+    }
+    await c.query('commit')
+    return id
+  } catch (e) {
+    await c.query('rollback').catch(() => {})
+    throw e
+  } finally {
+    c.release()
+  }
 }
 
 export async function comoUsuario<T>(
