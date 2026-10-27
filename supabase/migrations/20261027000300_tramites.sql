@@ -232,3 +232,250 @@ begin
    order by t.created_at, t.numero;
 end;
 $$;
+
+-- =====================================================================================
+-- 3. Ciclo de vida: estados, autorización, marcas y reasignación
+-- =====================================================================================
+-- Toda RPC que modifica un trámite recibe p_version (bloqueo optimista, caso O): bloquea la
+-- fila, compara la versión y, si tuvo éxito, la incrementa.
+
+-- Tabla de transiciones de cambiar_estado (spec D). A "autorizado" solo se llega por
+-- autorizar_tramite. Desde "suspendido" la tabla habilita volver a cualquier estado que se
+-- pueda suspender; cambiar_estado restringe además el destino al estado previo a la suspensión.
+create function public.transicion_permitida(
+  p_desde text,
+  p_hacia text,
+  p_rol text,
+  p_es_gestora_asignada boolean
+) returns boolean
+language sql immutable
+set search_path = public
+as $$
+  select coalesce(case
+    when p_rol in ('gerencia', 'contable') then
+      (p_desde, p_hacia) in (
+        ('borrador', 'observado'), ('borrador', 'rechazado'),
+        ('observado', 'borrador'),
+        ('autorizado', 'en_gestoria'),
+        ('autorizado', 'presentado'), ('en_gestoria', 'presentado'),
+        ('presentado', 'finalizado_registro'),
+        ('finalizado_registro', 'devuelto'),
+        ('devuelto', 'cerrado')
+      )
+      or (p_hacia in ('suspendido', 'cancelado')
+          and p_desde not in ('cerrado', 'cancelado', 'rechazado', p_hacia))
+      or (p_desde = 'suspendido'
+          and p_hacia in ('borrador', 'observado', 'autorizado', 'en_gestoria', 'presentado',
+                          'finalizado_registro', 'devuelto'))
+    when p_rol = 'gestora' and p_es_gestora_asignada then
+      (p_desde, p_hacia) in (
+        ('autorizado', 'presentado'), ('en_gestoria', 'presentado'),
+        ('presentado', 'finalizado_registro')
+      )
+    else false
+  end, false)
+$$;
+
+-- true si p_perfil es un perfil activo con rol gestora (destino de una asignación).
+create function public.es_gestora_activa(p_perfil uuid) returns boolean
+language sql stable security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.perfiles p where p.id = p_perfil and p.activo and p.rol = 'gestora')
+$$;
+
+-- Uso interno de autorizar_tramite y reasignar_gestora: no se expone a los clientes.
+revoke execute on function public.es_gestora_activa(uuid) from public;
+
+-- Autoriza un trámite en borrador y le asigna la gestora (regla 1, flujo 1).
+create function public.autorizar_tramite(p_tramite uuid, p_gestora uuid, p_version int)
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_t public.tramites%rowtype;
+begin
+  select t.* into v_t from public.tramites t where t.id = p_tramite for update;
+  if not found then
+    raise exception 'NO_ENCONTRADO: trámite inexistente';
+  end if;
+
+  if coalesce(public.mi_rol() in ('gerencia', 'contable'), false) is false
+     or not public.tiene_alcance(v_t.empresa_id, v_t.sucursal_id) then
+    raise exception 'SIN_PERMISO: solo gerencia o contable con alcance autorizan trámites';
+  end if;
+
+  if v_t.version is distinct from p_version then
+    raise exception 'VERSION_CONFLICTO: otro usuario modificó este trámite; recargá';
+  end if;
+
+  if v_t.estado <> 'borrador' then
+    raise exception 'TRANSICION_INVALIDA: solo se autoriza un trámite en borrador (está %)', v_t.estado;
+  end if;
+
+  if not public.es_gestora_activa(p_gestora) then
+    raise exception 'DATO_INVALIDO: la gestora asignada debe ser un perfil activo con rol gestora';
+  end if;
+
+  -- Sin motivo propio: se limpia para que la auditoría no herede uno anterior de la transacción.
+  perform set_config('app.motivo', '', true);
+
+  update public.tramites
+     set estado = 'autorizado',
+         gestora_id = p_gestora,
+         autorizado_por = auth.uid(),
+         autorizado_at = now(),
+         version = version + 1
+   where id = p_tramite;
+end;
+$$;
+
+-- Cambia el estado según transicion_permitida. Si el rol del usuario no puede hacer una
+-- transición que otro rol sí podría, es SIN_PERMISO; si nadie puede, TRANSICION_INVALIDA.
+create function public.cambiar_estado(p_tramite uuid, p_estado text, p_motivo text, p_version int)
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_t public.tramites%rowtype;
+  v_rol text := public.mi_rol();
+  v_asignada boolean;
+  v_motivo text := nullif(btrim(p_motivo), '');
+  v_previo text;
+begin
+  select t.* into v_t from public.tramites t where t.id = p_tramite for update;
+  if not found then
+    raise exception 'NO_ENCONTRADO: trámite inexistente';
+  end if;
+
+  v_asignada := v_rol = 'gestora' and v_t.gestora_id = auth.uid();
+  if not (coalesce(v_rol in ('gerencia', 'contable'), false)
+          and public.tiene_alcance(v_t.empresa_id, v_t.sucursal_id))
+     and not coalesce(v_asignada, false) then
+    raise exception 'SIN_PERMISO: no puede cambiar el estado de este trámite';
+  end if;
+
+  if v_t.version is distinct from p_version then
+    raise exception 'VERSION_CONFLICTO: otro usuario modificó este trámite; recargá';
+  end if;
+
+  if not public.transicion_permitida(v_t.estado, p_estado, v_rol, coalesce(v_asignada, false)) then
+    if public.transicion_permitida(v_t.estado, p_estado, 'gerencia', false) then
+      raise exception 'SIN_PERMISO: su rol no puede pasar el trámite de % a %', v_t.estado, p_estado;
+    end if;
+    raise exception 'TRANSICION_INVALIDA: no se puede pasar de % a %', v_t.estado, p_estado;
+  end if;
+
+  if v_t.estado = 'suspendido' and p_estado <> 'cancelado' then
+    -- Estado previo: el "antes" de la última actualización que suspendió el trámite.
+    select e.antes ->> 'estado' into v_previo
+      from public.eventos e
+     where e.entidad = 'tramites' and e.entidad_id = p_tramite and e.accion = 'update'
+       and e.despues ->> 'estado' = 'suspendido' and e.antes ->> 'estado' <> 'suspendido'
+     order by e.id desc
+     limit 1;
+    if v_previo is distinct from p_estado then
+      raise exception 'TRANSICION_INVALIDA: un trámite suspendido solo vuelve a su estado previo (%)',
+        coalesce(v_previo, 'desconocido');
+    end if;
+  end if;
+
+  if v_motivo is null and (
+       (v_t.estado = 'borrador' and p_estado in ('observado', 'rechazado'))
+       or p_estado in ('suspendido', 'cancelado')
+       or v_t.estado = 'suspendido') then
+    raise exception 'DATO_INVALIDO: el motivo es obligatorio para pasar de % a %', v_t.estado, p_estado;
+  end if;
+
+  perform set_config('app.motivo', coalesce(v_motivo, ''), true);
+
+  update public.tramites
+     set estado = p_estado,
+         version = version + 1
+   where id = p_tramite;
+end;
+$$;
+
+-- Marca documental (no bloquea el flujo). "retirado" la puede marcar también la gestora
+-- asignada (spec F); el resto, gerencia o contable con alcance. Idempotente.
+create function public.marcar(p_tramite uuid, p_marca text)
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_t public.tramites%rowtype;
+  v_rol text := public.mi_rol();
+begin
+  if p_marca is null or p_marca not in ('legajo_recibido', 'firmado', 'entregado', 'retirado', 'recibido_admin') then
+    raise exception 'DATO_INVALIDO: marca % inexistente', p_marca;
+  end if;
+
+  select t.* into v_t from public.tramites t where t.id = p_tramite;
+  if not found then
+    raise exception 'NO_ENCONTRADO: trámite inexistente';
+  end if;
+
+  if not (coalesce(v_rol in ('gerencia', 'contable'), false)
+          and public.tiene_alcance(v_t.empresa_id, v_t.sucursal_id))
+     and not (p_marca = 'retirado' and v_rol = 'gestora' and v_t.gestora_id = auth.uid()) then
+    raise exception 'SIN_PERMISO: no puede registrar la marca % en este trámite', p_marca;
+  end if;
+
+  perform set_config('app.motivo', '', true);
+
+  insert into public.tramite_marcas (tramite_id, marca, por)
+  values (p_tramite, p_marca, auth.uid())
+  on conflict (tramite_id, marca) do nothing;
+end;
+$$;
+
+-- Reasignación en lote (caso K): todo o nada; devuelve cuántos trámites cambiaron de gestora.
+create function public.reasignar_gestora(p_tramites uuid[], p_gestora uuid, p_motivo text)
+returns int
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_ids uuid[] := array(select distinct x from unnest(p_tramites) x where x is not null);
+  v_motivo text := nullif(btrim(p_motivo), '');
+  v_encontrados int;
+  v_n int;
+begin
+  if coalesce(public.mi_rol() in ('gerencia', 'contable'), false) is false then
+    raise exception 'SIN_PERMISO: solo gerencia o contable reasignan gestoras';
+  end if;
+
+  if v_motivo is null then
+    raise exception 'DATO_INVALIDO: el motivo de la reasignación es obligatorio';
+  end if;
+
+  if not public.es_gestora_activa(p_gestora) then
+    raise exception 'DATO_INVALIDO: la nueva gestora debe ser un perfil activo con rol gestora';
+  end if;
+
+  -- Bloquea todos los trámites en orden de id antes de validar y escribir.
+  perform 1 from public.tramites t where t.id = any (v_ids) order by t.id for update;
+
+  select count(*) into v_encontrados from public.tramites t where t.id = any (v_ids);
+  if v_encontrados <> cardinality(v_ids) then
+    raise exception 'NO_ENCONTRADO: % de % trámites no existen', cardinality(v_ids) - v_encontrados, cardinality(v_ids);
+  end if;
+
+  if exists (select 1 from public.tramites t
+              where t.id = any (v_ids) and not public.tiene_alcance(t.empresa_id, t.sucursal_id)) then
+    raise exception 'SIN_PERMISO: hay trámites fuera de su alcance';
+  end if;
+
+  perform set_config('app.motivo', v_motivo, true);
+
+  update public.tramites t
+     set gestora_id = p_gestora,
+         version = t.version + 1
+   where t.id = any (v_ids) and t.gestora_id is distinct from p_gestora;
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
