@@ -175,3 +175,48 @@ test('buscar_duplicados lista los trámites activos con la misma oferta o domini
   expect(r.rows.map((x) => x.id).sort()).toEqual([mismaOferta, mismoDominio].sort())
   expect(r.rows.every((x) => x.estado === 'borrador' && /^T-\d{4}-\d{5}$/.test(x.numero))).toBe(true)
 })
+
+test('buscar_duplicados es solo para gerencia y contable: gestora y comercial reciben SIN_PERMISO', async () => {
+  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
+  await crearTramite(contable, { oferta: 'OF-555', dominio: 'AB123CD' })
+  const empresa = await idPorNombre('empresas', 'Paris Autos')
+  const args = { p_empresa: empresa, p_oferta: 'OF-555', p_dominio: 'AB123CD' }
+
+  for (const rol of ['gestora', 'comercial', 'admin'] as const) {
+    const u = await crearUsuario(rol, [{ empresa: 'Paris Autos' }])
+    await expect(rpc(u, 'buscar_duplicados', args)).rejects.toThrow(/^SIN_PERMISO:/)
+  }
+
+  const gerente = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
+  expect((await rpc(gerente, 'buscar_duplicados', args)).rows).toHaveLength(1)
+
+  // Gerencia sin alcance en la empresa no ve nada.
+  const gerenteCars = await crearUsuario('gerencia', [{ empresa: 'Paris Cars' }])
+  expect((await rpc(gerenteCars, 'buscar_duplicados', args)).rows).toHaveLength(0)
+})
+
+test('el número visible es correlativo por año y reinicia en 00001 al cambiar de año', async () => {
+  // Fin de 2026: el último trámite del año fue el 450.
+  expect((await sqlAdmin(`select public.siguiente_numero_tramite('2026-12-31') as n`))[0].n).toBe('T-2026-00001')
+  await sqlAdmin(`update public.contadores_tramite set ultimo = 449 where anio = 2026`)
+  expect((await sqlAdmin(`select public.siguiente_numero_tramite('2026-12-31') as n`))[0].n).toBe('T-2026-00450')
+
+  // Primer trámite de enero de 2027: arranca de nuevo, y 2026 sigue su propia cuenta.
+  expect((await sqlAdmin(`select public.siguiente_numero_tramite('2027-01-01') as n`))[0].n).toBe('T-2027-00001')
+  expect((await sqlAdmin(`select public.siguiente_numero_tramite('2027-01-02') as n`))[0].n).toBe('T-2027-00002')
+  expect((await sqlAdmin(`select public.siguiente_numero_tramite('2026-12-31') as n`))[0].n).toBe('T-2026-00451')
+
+  // crear_tramite usa el contador del año en curso (zona AR) y no consume número si falla.
+  await sqlAdmin(`delete from public.contadores_tramite`)
+  await sqlAdmin(`insert into public.contadores_tramite (anio, ultimo) values ($1, 450)`, [Number(anioAR())])
+  await sqlAdmin(`insert into public.contadores_tramite (anio, ultimo) values ($1, 999)`, [Number(anioAR()) - 1])
+  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
+  const id = await crearTramite(contable)
+  expect((await tramite(id)).numero).toBe(`T-${anioAR()}-00451`)
+  await expect(crearTramite(contable)).rejects.toThrow(/^DUPLICADO:/)
+  const otro = await crearTramite(contable, { tipo: 'transferencia_usado' })
+  expect((await tramite(otro)).numero).toBe(`T-${anioAR()}-00452`)
+
+  // authenticated no puede invocar el contador directamente.
+  await expect(rpc(contable, 'siguiente_numero_tramite', { p_fecha: '2027-01-01' })).rejects.toThrow(/permission denied/)
+})

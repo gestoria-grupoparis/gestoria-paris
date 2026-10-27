@@ -21,8 +21,13 @@ create table public.operaciones (
   unique (id, empresa_id, sucursal_id)
 );
 
--- Correlativo del número visible del trámite (T-<año AR>-<00000>).
-create sequence public.seq_tramite;
+-- Correlativo del número visible del trámite (T-<año AR>-<00000>), que reinicia cada año
+-- (spec E). Una fila por año; se incrementa con upsert ... returning, que toma el lock de la
+-- fila y serializa altas concurrentes del mismo año.
+create table public.contadores_tramite (
+  anio int primary key check (anio between 2000 and 9999),
+  ultimo int not null check (ultimo > 0)
+);
 
 create table public.tramites (
   id uuid primary key default gen_random_uuid(),
@@ -79,6 +84,26 @@ create trigger trg_auditar after insert or update or delete on public.tramite_ma
 -- =====================================================================================
 -- 2. Alta de trámites
 -- =====================================================================================
+
+-- Próximo número visible para la fecha operativa dada: T-<año>-<correlativo del año>.
+-- Uso interno de crear_tramite (no se otorga a authenticated en 20261027000700_rls.sql).
+create function public.siguiente_numero_tramite(p_fecha date) returns text
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_anio int := extract(year from p_fecha)::int;
+  v_n int;
+begin
+  insert into public.contadores_tramite as c (anio, ultimo)
+  values (v_anio, 1)
+  on conflict (anio) do update set ultimo = c.ultimo + 1
+  returning c.ultimo into v_n;
+  return 'T-' || v_anio::text || '-' || lpad(v_n::text, 5, '0');
+end;
+$$;
+
+revoke execute on function public.siguiente_numero_tramite(date) from public;
 
 -- Crea un trámite en borrador. Idempotente por p_idem (caso N): si ya existe, devuelve su id.
 -- Reutiliza la operación existente de (empresa, oferta) (caso M) y rechaza duplicados (caso J).
@@ -155,7 +180,7 @@ begin
       numero, operacion_id, tipo_id, empresa_id, sucursal_id, vehiculo_desc, dominio, chasis,
       creado_por, idem_key
     ) values (
-      'T-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('public.seq_tramite')::text, 5, '0'),
+      public.siguiente_numero_tramite(current_date),
       v_operacion.id, v_tipo, p_empresa, p_sucursal, btrim(p_vehiculo), v_dominio, v_chasis,
       auth.uid(), p_idem
     )
@@ -182,13 +207,20 @@ begin
 end;
 $$;
 
--- Aviso previo en la UI: trámites vivos de la empresa con la misma oferta o el mismo dominio,
--- limitados al alcance del usuario.
+-- Aviso previo en la UI: trámites vivos de la empresa con la misma oferta o el mismo dominio.
+-- Solo para quienes pueden crear trámites (gerencia y contable, que son quienes ven el aviso)
+-- y limitado a su alcance: una gestora o un comercial no deben poder sondear trámites ajenos.
 create function public.buscar_duplicados(p_empresa uuid, p_oferta text, p_dominio text)
 returns table (id uuid, numero text, estado text)
-language sql stable security definer
+language plpgsql stable security definer
 set search_path = public
 as $$
+begin
+  if coalesce(public.mi_rol() in ('gerencia', 'contable'), false) is false then
+    raise exception 'SIN_PERMISO: solo gerencia y contable consultan duplicados';
+  end if;
+
+  return query
   select t.id, t.numero, t.estado
     from public.tramites t
     join public.operaciones o on o.id = t.operacion_id
@@ -197,5 +229,6 @@ as $$
      and (o.oferta_ref = nullif(btrim(p_oferta), '')
           or upper(t.dominio) = nullif(upper(btrim(p_dominio)), ''))
      and public.tiene_alcance(t.empresa_id, t.sucursal_id)
-   order by t.created_at, t.numero
+   order by t.created_at, t.numero;
+end;
 $$;
