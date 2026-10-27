@@ -95,7 +95,10 @@ export async function resetDb(url = TEST_DB_URL) {
   const client = new pg.Client({ connectionString: url })
   await client.connect()
   try {
+    // replica desactiva los triggers (como hace una migración) para que el TRUNCATE de tests no choque con
+    // trg_inmutable_truncate de las tablas solo-INSERT. Se restaura antes de recargar catálogos y seed.
     await client.query(`
+      set session_replication_role = replica;
       do $$
       declare r record;
       begin
@@ -109,6 +112,7 @@ export async function resetDb(url = TEST_DB_URL) {
           execute 'alter sequence ' || r.s || ' restart';
         end loop;
       end $$;
+      reset session_replication_role;
     `)
     for (const f of listarMigracionesCatalogo()) await client.query(leer(f))
     await aplicarSeed(client)

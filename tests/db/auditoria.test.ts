@@ -41,13 +41,14 @@ test('cambiar el rol de un perfil genera un evento con antes/después y actor', 
   expect(altas[1].despues.perfil_id).toBe(gestora)
 })
 
-test('update y delete sobre eventos fallan incluso como superusuario', async () => {
+test('update, delete y truncate sobre eventos fallan incluso como superusuario', async () => {
   await crearUsuario('contable', [{ empresa: 'Paris Cars' }])
   const [{ n }] = await sqlAdmin('select count(*)::int as n from public.eventos')
   expect(n).toBeGreaterThan(0)
 
   await expect(sqlAdmin(`update public.eventos set motivo = 'alterado'`)).rejects.toThrow(/registro inmutable/)
   await expect(sqlAdmin('delete from public.eventos')).rejects.toThrow(/registro inmutable/)
+  await expect(sqlAdmin('truncate public.eventos')).rejects.toThrow(/registro inmutable/)
 
   const [{ n: despues }] = await sqlAdmin('select count(*)::int as n from public.eventos')
   expect(despues).toBe(n)

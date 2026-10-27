@@ -4,6 +4,9 @@
 --     for each row execute function public.auditar();
 --   create trigger trg_inmutable before update or delete on <tabla>
 --     for each row execute function public.impedir_modificacion();
+--   create trigger trg_inmutable_truncate before truncate on <tabla>
+--     for each statement execute function public.impedir_modificacion();
+-- (los triggers por fila no se disparan con TRUNCATE: sin el segundo, el dueño podría vaciar la tabla).
 -- Grants y RLS de eventos se definen en 20261027000700_rls.sql.
 
 create table public.eventos (
@@ -48,7 +51,7 @@ begin
 end;
 $$;
 
--- Rechaza UPDATE y DELETE, también para el dueño de la tabla y superusuarios.
+-- Rechaza UPDATE, DELETE y TRUNCATE, también para el dueño de la tabla y superusuarios.
 -- Solo una migración puede saltearlo (deshabilitando el trigger explícitamente).
 create function public.impedir_modificacion() returns trigger
 language plpgsql
@@ -61,6 +64,10 @@ $$;
 
 create trigger trg_inmutable before update or delete on public.eventos
   for each row execute function public.impedir_modificacion();
+
+-- Sirve como trigger por sentencia: no usa OLD/NEW.
+create trigger trg_inmutable_truncate before truncate on public.eventos
+  for each statement execute function public.impedir_modificacion();
 
 create trigger trg_auditar after insert or update or delete on public.perfiles
   for each row execute function public.auditar();
