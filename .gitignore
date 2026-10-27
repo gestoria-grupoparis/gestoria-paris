@@ -1,0 +1,5 @@
+.superpowers/
+node_modules/
+.pgtest/
+.env*
+web/dist/
