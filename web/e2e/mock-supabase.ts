@@ -1,6 +1,7 @@
-// Simula la API HTTP de Supabase (auth + PostgREST + RPC) para los E2E. No hay usuarios de prueba en
-// staging y no se pueden crear, así que el navegador nunca sale de este mock: las RPC replican la
-// parte de las reglas de negocio que ejercitan los specs (duplicados, versión, motivo obligatorio).
+// Simula la API HTTP de Supabase (auth + PostgREST + RPC + Realtime) para los E2E. No hay usuarios de
+// prueba en staging y no se pueden crear, así que el navegador nunca sale de este mock: las RPC
+// replican la parte de las reglas de negocio que ejercitan los specs (duplicados, versión, motivo
+// obligatorio, saldos y compromisos).
 import type { Page, Route } from '@playwright/test'
 import sesion from './fixtures/sesion.json' with { type: 'json' }
 import catalogos from './fixtures/catalogos.json' with { type: 'json' }
@@ -16,7 +17,10 @@ interface Estado {
   marcas: Fila[]
   eventos: Fila[]
   presupuestos: Fila[]
-  pagos: Fila[]
+  /** importe con signo en centavos (texto), como movimientos.importe_cents. */
+  movimientos: Fila[]
+  /** { cuenta_id, fecha_corte, diferencia, movimientos: id[] } */
+  conciliaciones: Fila[]
   siguienteEvento: number
 }
 
@@ -29,20 +33,46 @@ export interface Semilla {
   situacion?: string
 }
 
+export interface Extra {
+  movimientos?: Fila[]
+  conciliaciones?: Fila[]
+}
+
+interface Canal {
+  joinRef: unknown
+  bindings: { id: number; table: string }[]
+}
+interface Socket {
+  enviar: (msg: unknown[]) => void
+  canales: Map<string, Canal>
+}
+
+/** Estado del "servidor". Se comparte entre páginas para probar Realtime con dos navegadores. */
+export interface Servidor {
+  st: Estado
+  situacionForzada: Map<unknown, string>
+  sockets: Set<Socket>
+  siguienteInstante: () => string
+  notificar: (tabla: string) => void
+}
+
 export interface OpcionesMock {
   /** Id de perfil (de fixtures/catalogos.json) con el que se inicia la sesión. Por defecto, Carla Contable. */
   usuario?: string
+  /** Servidor compartido con otras páginas; si falta, se crea uno con las semillas. */
+  servidor?: Servidor
 }
 
 const ESTADOS_EN_CURSO = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro']
 
 const nombreDe = (lista: Fila[], id: unknown) => lista.find((x) => x.id === id)
+const big = (x: unknown) => BigInt(String(x))
 
 function errorNegocio(route: Route, message: string) {
   return route.fulfill({ status: 400, json: { code: 'P0001', message, details: null, hint: null } })
 }
 
-// --- Filtros PostgREST mínimos: eq, neq, in, gte, lt, lte, ilike, is, or=(...), and(...) ---------
+// --- Filtros PostgREST mínimos: eq, neq, in, gt, gte, lt, lte, ilike, is, or=(...), and(...) ----
 function partirNivelSuperior(s: string): string[] {
   const partes: string[] = []
   let prof = 0
@@ -70,6 +100,8 @@ function cumple(fila: Fila, col: string, expr: string): boolean {
       return String(v) !== valor
     case 'in':
       return valor.replace(/^\(|\)$/g, '').split(',').map((x) => x.replace(/^"|"$/g, '')).includes(String(v))
+    case 'gt':
+      return v != null && big(v) > big(valor)
     case 'gte':
       return v != null && String(v) >= valor
     case 'lt':
@@ -109,23 +141,50 @@ function filtrar(filas: Fila[], params: URLSearchParams): Fila[] {
   return r
 }
 
+// --- Servidor ----------------------------------------------------------------------------------
+export function crearServidor(semillas: Semilla[] = [], extra: Extra = {}): Servidor {
+  let tic = 0
+  const sockets = new Set<Socket>()
+  return {
+    situacionForzada: new Map(semillas.filter((s) => s.situacion).map((s) => [s.tramite.id, s.situacion!])),
+    st: {
+      operaciones: [...new Map(semillas.map((s) => [s.operacion.id, { ...s.operacion }])).values()],
+      tramites: semillas.map((s) => ({ ...s.tramite })),
+      marcas: [],
+      eventos: [],
+      presupuestos: semillas.flatMap((s) =>
+        (s.presupuestos ?? []).map((total, i) => ({ tramite_id: s.tramite.id, version: i + 1, total }))),
+      movimientos: (extra.movimientos ?? []).map((m) => ({ ...m })),
+      conciliaciones: (extra.conciliaciones ?? []).map((c) => ({ ...c })),
+      siguienteEvento: 1,
+    },
+    sockets,
+    siguienteInstante: () => new Date(Date.parse(catalogos.ahora) + ++tic * 1000).toISOString(),
+    // Emite un postgres_changes a cada canal suscripto a la tabla (como el publication supabase_realtime).
+    notificar(tabla) {
+      for (const s of sockets)
+        for (const [topic, canal] of s.canales) {
+          const ids = canal.bindings.filter((b) => b.table === tabla || b.table === '*').map((b) => b.id)
+          if (!ids.length) continue
+          s.enviar([canal.joinRef, null, topic, 'postgres_changes', {
+            ids,
+            data: { schema: 'public', table: tabla, commit_timestamp: catalogos.ahora, type: 'INSERT', columns: [], record: {}, errors: null },
+          }])
+        }
+    },
+  }
+}
+
 // --- Mock --------------------------------------------------------------------------------------
 export async function montarSupabase(page: Page, semillas: Semilla[] = [], opciones: OpcionesMock = {}) {
   const ahora = catalogos.ahora
+  const hoy = ahora.slice(0, 10)
   const yo = opciones.usuario ?? sesion.user.id
+  const rol = nombreDe(catalogos.perfiles, yo)?.rol
   const sesionActiva = { ...sesion, user: { ...sesion.user, id: yo } }
   const rutasPedidas: string[] = []
-  const situacionForzada = new Map(semillas.filter((s) => s.situacion).map((s) => [s.tramite.id, s.situacion!]))
-  const st: Estado = {
-    operaciones: semillas.map((s) => ({ ...s.operacion })),
-    tramites: semillas.map((s) => ({ ...s.tramite })),
-    marcas: [],
-    eventos: [],
-    presupuestos: semillas.flatMap((s) =>
-      (s.presupuestos ?? []).map((total, i) => ({ tramite_id: s.tramite.id, version: i + 1, total }))),
-    pagos: [],
-    siguienteEvento: 1,
-  }
+  const servidor = opciones.servidor ?? crearServidor(semillas)
+  const { st, situacionForzada } = servidor
 
   function registrarEvento(e: Fila) {
     st.eventos.push({ id: st.siguienteEvento++, at: ahora, actor_id: yo, motivo: null, ...e })
@@ -151,31 +210,98 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     }
   }
 
-  // Réplica simplificada de v_tramite_finanzas (sin saldo de cuenta: sin_fondos llega forzado por semilla).
+  function tramite(id: unknown) {
+    return st.tramites.find((t) => t.id === id)
+  }
+
+  const revertido = (m: Fila) => st.movimientos.some((r) => r.revierte_id === m.id)
+
+  // Réplica simplificada de v_tramite_finanzas (sin_fondos llega forzado por semilla). Las filas
+  // traen los alias ::text que piden las consultas y comprometido_cents para filtrar.
   function finanzas(t: Fila): Fila {
     const versiones = st.presupuestos.filter((p) => p.tramite_id === t.id)
     const presupuesto = versiones.length ? String(versiones[versiones.length - 1].total) : null
-    const pagos = st.pagos.filter((p) => p.tramite_id === t.id)
-    const pagado = pagos.reduce((s, p) => s + BigInt(String(p.total)), 0n)
+    const movs = st.movimientos.filter((m) => m.tramite_id === t.id)
+    const pagado = -movs.reduce((s, m) => s + big(m.importe), 0n)
+    const pagoFinal = movs.some((m) => m.es_pago_final && !revertido(m))
     const enCurso = ESTADOS_EN_CURSO.includes(String(t.estado))
+    const comprometido = enCurso && !pagoFinal && presupuesto && big(presupuesto) > pagado ? big(presupuesto) - pagado : 0n
     let situacion = 'no_aplica'
-    if (pagos.some((p) => p.es_final)) situacion = 'pagado'
+    if (pagoFinal) situacion = 'pagado'
     else if (situacionForzada.has(t.id)) situacion = situacionForzada.get(t.id)!
-    else if (enCurso && presupuesto && pagado === 0n) situacion = 'comprometido'
+    else if (comprometido > 0n && pagado <= 0n) situacion = 'comprometido'
     else if (enCurso && !presupuesto) situacion = 'sin_presupuesto'
     else if (enCurso && pagado > 0n) situacion = 'pagado_parcial'
-    return { tramite_id: t.id, presupuesto, pagado: String(pagado), situacion }
+    return {
+      tramite_id: t.id, empresa_id: t.empresa_id, presupuesto, pagado: String(pagado),
+      comprometido: String(comprometido), comprometido_cents: String(comprometido), situacion,
+    }
+  }
+
+  function cuentaDe(empresa: unknown) {
+    return catalogos.cuentas.find((c) => c.empresa_id === empresa)!
+  }
+
+  function saldos(): Fila[] {
+    return catalogos.cuentas.map((c) => {
+      const registrado = big(c.saldo_inicial) +
+        st.movimientos.filter((m) => m.cuenta_id === c.id).reduce((s, m) => s + big(m.importe), 0n)
+      const comprometido = st.tramites.filter((t) => t.empresa_id === c.empresa_id)
+        .reduce((s, t) => s + big(finanzas(t).comprometido), 0n)
+      const ultima = st.conciliaciones.filter((k) => k.cuenta_id === c.id)
+        .sort((a, b) => String(b.fecha_corte).localeCompare(String(a.fecha_corte)))[0]
+      return {
+        cuenta_id: c.id, empresa_id: c.empresa_id, empresa: nombreDe(catalogos.empresas, c.empresa_id)!.nombre,
+        registrado: String(registrado), comprometido: String(comprometido), disponible: String(registrado - comprometido),
+        ultima_conciliacion_fecha: ultima?.fecha_corte ?? null, ultima_diferencia: ultima ? String(ultima.diferencia) : null,
+      }
+    })
+  }
+
+  function extracto(): Fila[] {
+    const orden = [...st.movimientos].sort((a, b) =>
+      String(a.fecha_operacion).localeCompare(String(b.fecha_operacion)) ||
+      String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id)))
+    const acum = new Map<unknown, bigint>()
+    return orden.map((m) => {
+      const c = catalogos.cuentas.find((x) => x.id === m.cuenta_id)!
+      const imp = big(m.importe)
+      const saldo = (acum.get(c.id) ?? big(c.saldo_inicial)) + imp
+      acum.set(c.id, saldo)
+      const t = m.tramite_id ? tramite(m.tramite_id) : undefined
+      return {
+        movimiento_id: m.id, cuenta_id: m.cuenta_id, fecha_operacion: m.fecha_operacion, tipo: m.tipo,
+        tramite_numero: t?.numero ?? null,
+        cliente: t ? nombreDe(st.operaciones, t.operacion_id)!.cliente_nombre : null,
+        responsable: nombreDe(catalogos.perfiles, m.creado_por)!.nombre,
+        ingreso: String(imp > 0n ? imp : 0n), egreso: String(imp < 0n ? -imp : 0n), saldo: String(saldo),
+        conciliado: st.conciliaciones.some((k) => (k.movimientos as string[]).includes(String(m.id))),
+      }
+    })
+  }
+
+  /** Inserta un movimiento (idempotente por idem) y lo publica por Realtime. */
+  function nuevoMovimiento(m: Fila): Fila {
+    const existente = st.movimientos.find((x) => x.idem != null && x.idem === m.idem)
+    if (existente) return existente
+    const n = st.movimientos.length + 1
+    const mov = {
+      id: `00000000-0000-4000-8000-00000000${String(n).padStart(3, '0')}f`, revierte_id: null, tramite_id: null,
+      es_pago_final: false, creado_por: yo, created_at: servidor.siguienteInstante(), ...m,
+    }
+    st.movimientos.push(mov)
+    servidor.notificar('movimientos')
+    return mov
   }
 
   function conceptos(a: Fila): bigint | null {
     const v = [a.p_arancel, a.p_prenda, a.p_sellado, a.p_otros]
     if (v.some((x) => x == null || !/^\d+$/.test(String(x)))) return null
-    return v.reduce<bigint>((s, x) => s + BigInt(String(x)), 0n)
+    return v.reduce<bigint>((s, x) => s + big(x), 0n)
   }
 
-  function tramite(id: unknown) {
-    return st.tramites.find((t) => t.id === id)
-  }
+  const importe = (x: unknown) => (/^-?\d+$/.test(String(x ?? '')) ? big(x) : null)
+  const conMotivo = (a: Fila) => String(a.p_motivo ?? '').trim() !== ''
 
   const rpcs: Record<string, (route: Route, a: Fila) => Promise<void>> = {
     async crear_tramite(route, a) {
@@ -250,7 +376,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       const total = conceptos(a)
       if (total == null || total <= 0n) return errorNegocio(route, 'DATO_INVALIDO: importes inválidos')
       const version = st.presupuestos.filter((p) => p.tramite_id === t.id).length + 1
-      if (version >= 2 && !String(a.p_motivo ?? '').trim())
+      if (version >= 2 && !conMotivo(a))
         return errorNegocio(route, 'DATO_INVALIDO: una nueva versión del presupuesto requiere motivo')
       st.presupuestos.push({ tramite_id: t.id, version, total: String(total) })
       await route.fulfill({ json: version })
@@ -262,9 +388,65 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       const total = conceptos(a)
       if (total == null || total <= 0n) return errorNegocio(route, 'DATO_INVALIDO: importes inválidos')
       if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha del pago es obligatoria')
-      if (!st.pagos.some((p) => p.idem === a.p_idem))
-        st.pagos.push({ idem: a.p_idem, tramite_id: t.id, total: String(total), es_final: a.p_es_final === true, fecha: a.p_fecha })
+      nuevoMovimiento({
+        idem: a.p_idem, cuenta_id: cuentaDe(t.empresa_id).id, tipo: 'pago_tramite', importe: String(-total),
+        fecha_operacion: a.p_fecha, tramite_id: t.id, es_pago_final: a.p_es_final === true,
+      })
       await route.fulfill({ json: a.p_idem })
+    },
+    async registrar_carga(route, a) {
+      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable cargan fondos')
+      const imp = importe(a.p_importe)
+      if (imp == null || imp <= 0n) return errorNegocio(route, 'DATO_INVALIDO: el importe de la carga debe ser mayor a cero')
+      if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha de la carga es obligatoria')
+      const m = nuevoMovimiento({ idem: a.p_idem, cuenta_id: cuentaDe(a.p_empresa).id, tipo: 'carga', importe: String(imp), fecha_operacion: a.p_fecha })
+      await route.fulfill({ json: m.id })
+    },
+    async registrar_ajuste(route, a) {
+      if (rol !== 'gerencia') return errorNegocio(route, 'SIN_PERMISO: solo gerencia con alcance ajusta saldos')
+      const imp = importe(a.p_importe)
+      if (imp == null || imp === 0n) return errorNegocio(route, 'DATO_INVALIDO: el importe del ajuste no puede ser cero')
+      if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha del ajuste es obligatoria')
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: el motivo del ajuste es obligatorio')
+      const m = nuevoMovimiento({ idem: a.p_idem, cuenta_id: cuentaDe(a.p_empresa).id, tipo: 'ajuste', importe: String(imp), fecha_operacion: a.p_fecha })
+      await route.fulfill({ json: m.id })
+    },
+    async revertir_movimiento(route, a) {
+      const previo = st.movimientos.find((x) => x.idem != null && x.idem === a.p_idem)
+      if (previo) return route.fulfill({ json: previo.id })
+      const m = st.movimientos.find((x) => x.id === a.p_movimiento)
+      if (!m) return errorNegocio(route, 'NO_ENCONTRADO: movimiento inexistente')
+      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable')
+      if (m.tipo === 'reversion') return errorNegocio(route, 'DATO_INVALIDO: una reversión no se revierte')
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: el motivo de la reversión es obligatorio')
+      if (revertido(m)) return errorNegocio(route, 'DUPLICADO: el movimiento ya fue revertido')
+      const r = nuevoMovimiento({
+        idem: a.p_idem, cuenta_id: m.cuenta_id, tipo: 'reversion', importe: String(-big(m.importe)),
+        fecha_operacion: hoy, tramite_id: m.tramite_id, revierte_id: m.id,
+      })
+      await route.fulfill({ json: r.id })
+    },
+    async registrar_conciliacion(route, a) {
+      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable')
+      const externo = importe(a.p_saldo_externo)
+      if (!a.p_fecha_corte || externo == null)
+        return errorNegocio(route, 'DATO_INVALIDO: la fecha de corte y el saldo externo son obligatorios')
+      const c = cuentaDe(a.p_empresa)
+      const interno = big(c.saldo_inicial) + st.movimientos
+        .filter((m) => m.cuenta_id === c.id && String(m.fecha_operacion) <= String(a.p_fecha_corte))
+        .reduce((s, m) => s + big(m.importe), 0n)
+      const id = `00000000-0000-4000-8000-0000000c${String(st.conciliaciones.length + 1).padStart(4, '0')}`
+      st.conciliaciones.push({
+        id, cuenta_id: c.id, fecha_corte: a.p_fecha_corte, diferencia: String(externo - interno),
+        movimientos: (a.p_movimientos as string[] | null) ?? [],
+      })
+      await route.fulfill({ json: id })
+    },
+    async aprobar_excepcion_fondos(route, a) {
+      if (rol !== 'gerencia') return errorNegocio(route, 'SIN_PERMISO: solo gerencia aprueba excepciones')
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: el motivo es obligatorio')
+      situacionForzada.delete(a.p_tramite)
+      await route.fulfill({ status: 204, body: '' })
     },
     async reasignar_gestora(route, a) {
       let n = 0
@@ -287,7 +469,9 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     operaciones: () => st.operaciones,
     tramites: () => st.tramites,
     v_tramite_finanzas: () => st.tramites.map(finanzas),
-    movimientos: () => [],
+    movimientos: () => st.movimientos.map(({ id, cuenta_id, revierte_id, created_at }) => ({ id, cuenta_id, revierte_id, created_at })),
+    v_saldos: saldos,
+    v_movimientos_extracto: extracto,
     eventos: () => st.eventos,
   }
 
@@ -295,8 +479,24 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     ([clave, valor]) => window.localStorage.setItem(clave, valor),
     [CLAVE_SESION, JSON.stringify(sesionActiva)] as const,
   )
-  await page.routeWebSocket(/\/realtime\/v1\//, () => {
-    // Acepta la conexión de Realtime sin servidor detrás: los specs no dependen de eventos en vivo.
+  // Realtime mínimo (protocolo Phoenix vsn 2.0.0 en frames de texto [join_ref, ref, topic, event,
+  // payload]): acepta los joins con postgres_changes y reenvía los movimientos que insertan las RPC.
+  await page.routeWebSocket(/\/realtime\/v1\//, (ws) => {
+    const socket: Socket = { enviar: (msg) => ws.send(JSON.stringify(msg)), canales: new Map() }
+    servidor.sockets.add(socket)
+    ws.onClose(() => servidor.sockets.delete(socket))
+    let siguienteId = 1
+    ws.onMessage((raw) => {
+      const [joinRef, ref, topic, event, payload] = JSON.parse(String(raw)) as [unknown, unknown, string, string, Fila]
+      let respuesta: Fila = {}
+      if (event === 'phx_join') {
+        const filtros = (((payload.config as Fila | undefined)?.postgres_changes ?? []) as Fila[])
+          .map((f) => ({ ...f, id: siguienteId++ }))
+        socket.canales.set(topic, { joinRef, bindings: filtros.map((f) => ({ id: f.id, table: String(f.table ?? '*') })) })
+        respuesta = { postgres_changes: filtros }
+      } else if (event === 'phx_leave') socket.canales.delete(topic)
+      socket.enviar([joinRef, ref, topic, 'phx_reply', { status: 'ok', response: respuesta }])
+    })
   })
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const req = route.request()

@@ -1,0 +1,52 @@
+{
+  "operacion": {
+    "id": "00000000-0000-4000-8000-000000000093",
+    "empresa_id": "00000000-0000-4000-8000-0000000000e1",
+    "sucursal_id": "00000000-0000-4000-8000-0000000000d1",
+    "cliente_nombre": "Héctor Ponce",
+    "cuenta_personal": "CP-6001",
+    "oferta_ref": "OF-8100",
+    "referencia_mail": null,
+    "created_at": "2026-10-01T12:00:00.000Z"
+  },
+  "tramite21": {
+    "id": "00000000-0000-4000-8000-0000000000b5",
+    "numero": "T-2026-00021",
+    "operacion_id": "00000000-0000-4000-8000-000000000093",
+    "tipo_id": "00000000-0000-4000-8000-0000000000f1",
+    "empresa_id": "00000000-0000-4000-8000-0000000000e1",
+    "sucursal_id": "00000000-0000-4000-8000-0000000000d1",
+    "estado": "presentado",
+    "vehiculo_desc": "Toyota Hilux SRV",
+    "dominio": "AG100AA",
+    "chasis": null,
+    "gestora_id": "00000000-0000-4000-8000-000000000071",
+    "autorizado_at": "2026-10-05T13:00:00.000Z",
+    "version": 3,
+    "created_at": "2026-10-02T12:00:00.000Z"
+  },
+  "tramite22": {
+    "id": "00000000-0000-4000-8000-0000000000b6",
+    "numero": "T-2026-00022",
+    "operacion_id": "00000000-0000-4000-8000-000000000093",
+    "tipo_id": "00000000-0000-4000-8000-0000000000f2",
+    "empresa_id": "00000000-0000-4000-8000-0000000000e1",
+    "sucursal_id": "00000000-0000-4000-8000-0000000000d1",
+    "estado": "autorizado",
+    "vehiculo_desc": "VW Amarok V6",
+    "dominio": "AB777CC",
+    "chasis": null,
+    "gestora_id": "00000000-0000-4000-8000-000000000071",
+    "autorizado_at": "2026-10-06T13:00:00.000Z",
+    "version": 2,
+    "created_at": "2026-10-02T12:00:00.000Z"
+  },
+  "movimientos": [
+    { "id": "00000000-0000-4000-8000-000000000a01", "cuenta_id": "00000000-0000-4000-8000-0000000000c0", "tipo": "carga", "importe": "200000000", "fecha_operacion": "2026-10-01", "tramite_id": null, "revierte_id": null, "es_pago_final": false, "creado_por": "00000000-0000-4000-8000-0000000000c1", "created_at": "2026-10-01T15:00:00.000Z" },
+    { "id": "00000000-0000-4000-8000-000000000a02", "cuenta_id": "00000000-0000-4000-8000-0000000000c0", "tipo": "pago_tramite", "importe": "-45000000", "fecha_operacion": "2026-10-10", "tramite_id": "00000000-0000-4000-8000-0000000000b5", "revierte_id": null, "es_pago_final": false, "creado_por": "00000000-0000-4000-8000-000000000071", "created_at": "2026-10-10T15:00:00.000Z" },
+    { "id": "00000000-0000-4000-8000-000000000a03", "cuenta_id": "00000000-0000-4000-8000-0000000000c0", "tipo": "pago_tramite", "importe": "-30000000", "fecha_operacion": "2026-10-12", "tramite_id": "00000000-0000-4000-8000-0000000000b6", "revierte_id": null, "es_pago_final": false, "creado_por": "00000000-0000-4000-8000-000000000071", "created_at": "2026-10-12T15:00:00.000Z" }
+  ],
+  "conciliaciones": [
+    { "id": "00000000-0000-4000-8000-000000000c51", "cuenta_id": "00000000-0000-4000-8000-0000000000c0", "fecha_corte": "2026-10-25", "diferencia": "0", "movimientos": ["00000000-0000-4000-8000-000000000a01"] }
+  ]
+}

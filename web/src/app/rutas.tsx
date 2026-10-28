@@ -7,8 +7,15 @@ import { navegacionPorRol } from './navegacion'
 import { pantallaPara } from '../lib/perfil'
 import { Tramites } from '../pages/Tramites'
 import { MisTramites } from '../pages/MisTramites'
+import { Habitualista } from '../pages/Habitualista'
+import { Tablero } from '../pages/Tablero'
 
-const PANTALLAS: Record<string, ComponentType> = { '/tramites': Tramites, '/mis-tramites': MisTramites }
+const PANTALLAS: Record<string, ComponentType> = {
+  '/tramites': Tramites,
+  '/mis-tramites': MisTramites,
+  '/habitualista': Habitualista,
+  '/tablero': Tablero,
+}
 
 // Las pantallas reales llegan en las tareas siguientes.
 function Pendiente({ titulo }: { titulo: string }) {
