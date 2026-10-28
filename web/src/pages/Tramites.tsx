@@ -4,7 +4,9 @@ import { useSearchParams } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { cargarCatalogos, LIMITE, listarTramites } from '../features/tramites/consultas'
 import { Button, Cargando, EmptyState, ErrorState, PageHeader } from '../ui'
-import { IconoMas } from '../ui/Iconos'
+import { IconoDescarga, IconoMas } from '../ui/Iconos'
+import { descargarTexto, nombreArchivo, tramitesACsv } from '../features/tramites/exportar'
+import { hoyEnBuenosAires } from '../features/tramites/filtros'
 import { filtrosAURL, filtrosDesdeURL, type FiltrosTramites as Filtros } from '../features/tramites/filtros'
 import { FiltrosTramites } from '../features/tramites/FiltrosTramites'
 import { FormAlta } from '../features/tramites/FormAlta'
@@ -77,9 +79,20 @@ export function Tramites() {
             </span>
           }
           acciones={
-            <Button icono={<IconoMas className="size-[18px]" />} disabled={!catalogos.data} onClick={() => setAltaAbierta(true)}>
-              Nuevo trámite
-            </Button>
+            <>
+              <Button
+                variante="secundario"
+                icono={<IconoDescarga className="size-[18px]" />}
+                disabled={!lista.data?.length}
+                title="Descarga los trámites visibles, con los filtros aplicados, para abrir en Excel"
+                onClick={() => lista.data && descargarTexto(nombreArchivo(hoyEnBuenosAires()), tramitesACsv(lista.data, nombre))}
+              >
+                Exportar a Excel
+              </Button>
+              <Button icono={<IconoMas className="size-[18px]" />} disabled={!catalogos.data} onClick={() => setAltaAbierta(true)}>
+                Nuevo trámite
+              </Button>
+            </>
           }
         />
         <FiltrosTramites filtros={filtros} catalogos={catalogos.data} onCambiar={cambiarFiltros} />

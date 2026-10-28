@@ -70,6 +70,8 @@ export interface OpcionesMock {
    * Sin alcances, el perfil ve todo (specs que no prueban permisos).
    */
   alcances?: { empresa_id: string; sucursal_id: string | null }[]
+  /** Filas de public.alcances de todos los perfiles (pantalla de Usuarios). */
+  tablaAlcances?: { perfil_id: string; empresa_id: string; sucursal_id: string | null }[]
   /**
    * Fuente fija de v_saldos (salida real de la base, p. ej. fixtures/escenario-saldos.json). Recibe el
    * estado y devuelve las filas, o undefined si el estado no tiene salida registrada: en ese caso la
@@ -494,6 +496,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
 
   const tablas: Record<string, () => Fila[]> = {
     perfiles: () => catalogos.perfiles,
+    alcances: () => opciones.tablaAlcances ?? [],
     empresas: () => catalogos.empresas,
     sucursales: () => catalogos.sucursales,
     tipos_tramite: () => catalogos.tipos_tramite,

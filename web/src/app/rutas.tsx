@@ -9,6 +9,7 @@ import { Tramites } from '../pages/Tramites'
 import { MisTramites } from '../pages/MisTramites'
 import { Habitualista } from '../pages/Habitualista'
 import { Tablero } from '../pages/Tablero'
+import { Usuarios } from '../pages/Usuarios'
 import { Button, PaginaPendiente, PantallaCarga, PantallaMensaje } from '../ui'
 
 const PANTALLAS: Record<string, ComponentType> = {
@@ -16,6 +17,7 @@ const PANTALLAS: Record<string, ComponentType> = {
   '/mis-tramites': MisTramites,
   '/habitualista': Habitualista,
   '/tablero': Tablero,
+  '/usuarios': Usuarios,
 }
 
 function Pendiente({ titulo }: { titulo: string }) {

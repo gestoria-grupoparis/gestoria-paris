@@ -27,3 +27,5 @@ export const IconoDoc = (p: P) => <Base {...p}><path d="M7 3.5h7l4 4V20a.5.5 0 0
 export const IconoFlecha = (p: P) => <Base {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Base>
 export const IconoChevron = (p: P) => <Base {...p}><path d="m9 6 6 6-6 6" /></Base>
 export const IconoProhibido = (p: P) => <Base {...p}><circle cx="12" cy="12" r="8.5" /><path d="m6 6 12 12" /></Base>
+export const IconoDescarga = (p: P) => <Base {...p}><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14" /></Base>
+export const IconoEscudo = (p: P) => <Base {...p}><path d="M12 3.5 19 6v5.5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z" /><path d="m9 12 2 2 4-4" /></Base>
