@@ -56,7 +56,7 @@ export function Login({ aviso }: { aviso?: string } = {}) {
             ))}
           </ul>
         </div>
-        <p className="relative z-10 text-[12px] text-superficie/45">Uso interno · acceso solo con usuario asignado por gerencia</p>
+        <p className="relative z-10 text-[12px] text-superficie/70">Uso interno · acceso solo con usuario asignado por gerencia</p>
         <span aria-hidden className="pointer-events-none absolute -right-32 -bottom-32 size-[28rem] rounded-full border-[48px] border-marca/50" />
         <span aria-hidden className="pointer-events-none absolute right-24 bottom-40 size-24 rounded-full border-[14px] border-laton/25" />
       </section>
@@ -84,7 +84,7 @@ export function Login({ aviso }: { aviso?: string } = {}) {
               extra={
                 <button type="button" onClick={() => setVer((v) => !v)} aria-pressed={ver}
                   aria-label={ver ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  className="-my-2 rounded px-1 py-2 text-[13px] font-semibold text-marca hover:underline">
+                  className="-my-3 min-h-11 min-w-11 rounded px-2 py-3 text-[13px] font-semibold text-marca hover:underline">
                   {ver ? 'Ocultar' : 'Mostrar'}
                 </button>
               }
