@@ -5,17 +5,16 @@ import honda from './marcas/honda.svg?raw'
 import jetour from './marcas/jetour.svg?raw'
 import dfsk from './marcas/dfsk.svg?raw'
 import kyc from './marcas/kyc.svg?raw'
-import { cx } from '../cx'
 
-/** Las 7 marcas que trabaja Grupo Paris. `alto` iguala el peso visual (emblemas vs. wordmarks). */
+/** Las 7 marcas que trabaja Grupo Paris. todas en la misma caja (alto y ancho fijos) para que pesen igual. */
 export const MARCAS_OFICIALES = [
-  { nombre: 'Peugeot', svg: peugeot, alto: 'h-7' },
-  { nombre: 'Citroën', svg: citroen, alto: 'h-7' },
-  { nombre: 'Chevrolet', svg: chevrolet, alto: 'h-7' },
-  { nombre: 'Honda Motos', svg: honda, alto: 'h-7' },
-  { nombre: 'Jetour', svg: jetour, alto: 'h-[15px]' },
-  { nombre: 'DFSK', svg: dfsk, alto: 'h-6' },
-  { nombre: 'KYC', svg: kyc, alto: 'h-6' },
+  { nombre: 'Peugeot', svg: peugeot },
+  { nombre: 'Citroën', svg: citroen },
+  { nombre: 'Chevrolet', svg: chevrolet },
+  { nombre: 'Honda Motos', svg: honda },
+  { nombre: 'Jetour', svg: jetour },
+  { nombre: 'DFSK', svg: dfsk },
+  { nombre: 'KYC', svg: kyc },
 ] as const
 
 const sinTitulo = (svg: string) => svg.replace(/<title>.*?<\/title>/s, '')
@@ -24,7 +23,7 @@ function Pista() {
   return (
     <ul className="flex shrink-0 items-center">
       {MARCAS_OFICIALES.map((m) => (
-        <li key={m.nombre} className={cx('marquee-logo mx-10 shrink-0 md:mx-14', m.alto)} dangerouslySetInnerHTML={{ __html: sinTitulo(m.svg) }} />
+        <li key={m.nombre} className={'marquee-logo mx-8 flex h-11 w-28 shrink-0 items-center justify-center md:mx-12 md:h-12 md:w-32'} dangerouslySetInnerHTML={{ __html: sinTitulo(m.svg) }} />
       ))}
     </ul>
   )
@@ -42,7 +41,7 @@ export function MarqueeMarcas({ className }: { className?: string }) {
       <ul className="sr-only">
         {MARCAS_OFICIALES.map((m) => <li key={m.nombre}>{m.nombre}</li>)}
       </ul>
-      <div aria-hidden className="marquee overflow-hidden text-white/55">
+      <div aria-hidden className="marquee overflow-hidden text-white/75">
         <div className="marquee-pista">
           <Pista />
           <Pista />

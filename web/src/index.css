@@ -100,7 +100,7 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; font-wei
 }
 .marquee-pista { display: flex; width: max-content; animation: marquee 50s linear infinite; will-change: transform; }
 .marquee:hover .marquee-pista { animation-play-state: paused; }
-.marquee-logo svg { height: 100%; width: auto; display: block; }
+.marquee-logo svg { max-height: 100%; max-width: 100%; height: 100%; width: auto; display: block; }
 
 @media (prefers-reduced-motion: reduce) {
   .esqueleto, .marquee-pista { animation: none; }

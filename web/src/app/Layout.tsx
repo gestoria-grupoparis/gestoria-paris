@@ -61,7 +61,7 @@ export function Layout() {
     <div className="min-h-dvh md:flex">
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-noche text-white md:flex">
         <div className="px-5 pt-6 pb-8">
-          <LogoGrupoParis tono="claro" className="h-7 w-auto" />
+          <LogoGrupoParis className="h-14" />
         </div>
         <p className="rotulo-marca px-6 pb-3 text-[9px] text-white/35">Menú</p>
         <nav aria-label="Principal" className="flex flex-1 flex-col gap-1 px-3">
@@ -106,7 +106,7 @@ export function Layout() {
 
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-linea bg-superficie/90 px-4 backdrop-blur-md md:hidden">
-          <LogoGrupoParis className="h-7 w-auto" />
+          <LogoGrupoParis className="h-10" />
           <button
             type="button"
             aria-label="Tu cuenta"
