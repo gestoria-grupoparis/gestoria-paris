@@ -3,3 +3,4 @@ node_modules/
 .pgtest/
 .env*
 web/dist/
+supabase/.temp/
