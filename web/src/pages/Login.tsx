@@ -70,12 +70,12 @@ export function Login({ aviso }: { aviso?: string } = {}) {
 
       <header className="flex items-center justify-between px-5 pt-6 md:px-10 md:pt-8">
         <LogoGrupoParis tono="claro" className="h-9 w-auto md:h-11" />
-        <span className="rotulo-marca hidden text-white/45 sm:inline">Gestoría interna</span>
+        <span className="rotulo-marca hidden text-white/60 sm:inline">Gestoría interna</span>
       </header>
 
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <form onSubmit={ingresar} className="w-full max-w-[380px]">
-          <p className="rotulo-marca mb-4 text-white/50">Acceso</p>
+          <p className="rotulo-marca mb-4 text-white/60">Acceso</p>
           <h1 className="font-marca text-[22px] leading-[1.25] font-normal tracking-[0.02em] text-white md:text-[26px]">Ingresá a tu cuenta</h1>
           <p className="mt-3 mb-9 text-[14px] leading-relaxed text-tenue">Usá el email y la contraseña que te dio gerencia.</p>
 
@@ -131,7 +131,7 @@ export function Login({ aviso }: { aviso?: string } = {}) {
         <div ref={frente} className="will-change-transform">
           <MarqueeMarcas />
         </div>
-        <p className="mt-7 text-center text-[12px] text-white/40">Uso interno · acceso solo con usuario asignado por gerencia</p>
+        <p className="mt-7 text-center text-[12px] text-white/60">Uso interno · acceso solo con usuario asignado por gerencia</p>
       </footer>
     </div>
   )
