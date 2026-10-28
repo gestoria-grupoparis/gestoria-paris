@@ -1,9 +1,9 @@
 import { NavLink, Outlet } from 'react-router'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSesion, type Rol } from '../lib/sesion'
 import { navegacionPorRol } from './navegacion'
-import { Wordmark, cx } from '../ui'
+import { Button, Wordmark, cx } from '../ui'
 
 const ROL_ETIQUETA: Record<Rol, string> = {
   gerencia: 'Gerencia',
@@ -32,15 +32,37 @@ function iniciales(nombre?: string) {
   return (nombre ?? '?').split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('')
 }
 
+const EMPRESA = 'Grupo Paris'
+
+function IconoSalir({ className = 'size-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />
+    </svg>
+  )
+}
+
 export function Layout() {
   const { perfil, rol } = useSesion()
   const items = navegacionPorRol(rol)
+  const [cuenta, setCuenta] = useState(false)
+  const rolTexto = rol ? ROL_ETIQUETA[rol] : ''
+  const salir = () => void supabase.auth.signOut()
+
+  useEffect(() => {
+    if (!cuenta) return
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && setCuenta(false)
+    window.addEventListener('keydown', f)
+    return () => window.removeEventListener('keydown', f)
+  }, [cuenta])
+
   return (
     <div className="min-h-dvh md:flex">
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-noche text-superficie md:flex">
-        <div className="px-5 pt-6 pb-8">
+        <div className="px-5 pt-6 pb-7">
           <Wordmark tono="claro" />
         </div>
+        <p className="px-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-superficie/40">Menú</p>
         <nav aria-label="Principal" className="flex flex-1 flex-col gap-1 px-3">
           {items.map((i) => (
             <NavLink
@@ -48,7 +70,7 @@ export function Layout() {
               to={i.ruta}
               className={({ isActive }) =>
                 cx(
-                  'flex h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium transition-colors',
+                  'flex h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium transition-colors focus-visible:outline-laton',
                   isActive ? 'bg-superficie/10 text-superficie shadow-[inset_3px_0_0_var(--color-laton)]' : 'text-superficie/65 hover:bg-superficie/5 hover:text-superficie',
                 )
               }
@@ -58,34 +80,80 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="m-3 flex items-center gap-3 rounded-lg bg-superficie/5 p-3">
-          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-laton font-display text-sm font-bold text-noche">
-            {iniciales(perfil?.nombre)}
-          </span>
-          <div className="min-w-0 flex-1 text-sm leading-tight">
-            <div className="truncate font-semibold">{perfil?.nombre}</div>
-            <div className="text-[12px] text-superficie/55">{rol ? ROL_ETIQUETA[rol] : ''}</div>
+        <div className="m-3 rounded-xl bg-superficie/[0.06] p-3 ring-1 ring-superficie/10">
+          <div className="flex items-center gap-3">
+            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-laton font-display text-sm font-bold text-noche">
+              {iniciales(perfil?.nombre)}
+            </span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="truncate text-sm font-semibold">{perfil?.nombre}</div>
+              <div className="mt-0.5 truncate text-[12px] text-superficie/60">
+                {rolTexto} · {EMPRESA}
+              </div>
+            </div>
           </div>
           <button
-            className="rounded px-1.5 py-1 text-[12px] font-semibold text-superficie/70 hover:text-superficie"
-            onClick={() => supabase.auth.signOut()}
+            type="button"
+            className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-md text-[13px] font-semibold text-superficie/75 ring-1 ring-superficie/15 hover:bg-superficie/5 hover:text-superficie focus-visible:outline-laton"
+            onClick={salir}
           >
+            <IconoSalir className="size-4" />
             Cerrar sesión
           </button>
         </div>
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="flex h-14 items-center justify-between border-b border-linea bg-superficie px-4 md:hidden">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-linea bg-superficie/95 px-4 backdrop-blur md:hidden">
           <Wordmark />
-          <span aria-hidden className="grid size-9 place-items-center rounded-full bg-marca font-display text-sm font-bold text-superficie">
-            {iniciales(perfil?.nombre)}
-          </span>
+          <button
+            type="button"
+            aria-label="Tu cuenta"
+            aria-expanded={cuenta}
+            aria-haspopup="dialog"
+            onClick={() => setCuenta(true)}
+            className="grid size-11 place-items-center rounded-full"
+          >
+            <span aria-hidden className="grid size-9 place-items-center rounded-full bg-marca font-display text-sm font-bold text-superficie">
+              {iniciales(perfil?.nombre)}
+            </span>
+          </button>
         </header>
         <main className="min-w-0 pb-24 md:pb-0">
           <Outlet />
         </main>
       </div>
+
+      {cuenta && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button type="button" aria-label="Cerrar" tabIndex={-1} className="absolute inset-0 bg-noche/50" onClick={() => setCuenta(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Tu cuenta"
+            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-superficie px-5 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-flotante"
+          >
+            <span aria-hidden className="mx-auto mb-5 block h-1 w-10 rounded-full bg-linea-fuerte" />
+            <div className="flex items-center gap-4">
+              <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-full bg-marca font-display text-lg font-bold text-superficie">
+                {iniciales(perfil?.nombre)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-display text-xl font-bold">{perfil?.nombre}</p>
+                <p className="text-sm text-tenue">{rolTexto} · {EMPRESA}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col gap-2.5">
+              <Button variante="secundario" tamano="lg" ancho icono={<IconoSalir />} onClick={salir}>
+                Cerrar sesión
+              </Button>
+              <Button variante="fantasma" tamano="lg" ancho onClick={() => setCuenta(false)} autoFocus>
+                Volver
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav
         aria-label="Principal móvil"
@@ -96,19 +164,16 @@ export function Layout() {
             key={i.ruta}
             to={i.ruta}
             className={({ isActive }) =>
-              cx('flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[12px] font-semibold', isActive ? 'text-marca' : 'text-tenue')
+              cx(
+                'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[12px] font-semibold',
+                isActive ? 'text-marca after:absolute after:top-0 after:h-[3px] after:w-8 after:rounded-b after:bg-marca' : 'text-tenue',
+              )
             }
           >
             <Icono ruta={i.ruta} />
             {i.etiqueta}
           </NavLink>
         ))}
-        <button className="flex min-h-14 flex-col items-center justify-center gap-0.5 px-4 text-[12px] font-semibold text-tenue" onClick={() => supabase.auth.signOut()}>
-          <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />
-          </svg>
-          Salir
-        </button>
       </nav>
     </div>
   )
