@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:db": "vitest run tests/db"
+    "test:db": "vitest run tests/db",
+    "test:web": "npm --prefix web test"
   },
   "keywords": [],
   "author": "",

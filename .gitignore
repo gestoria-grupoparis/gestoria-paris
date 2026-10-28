@@ -2,5 +2,6 @@
 node_modules/
 .pgtest/
 .env*
+!.env.example
 web/dist/
 supabase/.temp/

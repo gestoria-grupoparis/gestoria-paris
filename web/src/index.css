@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --color-fondo: #f3f5f7;
+  --color-tinta: #1a2430;
+  --color-tenue: #5b6b7b;
+  --color-linea: #d5dce3;
+  --color-marca: #0f5e7a;
+  --color-alerta: #b42318;
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+  font-variant-numeric: tabular-nums;
+}
