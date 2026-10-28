@@ -500,7 +500,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     operaciones: () => st.operaciones,
     tramites: () => st.tramites.filter(veTramite),
     v_tramite_finanzas: () => st.tramites.filter(veTramite).map(finanzas),
-    movimientos: () => st.movimientos.map(({ id, cuenta_id, revierte_id, created_at }) => ({ id, cuenta_id, revierte_id, created_at })),
+    movimientos: () => st.movimientos.map(({ id, cuenta_id, revierte_id, created_at, fecha_operacion, tipo }) => ({ id, cuenta_id, revierte_id, created_at, fecha_operacion, tipo })),
     v_saldos: () => {
       if (rol !== 'gerencia' && rol !== 'contable') return []
       const filas = opciones.saldosFijos ? opciones.saldosFijos(st) : saldos()
@@ -578,6 +578,10 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
         return 0
       })
     }
+    // .range() de supabase-js viaja como offset/limit.
+    const offset = Number(url.searchParams.get('offset') ?? 0)
+    const limit = url.searchParams.get('limit')
+    if (offset || limit) filas = filas.slice(offset, limit ? offset + Number(limit) : undefined)
     if ((req.headers()['accept'] ?? '').includes('vnd.pgrst.object')) {
       if (filas.length !== 1) return route.fulfill({ status: 406, json: { code: 'PGRST116', message: 'no rows' } })
       return route.fulfill({ json: filas[0] })

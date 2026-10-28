@@ -18,6 +18,7 @@ export function KpiTile({
   detalle,
   tono = 'neutro',
   icono,
+  grande,
   className,
 }: {
   rotulo: string
@@ -25,6 +26,8 @@ export function KpiTile({
   detalle?: ReactNode
   tono?: TonoKpi
   icono?: ReactNode
+  /** Cifra protagonista (p. ej. el disponible). */
+  grande?: boolean
   className?: string
 }) {
   const oscuro = tono === 'destacado'
@@ -34,7 +37,7 @@ export function KpiTile({
         <span className={cx('text-[11px] font-semibold uppercase tracking-[0.08em]', oscuro ? 'text-laton' : 'text-tenue')}>{rotulo}</span>
         {icono && <span aria-hidden className="opacity-70">{icono}</span>}
       </div>
-      <span className="cifra font-display text-[28px] font-bold leading-none tracking-tight">{valor}</span>
+      <span className={cx('cifra font-display font-bold leading-none tracking-tight whitespace-nowrap', grande ? 'text-[34px] md:text-[48px]' : 'text-[24px] xl:text-[28px]')}>{valor}</span>
       {detalle && <span className={cx('text-[13px]', oscuro ? 'text-superficie/75' : 'text-tenue')}>{detalle}</span>}
     </div>
   )

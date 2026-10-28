@@ -61,36 +61,79 @@ export async function listarSaldos(): Promise<Saldo[]> {
 }
 
 type FilaExtracto = Omit<Movimiento, 'revierte' | 'revertidoPor'>
+type Vinculado = Pick<Movimiento, 'movimiento_id' | 'tipo' | 'fecha_operacion'>
+type FilaMov = { id: string; revierte_id: string | null; created_at: string; fecha_operacion: string; tipo: string }
 
-/** Extracto de la cuenta, más reciente primero, con las reversiones ligadas a su original. */
-export async function listarExtracto(cuenta: string): Promise<Movimiento[]> {
-  const [ext, movs] = await Promise.all([
-    supabase
-      .from('v_movimientos_extracto')
-      .select(
-        'movimiento_id,fecha_operacion,tipo,tramite_numero,cliente,responsable,ingreso:ingreso_cents::text,' +
-          'egreso:egreso_cents::text,saldo:saldo_resultante_cents::text,conciliado',
-      )
-      .eq('cuenta_id', cuenta),
-    supabase.from('movimientos').select('id,revierte_id,created_at').eq('cuenta_id', cuenta),
-  ])
-  if (ext.error) throw ext.error
+/** Movimientos por página del extracto. */
+export const POR_PAGINA = 25
+
+const COLUMNAS_EXTRACTO =
+  'movimiento_id,fecha_operacion,tipo,tramite_numero,cliente,responsable,ingreso:ingreso_cents::text,' +
+  'egreso:egreso_cents::text,saldo:saldo_resultante_cents::text,conciliado'
+const COLUMNAS_MOV = 'id,revierte_id,created_at,fecha_operacion,tipo'
+const vinculado = (m: FilaMov): Movimiento =>
+  ({ movimiento_id: m.id, tipo: m.tipo, fecha_operacion: m.fecha_operacion } satisfies Vinculado) as Movimiento
+
+export interface PaginaExtracto {
+  filas: Movimiento[]
+  hayMas: boolean
+}
+
+/**
+ * Una página del extracto, más reciente primero, con las reversiones ligadas a su original
+ * aunque la contraparte esté en otra página. Se pagina con .range() sobre movimientos, en el
+ * mismo orden que el saldo acumulado de la vista (fecha_operacion, created_at, id) invertido.
+ */
+export async function listarExtracto(cuenta: string, pagina = 0): Promise<PaginaExtracto> {
+  const desde = pagina * POR_PAGINA
+  const movs = await supabase
+    .from('movimientos')
+    .select(COLUMNAS_MOV)
+    .eq('cuenta_id', cuenta)
+    .order('fecha_operacion', { ascending: false })
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .range(desde, desde + POR_PAGINA) // una fila de más para saber si hay otra página
   if (movs.error) throw movs.error
-  const filas = (ext.data ?? []) as unknown as FilaExtracto[]
-  const datos = (movs.data ?? []) as { id: string; revierte_id: string | null; created_at: string }[]
-  const creado = new Map(datos.map((m) => [m.id, m.created_at]))
-  const porId = new Map(filas.map((f) => [f.movimiento_id, { ...f, revierte: null, revertidoPor: null } as Movimiento]))
-  for (const { id, revierte_id } of datos) {
-    const reversion = porId.get(id)
-    const original = revierte_id ? porId.get(revierte_id) : undefined
-    if (reversion && original) {
-      reversion.revierte = original
-      original.revertidoPor = reversion
-    }
+  const todos = (movs.data ?? []) as unknown as FilaMov[]
+  const pag = todos.slice(0, POR_PAGINA)
+  if (!pag.length) return { filas: [], hayMas: false }
+  const ids = pag.map((m) => m.id)
+  const revertidos = [...new Set(pag.map((m) => m.revierte_id).filter((x): x is string => !!x))]
+  const [ext, reversiones, originales] = await Promise.all([
+    supabase.from('v_movimientos_extracto').select(COLUMNAS_EXTRACTO).eq('cuenta_id', cuenta).in('movimiento_id', ids),
+    supabase.from('movimientos').select(COLUMNAS_MOV).in('revierte_id', ids),
+    revertidos.length
+      ? supabase.from('movimientos').select(COLUMNAS_MOV).in('id', revertidos)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  for (const r of [ext, reversiones, originales]) if (r.error) throw r.error
+  const porId = new Map(
+    ((ext.data ?? []) as unknown as FilaExtracto[]).map((f) => [f.movimiento_id, { ...f, revierte: null, revertidoPor: null } as Movimiento]),
+  )
+  const orig = new Map(((originales.data ?? []) as unknown as FilaMov[]).map((m) => [m.id, m]))
+  for (const m of pag) {
+    const fila = porId.get(m.id)
+    const o = m.revierte_id ? orig.get(m.revierte_id) : undefined
+    if (fila && o) fila.revierte = vinculado(o)
   }
-  // Mismo orden que el saldo acumulado de la vista (fecha_operacion, created_at, id), invertido.
-  const clave = (m: Movimiento) => `${m.fecha_operacion}|${creado.get(m.movimiento_id) ?? ''}|${m.movimiento_id}`
-  return [...porId.values()].sort((a, b) => clave(b).localeCompare(clave(a)))
+  for (const r of (reversiones.data ?? []) as unknown as FilaMov[]) {
+    const fila = r.revierte_id ? porId.get(r.revierte_id) : undefined
+    if (fila) fila.revertidoPor = vinculado(r)
+  }
+  return { filas: ids.map((id) => porId.get(id)).filter((m): m is Movimiento => !!m), hayMas: todos.length > POR_PAGINA }
+}
+
+/** Movimientos sin conciliar de la cuenta (todas las páginas), para el formulario de conciliación. */
+export async function listarPendientes(cuenta: string): Promise<Movimiento[]> {
+  const { data, error } = await supabase
+    .from('v_movimientos_extracto')
+    .select(COLUMNAS_EXTRACTO)
+    .eq('cuenta_id', cuenta)
+    .eq('conciliado', false)
+    .order('fecha_operacion', { ascending: false })
+  if (error) throw error
+  return ((data ?? []) as unknown as FilaExtracto[]).map((f) => ({ ...f, revierte: null, revertidoPor: null }))
 }
 
 /** Trámites de la razón social que componen el comprometido. */

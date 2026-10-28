@@ -107,11 +107,41 @@ test('tablero muestra saldos por razón social, contadores y trámites que requi
   await page.clock.setFixedTime(catalogos.ahora)
   await montarSupabase(page, [], { usuario: GERENTE, servidor: servidorHabitualista() })
   await page.goto('/tablero')
-  const autos = page.getByRole('row', { name: /Paris Autos/ })
+  const autos = page.getByRole('article', { name: 'Paris Autos' })
   await expect(autos.getByTestId('disponible')).toHaveText('$ 800.000,00')
   await expect(autos.getByTestId('recarga')).toHaveText('$ 0,00')
   await expect(page.getByRole('list', { name: 'Requieren intervención' })).toContainText('T-2026-00022')
   await expect(page.getByRole('list', { name: 'Requieren intervención' })).not.toContainText('T-2026-00021')
   await page.getByRole('link', { name: /Presentado 1/ }).click()
   await expect(page).toHaveURL(/\/tramites\?estado=presentado$/)
+})
+
+test('el extracto se pagina de a 25 y la reversión se liga aunque el original quede en otra página', async ({ page }) => {
+  const cuenta = h.movimientos[0].cuenta_id
+  const extra = Array.from({ length: 30 }, (_, i) => ({
+    id: `00000000-0000-4000-8000-000000000${String(100 + i)}`,
+    cuenta_id: cuenta, tipo: 'carga', importe: '100000', fecha_operacion: `2026-10-${String(15 + Math.floor(i / 3)).padStart(2, '0')}`,
+    tramite_id: null, revierte_id: null, es_pago_final: false, creado_por: CONTABLE,
+    created_at: `2026-10-20T1${i % 10}:00:00.000Z`,
+  }))
+  const servidor = crearServidor(
+    [{ operacion: h.operacion, tramite: h.tramite21, presupuestos: ['70000000'] }],
+    {
+      movimientos: [
+        ...h.movimientos,
+        ...extra,
+        { ...extra[0], id: '00000000-0000-4000-8000-000000000199', tipo: 'reversion', importe: '-100000',
+          fecha_operacion: '2026-10-27', revierte_id: h.movimientos[0].id, created_at: '2026-10-27T12:00:00.000Z' },
+      ],
+      conciliaciones: h.conciliaciones,
+    },
+  )
+  await abrir(page, servidor, CONTABLE)
+  const tabla = page.getByRole('table', { name: 'Movimientos' })
+  await expect(tabla.getByRole('row')).toHaveCount(26)
+  await expect(filaDe(page, 'Reversión').getByTestId('vinculo')).toHaveText('Revierte la carga del 01/10/2026')
+  await expect(page.getByRole('button', { name: 'Más recientes' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Anteriores' }).click()
+  await expect(filaDe(page, '01/10/2026').getByTestId('vinculo')).toHaveText('Revertido el 27/10/2026')
+  await expect(page.getByRole('button', { name: 'Anteriores' })).toBeDisabled()
 })

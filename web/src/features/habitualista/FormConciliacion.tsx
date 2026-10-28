@@ -8,9 +8,11 @@ import { registrarConciliacion, TIPOS_MOVIMIENTO, type Movimiento } from './cons
 import { fechaOperativa } from './saldos'
 
 /** Conciliación simple: saldo que muestra la Habitualista a una fecha y movimientos verificados. */
-export function FormConciliacion({ empresa, pendientes, onCerrar, onGuardado }: {
+export function FormConciliacion({ empresa, pendientes, cargando = false, onCerrar, onGuardado }: {
   empresa: { id: string; nombre: string }
   pendientes: Movimiento[]
+  /** Mientras se traen los pendientes (de todas las páginas del extracto). */
+  cargando?: boolean
   onCerrar: () => void
   onGuardado: () => void
 }) {
@@ -55,9 +57,12 @@ export function FormConciliacion({ empresa, pendientes, onCerrar, onGuardado }: 
   }
 
   return (
-    <Dialogo titulo="Conciliar" onCerrar={onCerrar}>
-      <form onSubmit={enviar} className="space-y-3">
-        <div className="grid grid-cols-2 gap-2">
+    <Dialogo titulo="Conciliar" rotulo={empresa.nombre} onCerrar={onCerrar} ancho="md:max-w-2xl">
+      <form onSubmit={enviar} className="space-y-4">
+        <p className="text-sm text-tenue">
+          Abrí el extracto de la Habitualista, anotá el saldo que muestra a la fecha de corte y tildá los movimientos que ya figuran ahí.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className={CLASE_ETIQUETA}>
             Fecha de corte
             <input type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} className={CLASE_CAMPO} />
@@ -69,30 +74,33 @@ export function FormConciliacion({ empresa, pendientes, onCerrar, onGuardado }: 
         </div>
         <fieldset>
           <legend className={CLASE_ETIQUETA}>Movimientos pendientes que figuran en el extracto de {empresa.nombre}</legend>
-          {candidatos.length ? (
-            <ul className="mt-1 max-h-48 overflow-y-auto border border-linea text-sm">
+          {cargando ? (
+            <p role="status" className="mt-2 text-sm text-tenue">Buscando movimientos pendientes…</p>
+          ) : candidatos.length ? (
+            <ul className="mt-2 max-h-64 overflow-y-auto rounded-md bg-superficie text-sm ring-1 ring-linea">
               {candidatos.map((m) => (
                 <li key={m.movimiento_id} className="border-b border-linea last:border-0">
-                  <label className="flex items-center gap-2 px-2 py-1">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-marca-suave/50">
                     <input type="checkbox" checked={marcados.has(m.movimiento_id)}
-                      onChange={() => alternar(m.movimiento_id)} className="accent-marca" />
-                    <span className="flex-1">
-                      {fechaOperativa(m.fecha_operacion)} {TIPOS_MOVIMIENTO[m.tipo] ?? m.tipo} {m.tramite_numero ?? ''}
+                      onChange={() => alternar(m.movimiento_id)} className="size-4 accent-marca" />
+                    <span className="cifra w-20 text-tenue">{fechaOperativa(m.fecha_operacion)}</span>
+                    <span className="flex-1 font-medium">
+                      {TIPOS_MOVIMIENTO[m.tipo] ?? m.tipo} {m.tramite_numero ?? ''}
                     </span>
-                    <span>{m.ingreso !== '0' ? formatearPesos(m.ingreso) : `-${formatearPesos(m.egreso)}`}</span>
+                    <span className={`cifra font-semibold ${m.ingreso !== '0' ? 'text-disponible' : ''}`}>{m.ingreso !== '0' ? formatearPesos(m.ingreso) : `-${formatearPesos(m.egreso)}`}</span>
                   </label>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-1 text-sm text-tenue">No hay movimientos pendientes hasta esa fecha.</p>
+            <p className="mt-2 rounded-md bg-hundido px-3 py-2 text-sm text-tenue">No hay movimientos pendientes hasta esa fecha.</p>
           )}
         </fieldset>
         <label className={CLASE_ETIQUETA}>
           Nota (opcional)
           <input value={nota} onChange={(e) => setNota(e.target.value)} className={CLASE_CAMPO} />
         </label>
-        {error && <p role="alert" className="text-sm text-alerta">{error}</p>}
+        {error && <p role="alert" className="rounded-md bg-sinfondos-suave px-3 py-2 text-sm text-sinfondos">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onCerrar} className={CLASE_SECUNDARIO}>Cancelar</button>
           <button type="submit" disabled={enviando} className={CLASE_PRIMARIO}>Guardar conciliación</button>
