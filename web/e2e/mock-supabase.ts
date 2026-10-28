@@ -6,6 +6,8 @@ import type { Page, Route } from '@playwright/test'
 import sesion from './fixtures/sesion.json' with { type: 'json' }
 import catalogos from './fixtures/catalogos.json' with { type: 'json' }
 
+const MAX_ROWS = 1000
+
 export const SUPABASE_URL = 'http://supabase.e2e.test'
 const CLAVE_SESION = 'sb-supabase-auth-token'
 
@@ -512,8 +514,14 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     }
     const tabla = /^\/rest\/v1\/(\w+)$/.exec(url.pathname)?.[1]
     const fuente = tabla && tablas[tabla]
-    if (!fuente || req.method() !== 'GET') throw new Error(`Ruta sin mock: ${req.method()} ${url.pathname}`)
+    if (!fuente || !['GET', 'HEAD'].includes(req.method())) throw new Error(`Ruta sin mock: ${req.method()} ${url.pathname}`)
     let filas = filtrar(fuente(), url.searchParams)
+    if (req.method() === 'HEAD') {
+      const total = filas.length
+      return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range', 'content-range': total ? `0-${total - 1}/${total}` : `*/0` }, body: '' })
+    }
+    // Tope de filas de PostgREST (max_rows): una lectura sin paginar se trunca sin error.
+    filas = filas.slice(0, MAX_ROWS)
     if (tabla === 'tramites') filas = filas.map(vistaTramite)
     const orden = url.searchParams.get('order')
     if (orden) {

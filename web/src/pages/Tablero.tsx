@@ -71,6 +71,9 @@ export function Tablero() {
 
       <section aria-labelledby="t-estados">
         <h2 id="t-estados" className="mb-1 text-sm font-semibold">Trámites por estado</h2>
+        {conteo.isError && (
+          <p role="alert" className="text-sm text-alerta">No se pudieron contar los trámites.</p>
+        )}
         {conteo.data && (
           <ul className="flex flex-wrap gap-2 text-sm">
             {ESTADOS.map((e) => (

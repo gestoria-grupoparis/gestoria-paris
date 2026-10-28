@@ -3,11 +3,23 @@ import {
   DIAS_DEMORA_AUTORIZADO, ESTADOS, hoyEnBuenosAires, inicioDelDia, restarDiasHabiles,
 } from '../tramites/filtros'
 
+/**
+ * Un conteo exacto por estado (HEAD + Prefer: count=exact): no trae filas, así que no lo
+ * trunca el tope max_rows de PostgREST.
+ */
 export async function contarPorEstado(): Promise<Record<string, number>> {
-  const { data, error } = await supabase.from('tramites').select('estado')
-  if (error) throw error
-  const cuenta: Record<string, number> = Object.fromEntries(ESTADOS.map((e) => [e.id, 0]))
-  for (const { estado } of (data ?? []) as { estado: string }[]) cuenta[estado] = (cuenta[estado] ?? 0) + 1
+  const resultados = await Promise.all(
+    ESTADOS.map((e) =>
+      supabase.from('tramites').select('id', { count: 'exact', head: true }).eq('estado', e.id),
+    ),
+  )
+  const cuenta: Record<string, number> = {}
+  ESTADOS.forEach((e, i) => {
+    const { count, error } = resultados[i]
+    if (error) throw error
+    if (count == null) throw new Error(`Sin conteo para el estado ${e.id}`)
+    cuenta[e.id] = count
+  })
   return cuenta
 }
 
