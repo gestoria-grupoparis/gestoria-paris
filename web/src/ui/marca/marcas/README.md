@@ -9,5 +9,5 @@ SVG monocromos (`fill="currentColor"`). Son marcas registradas de sus titulares;
 | chevrolet.svg | simple-icons 13.21.0 (origen: catálogo oficial chevrolet.com) | Paquete CC0; marca de General Motors |
 | honda.svg | https://commons.wikimedia.org/wiki/File:Honda_Logo.svg (ala de Honda Motos) | Marca de Honda Motor Co. Recoloreado a currentColor |
 | jetour.svg | https://commons.wikimedia.org/wiki/File:Jetour_logo.svg | Dominio público en Commons (logo de texto simple); marca de Chery/Jetour. Recoloreado a currentColor |
-| dfsk.svg | **No se encontró vector oficial** | Wordmark neutro en Michroma, no es el logo oficial. Reemplazar cuando se consiga el original |
-| kyc.svg | **No se encontró vector oficial** | Wordmark neutro en Michroma, no es el logo oficial. Reemplazar cuando se consiga el original |
+| dfsk.svg | Logo provisto por Grupo Paris, vectorizado (potrace) | Marca de DFSK |
+| kyc.svg | Logo provisto por Grupo Paris, vectorizado (potrace) | Marca de KYC |
