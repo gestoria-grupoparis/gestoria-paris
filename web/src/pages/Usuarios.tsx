@@ -22,8 +22,8 @@ function Avatar({ u }: { u: Usuario }) {
     <span
       aria-hidden
       className={cx(
-        'grid size-10 shrink-0 place-items-center rounded-full font-display text-[14px] font-bold',
-        u.activo ? 'bg-noche text-laton' : 'bg-hundido text-tenue',
+        'grid size-8 shrink-0 place-items-center rounded-full text-[12px] font-semibold',
+        u.activo ? 'bg-hundido text-tinta ring-1 ring-linea-fuerte/70' : 'bg-hundido text-tenue',
       )}
     >
       {iniciales(u.nombre)}
@@ -91,10 +91,10 @@ export function Usuarios() {
         <>
           <section aria-label="Resumen por rol" className="mb-6 grid grid-cols-3 gap-3 md:grid-cols-4">
             <div className="col-span-3 flex items-end justify-between gap-3 rounded-lg bg-noche p-5 text-superficie shadow-tarjeta md:col-span-1 md:flex-col md:items-start">
-              <span className="text-[11px] font-semibold tracking-[0.08em] text-laton uppercase">Usuarios activos</span>
-              <span className="cifra font-display text-[40px] leading-none font-bold md:text-[48px]">
+              <span className="text-[12px] font-medium text-white/60">Usuarios activos</span>
+              <span className="cifra font-display text-[40px] leading-none font-semibold md:text-[48px]">
                 {activos}
-                <span className="ml-2 align-middle text-[15px] font-medium text-superficie/70">de {total}</span>
+                <span className="ml-2 align-middle text-[14px] font-medium text-superficie/70">de {total}</span>
               </span>
             </div>
             {(['gerencia', 'contable', 'gestora'] as const).map((r) => (
@@ -109,7 +109,7 @@ export function Usuarios() {
                 )}
               >
                 <span className="rotulo">{etiquetaRol(r)}</span>
-                <span className="cifra font-display text-[28px] leading-none font-bold text-tinta">{porRol(r)}</span>
+                <span className="cifra font-display text-[28px] leading-none font-semibold text-tinta">{porRol(r)}</span>
                 <span className="hidden text-[12px] leading-snug text-tenue md:block">{ROLES.find((x) => x.id === r)?.descripcion}</span>
               </button>
             ))}
@@ -123,7 +123,7 @@ export function Usuarios() {
                 type="search"
                 aria-label="Buscar usuario"
                 placeholder="Buscar por nombre o razón social"
-                className={cx(claseControl, 'h-12 pl-10 text-[15px] shadow-tarjeta')}
+                className={cx(claseControl, 'h-12 pl-10 text-[14px] shadow-tarjeta')}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
               />

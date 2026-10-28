@@ -51,7 +51,7 @@ export function TablaExtracto({
                     {fechaOperativa(m.fecha_operacion)} · {m.responsable}
                   </span>
                 </div>
-                <span className={cx('cifra font-display text-lg font-bold', m.ingreso !== '0' && !anulado && 'text-disponible')}>
+                <span className={cx('cifra shrink-0 whitespace-nowrap font-display text-[17px] font-semibold tracking-[-0.02em]', m.ingreso !== '0' && !anulado && 'text-disponible')}>
                   {m.ingreso !== '0' ? formatearPesos(m.ingreso) : formatearPesos(m.egreso)}
                 </span>
               </div>
@@ -121,7 +121,7 @@ export function TablaExtracto({
                 </td>
                 <td>
                   {m.conciliado ? (
-                    <span data-testid="conciliado" title="Conciliado" className="inline-grid size-7 place-items-center rounded-full bg-disponible-suave font-bold text-disponible">✓</span>
+                    <span data-testid="conciliado" title="Conciliado" className="inline-grid size-7 place-items-center rounded-full bg-disponible-suave font-semibold text-disponible">✓</span>
                   ) : (
                     <span data-testid="conciliado" className="inline-flex h-6 items-center rounded-full bg-comprometido-suave px-2.5 text-[12px] font-semibold text-comprometido">Pendiente</span>
                   )}

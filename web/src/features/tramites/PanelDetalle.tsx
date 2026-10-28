@@ -34,7 +34,7 @@ function Dato({ etiqueta, children, testId, ancho }: { etiqueta: string; childre
   return (
     <div className={cx('min-w-0', ancho && 'col-span-2')}>
       <dt className="text-[12px] text-tenue">{etiqueta}</dt>
-      <dd className="truncate text-[15px] font-medium" data-testid={testId}>
+      <dd className="truncate text-[14px] font-medium" data-testid={testId}>
         {children}
       </dd>
     </div>
@@ -59,8 +59,8 @@ function Recorrido({ estado }: { estado: string }) {
         const enCurso = i === actual && !hecho
         return (
           <li key={p.id} aria-current={enCurso ? 'step' : undefined} className="flex flex-col gap-1.5">
-            <span className={cx('h-1.5 rounded-full', hecho ? 'bg-marca' : enCurso ? 'bg-laton' : 'bg-hundido')} />
-            <span className={cx('truncate text-[11px] leading-tight', enCurso ? 'font-bold text-tinta' : hecho ? 'text-tinta' : 'text-tenue')}>
+            <span className={cx('h-1.5 rounded-full', hecho ? 'bg-marca' : enCurso ? 'bg-acento' : 'bg-hundido')} />
+            <span className={cx('truncate text-[11px] leading-tight', enCurso ? 'font-semibold text-tinta' : hecho ? 'text-tinta' : 'text-tenue')}>
               {p.etiqueta}
             </span>
           </li>
@@ -140,7 +140,7 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
           <div className="min-w-0">
             <div className="rotulo truncate">{t ? t.tipo.nombre : 'Trámite'}</div>
             {t ? (
-              <h2 className="cifra mt-1 text-[28px] leading-none font-extrabold">{t.numero}</h2>
+              <h2 className="cifra mt-1 text-[28px] leading-none font-semibold">{t.numero}</h2>
             ) : (
               <Skeleton className="mt-2 h-7 w-40" />
             )}
@@ -191,11 +191,11 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-md bg-fondo px-3.5 py-3 ring-1 ring-linea">
                 <div className="rotulo">Presupuesto</div>
-                <div className="cifra mt-1 font-display text-[20px] font-bold">{pesos(t.finanzas?.presupuesto)}</div>
+                <div className="cifra mt-1 font-display text-[20px] font-semibold">{pesos(t.finanzas?.presupuesto)}</div>
               </div>
               <div className="rounded-md bg-fondo px-3.5 py-3 ring-1 ring-linea">
                 <div className="rotulo">Pagado</div>
-                <div className="cifra mt-1 font-display text-[20px] font-bold">{pesos(t.finanzas?.pagado)}</div>
+                <div className="cifra mt-1 font-display text-[20px] font-semibold">{pesos(t.finanzas?.pagado)}</div>
               </div>
               {t.finanzas?.situacion && t.finanzas.situacion !== 'no_aplica' && (
               <div className="col-span-2 flex items-center justify-between gap-2 px-1">
@@ -209,7 +209,7 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
 
           <Seccion titulo="Cliente y vehículo">
             <div className="mb-4">
-              <div className="font-display text-[19px] leading-tight font-bold">{t.operacion.cliente_nombre}</div>
+              <div className="font-display text-[19px] leading-tight font-semibold">{t.operacion.cliente_nombre}</div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-[14px] text-tenue">
                 <span>{t.vehiculo_desc}</span>
                 {t.dominio ? <Patente dominio={t.dominio} /> : t.chasis ? <span className="font-mono text-[12px]">{t.chasis}</span> : null}

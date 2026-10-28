@@ -47,14 +47,14 @@ function TarjetaEmpresa({ s, hoy }: { s: Saldo; hoy: string }) {
       )}
     >
       <div className="flex items-start justify-between gap-3 px-5 pt-5">
-        <h3 className="text-lg font-bold leading-tight">{s.empresa}</h3>
+        <h3 className="text-lg font-semibold leading-tight">{s.empresa}</h3>
         {falta ? <Chip tono="sinfondos">Sin fondos</Chip> : <Chip tono="disponible">Con fondos</Chip>}
       </div>
       <div className="px-5 pt-4">
         <div className="rotulo">Disponible</div>
         <div
           data-testid="disponible"
-          className={cx('cifra font-display text-[32px] font-extrabold leading-tight tracking-tight', falta ? 'text-sinfondos' : 'text-marca')}
+          className={cx('cifra font-display text-[32px] font-semibold leading-tight tracking-tight', falta ? 'text-sinfondos' : 'text-marca')}
         >
           {formatearPesos(s.disponible)}
         </div>
@@ -146,7 +146,7 @@ export function Tablero() {
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
             <div className="rotulo mb-1">Habitualista</div>
-            <h2 id="t-saldos" className="text-[22px] font-extrabold">Fondos por razón social</h2>
+            <h2 id="t-saldos" className="text-[22px] font-semibold">Fondos por razón social</h2>
           </div>
           <Link to="/habitualista" className="hidden text-sm font-semibold text-marca hover:underline sm:block">Ir a Habitualista</Link>
         </div>

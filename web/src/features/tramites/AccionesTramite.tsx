@@ -218,7 +218,7 @@ function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, motivoOpci
   return (
     <Dialogo titulo={titulo} rotulo={rotulo} onCerrar={onCerrar}>
       <form onSubmit={confirmar} noValidate className="space-y-4">
-        {aviso && <p className="rounded-md bg-hundido px-4 py-3 text-[15px]">{aviso}</p>}
+        {aviso && <p className="rounded-md bg-hundido px-4 py-3 text-[14px]">{aviso}</p>}
         {pideGestora && (
           <Field label="Gestora">
             {(p) => (

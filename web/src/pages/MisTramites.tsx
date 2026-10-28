@@ -94,7 +94,7 @@ export function MisTramites() {
               >
                 <span className="flex items-center justify-between">
                   <Icono className={cx('size-[18px]', n ? 'text-marca' : 'text-tenue')} />
-                  <span className="cifra font-display text-[26px] leading-none font-extrabold">{n}</span>
+                  <span className="cifra font-display text-[26px] leading-none font-semibold">{n}</span>
                 </span>
                 <span className="text-[13px] font-semibold">{g.titulo}</span>
               </a>
@@ -140,12 +140,12 @@ export function MisTramites() {
           const Icono = ICONO_GRUPO[g.id]
           return (
             <section key={g.id} aria-labelledby={`grupo-${g.id}`} id={`seccion-${g.id}`} className="scroll-mt-20">
-              <h2 id={`grupo-${g.id}`} className="mb-3 flex items-center gap-2.5 text-[20px] font-extrabold tracking-tight">
+              <h2 id={`grupo-${g.id}`} className="mb-3 flex items-center gap-2.5 text-[20px] font-semibold tracking-tight">
                 <span aria-hidden className="grid size-8 place-items-center rounded-md bg-marca-suave text-marca">
                   <Icono className="size-[18px]" />
                 </span>
                 {g.titulo}
-                <span className="cifra ml-auto rounded-full bg-hundido px-2.5 py-0.5 text-[13px] font-bold text-tenue" aria-hidden="true">
+                <span className="cifra ml-auto rounded-full bg-hundido px-2.5 py-0.5 text-[13px] font-semibold text-tenue" aria-hidden="true">
                   {g.items.length}
                 </span>
               </h2>

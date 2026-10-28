@@ -87,7 +87,7 @@ export function FormConciliacion({ empresa, pendientes, cargando = false, onCerr
                     <span className="flex-1 font-medium">
                       {TIPOS_MOVIMIENTO[m.tipo] ?? m.tipo} {m.tramite_numero ?? ''}
                     </span>
-                    <span className={`cifra font-semibold ${m.ingreso !== '0' ? 'text-disponible' : ''}`}>{m.ingreso !== '0' ? formatearPesos(m.ingreso) : `-${formatearPesos(m.egreso)}`}</span>
+                    <span className={`cifra whitespace-nowrap font-semibold ${m.ingreso !== '0' ? 'text-disponible' : ''}`}>{m.ingreso !== '0' ? formatearPesos(m.ingreso) : `-${formatearPesos(m.egreso)}`}</span>
                   </label>
                 </li>
               ))}

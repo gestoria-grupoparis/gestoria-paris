@@ -45,8 +45,8 @@ export function FormPago({ tramite, onCerrar, onGuardado }: {
       <form onSubmit={enviar} className="space-y-4">
         <div className="flex items-end justify-between gap-3 rounded-lg bg-noche px-4 py-3 text-superficie">
           <div>
-            <div className="text-[11px] font-semibold tracking-[0.08em] text-laton uppercase">Presupuesto cargado</div>
-            <strong data-testid="presupuesto-referencia" className="cifra mt-0.5 block font-display text-[24px] leading-tight font-extrabold">
+            <div className="text-[12px] font-medium text-white/60">Presupuesto cargado</div>
+            <strong data-testid="presupuesto-referencia" className="cifra mt-0.5 block font-display text-[24px] leading-tight font-semibold">
               {tramite.presupuesto ? formatearPesos(tramite.presupuesto) : 'Sin presupuesto'}
             </strong>
           </div>
@@ -64,7 +64,7 @@ export function FormPago({ tramite, onCerrar, onGuardado }: {
             className="size-5 accent-marca"
           />
           <span>
-            <span className="block text-[15px] font-semibold">¿Es el pago final?</span>
+            <span className="block text-[14px] font-semibold">¿Es el pago final?</span>
             <span className="block text-[13px] text-tenue">Desmarcalo si vas a pagar el resto otro día.</span>
           </span>
         </label>

@@ -173,7 +173,7 @@ export function TablaTramites({ filas, seleccionado, onSeleccionar, nombreGestor
                   <span className="cifra text-[13px] font-semibold text-tenue">{t.numero}</span>
                   <EstadoChip estado={t.estado} />
                 </div>
-                <div className="mt-1.5 truncate font-display text-[17px] leading-tight font-bold">{t.operacion.cliente_nombre}</div>
+                <div className="mt-1.5 truncate font-display text-[17px] leading-tight font-semibold">{t.operacion.cliente_nombre}</div>
                 <div className="mt-1 flex items-center gap-2 text-[13px] text-tenue">
                   <span className="truncate">{t.vehiculo_desc}</span>
                   {t.dominio && <Patente dominio={t.dominio} className="shrink-0" />}
@@ -187,7 +187,7 @@ export function TablaTramites({ filas, seleccionado, onSeleccionar, nombreGestor
                   </div>
                   <div className="text-right">
                     {t.finanzas?.presupuesto != null ? (
-                      <div className="cifra font-display text-[16px] font-bold">{pesos(t.finanzas.presupuesto)}</div>
+                      <div className="cifra font-display text-[16px] font-semibold">{pesos(t.finanzas.presupuesto)}</div>
                     ) : (
                       <div className="text-[12px] text-tenue">Sin presupuesto</div>
                     )}

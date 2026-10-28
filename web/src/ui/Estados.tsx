@@ -3,11 +3,11 @@ import { cx } from './cx'
 
 export function EmptyState({ titulo, descripcion, accion, icono }: { titulo: string; descripcion?: ReactNode; accion?: ReactNode; icono?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-linea-fuerte bg-superficie/60 px-6 py-12 text-center">
-      <span aria-hidden className="grid size-12 place-items-center rounded-full bg-marca-suave text-marca">
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-linea-fuerte bg-superficie px-6 py-12 text-center">
+      <span aria-hidden className="grid size-11 place-items-center rounded-lg bg-hundido text-tenue ring-1 ring-linea">
         {icono ?? <IconoVacio />}
       </span>
-      <h3 className="text-lg font-bold">{titulo}</h3>
+      <h3 className="text-[14px] font-semibold">{titulo}</h3>
       {descripcion && <p className="max-w-sm text-sm text-tenue">{descripcion}</p>}
       {accion}
     </div>

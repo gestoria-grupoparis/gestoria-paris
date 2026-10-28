@@ -22,7 +22,7 @@ function describir(e: Evento, nombre: (id: string | null) => string): string {
 }
 
 function tono(e: Evento): string {
-  if (e.entidad === 'tramite_marcas') return 'bg-laton'
+  if (e.entidad === 'tramite_marcas') return 'bg-plata'
   if (e.estado_despues && ['rechazado', 'cancelado'].includes(e.estado_despues)) return 'bg-sinfondos'
   if (e.estado_despues && ['observado', 'suspendido'].includes(e.estado_despues)) return 'bg-comprometido'
   return 'bg-marca'

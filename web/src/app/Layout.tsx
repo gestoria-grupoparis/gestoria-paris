@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSesion, type Rol } from '../lib/sesion'
 import { navegacionPorRol } from './navegacion'
-import { Button, Wordmark, cx } from '../ui'
+import { Button, LogoGrupoParis, cx } from '../ui'
 
 const ROL_ETIQUETA: Record<Rol, string> = {
   gerencia: 'Gerencia',
@@ -23,7 +23,7 @@ const ICONOS: Record<string, ReactNode> = {
 
 function Icono({ ruta }: { ruta: string }) {
   return (
-    <svg aria-hidden viewBox="0 0 24 24" className="size-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden viewBox="0 0 24 24" className="size-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       {ICONOS[ruta] ?? <circle cx="12" cy="12" r="7" />}
     </svg>
   )
@@ -59,11 +59,11 @@ export function Layout() {
 
   return (
     <div className="min-h-dvh md:flex">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-noche text-superficie md:flex">
-        <div className="px-5 pt-6 pb-7">
-          <Wordmark tono="claro" />
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-noche text-white md:flex">
+        <div className="px-5 pt-6 pb-8">
+          <LogoGrupoParis tono="claro" className="h-7 w-auto" />
         </div>
-        <p className="px-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-superficie/40">Menú</p>
+        <p className="rotulo-marca px-6 pb-3 text-[9px] text-white/35">Menú</p>
         <nav aria-label="Principal" className="flex flex-1 flex-col gap-1 px-3">
           {items.map((i) => (
             <NavLink
@@ -71,8 +71,8 @@ export function Layout() {
               to={i.ruta}
               className={({ isActive }) =>
                 cx(
-                  'flex h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium transition-colors focus-visible:outline-laton',
-                  isActive ? 'bg-superficie/10 text-superficie shadow-[inset_3px_0_0_var(--color-laton)]' : 'text-superficie/65 hover:bg-superficie/5 hover:text-superficie',
+                  'flex h-10 items-center gap-3 rounded-md px-3 text-[14px] font-medium transition-colors',
+                  isActive ? 'bg-white/[0.08] text-white ring-1 ring-inset ring-white/[0.06]' : 'text-white/55 hover:bg-white/[0.04] hover:text-white',
                 )
               }
             >
@@ -81,21 +81,21 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="m-3 rounded-xl bg-superficie/[0.06] p-3 ring-1 ring-superficie/10">
+        <div className="m-3 rounded-lg bg-white/[0.04] p-3 ring-1 ring-white/[0.08]">
           <div className="flex items-center gap-3">
-            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-laton font-display text-sm font-bold text-noche">
+            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-[13px] font-semibold text-noche">
               {iniciales(perfil?.nombre)}
             </span>
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-sm font-semibold">{perfil?.nombre}</div>
-              <div className="mt-0.5 truncate text-[12px] text-superficie/60">
+              <div className="truncate text-[13px] font-medium">{perfil?.nombre}</div>
+              <div className="mt-0.5 truncate text-[12px] text-white/50">
                 {rolTexto} · {EMPRESA}
               </div>
             </div>
           </div>
           <button
             type="button"
-            className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-md text-[13px] font-semibold text-superficie/75 ring-1 ring-superficie/15 hover:bg-superficie/5 hover:text-superficie focus-visible:outline-laton"
+            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 ring-1 ring-white/[0.12] hover:bg-white/[0.05] hover:text-white"
             onClick={salir}
           >
             <IconoSalir className="size-4" />
@@ -105,8 +105,8 @@ export function Layout() {
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-linea bg-superficie/95 px-4 backdrop-blur md:hidden">
-          <Wordmark />
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-linea bg-superficie/90 px-4 backdrop-blur-md md:hidden">
+          <LogoGrupoParis className="h-7 w-auto" />
           <button
             type="button"
             aria-label="Tu cuenta"
@@ -115,7 +115,7 @@ export function Layout() {
             onClick={() => setCuenta(true)}
             className="grid size-11 place-items-center rounded-full"
           >
-            <span aria-hidden className="grid size-9 place-items-center rounded-full bg-marca font-display text-sm font-bold text-superficie">
+            <span aria-hidden className="grid size-9 place-items-center rounded-full bg-marca text-[13px] font-semibold text-superficie">
               {iniciales(perfil?.nombre)}
             </span>
           </button>
@@ -136,11 +136,11 @@ export function Layout() {
           >
             <span aria-hidden className="mx-auto mb-5 block h-1 w-10 rounded-full bg-linea-fuerte" />
             <div className="flex items-center gap-4">
-              <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-full bg-marca font-display text-lg font-bold text-superficie">
+              <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-full bg-marca text-lg font-semibold text-superficie">
                 {iniciales(perfil?.nombre)}
               </span>
               <div className="min-w-0">
-                <p className="truncate font-display text-xl font-bold">{perfil?.nombre}</p>
+                <p className="truncate text-lg font-semibold tracking-tight">{perfil?.nombre}</p>
                 <p className="text-sm text-tenue">{rolTexto} · {EMPRESA}</p>
               </div>
             </div>
@@ -158,7 +158,7 @@ export function Layout() {
 
       <nav
         aria-label="Principal móvil"
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-linea bg-superficie/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-linea bg-superficie/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
         {items.map((i) => (
           <NavLink
@@ -166,8 +166,8 @@ export function Layout() {
             to={i.ruta}
             className={({ isActive }) =>
               cx(
-                'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[12px] font-semibold',
-                isActive ? 'text-marca after:absolute after:top-0 after:h-[3px] after:w-8 after:rounded-b after:bg-marca' : 'text-tenue',
+                'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium',
+                isActive ? 'text-tinta after:absolute after:top-0 after:h-[2px] after:w-8 after:rounded-b after:bg-marca' : 'text-tenue',
               )
             }
           >

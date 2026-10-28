@@ -2,7 +2,7 @@ import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'rea
 import { cx } from './cx'
 
 export const claseControl =
-  'h-11 w-full rounded-md border border-linea-fuerte bg-superficie px-3 text-[15px] text-tinta placeholder:text-tenue/70 transition-colors hover:border-tenue focus-visible:border-marca aria-[invalid=true]:border-sinfondos'
+  'h-11 w-full rounded-md border border-linea-fuerte bg-superficie px-3 text-[14px] text-tinta placeholder:text-tenue/70 transition-colors hover:border-tenue/60 focus-visible:border-acento focus-visible:outline-acento/30 aria-[invalid=true]:border-sinfondos'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...p }, ref) {
   return <input ref={ref} className={cx(claseControl, className)} {...p} />
@@ -39,7 +39,7 @@ export function Field({
   return (
     <div className={cx('flex flex-col gap-1.5', className)}>
       <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="text-[13px] font-semibold text-tinta">
+        <label htmlFor={id} className="text-[13px] font-medium text-tinta">
           {label}
         </label>
         {extra}

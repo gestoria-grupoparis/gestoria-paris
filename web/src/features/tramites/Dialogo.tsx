@@ -6,9 +6,9 @@ import { IconoCerrar } from '../../ui/Iconos'
 export const CLASE_CAMPO = `mt-1.5 ${claseControl}`
 export const CLASE_ETIQUETA = 'block text-[13px] font-semibold text-tinta'
 export const CLASE_PRIMARIO =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-md bg-marca px-4 text-[15px] font-semibold text-superficie shadow-tarjeta transition-colors hover:bg-marca-hover disabled:cursor-not-allowed disabled:opacity-55'
+  'inline-flex h-11 items-center justify-center gap-2 rounded-md bg-marca px-4 text-[14px] font-semibold text-superficie shadow-tarjeta transition-colors hover:bg-marca-hover disabled:cursor-not-allowed disabled:opacity-55'
 export const CLASE_SECUNDARIO =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-md bg-superficie px-4 text-[15px] font-semibold text-tinta ring-1 ring-inset ring-linea-fuerte transition-colors hover:bg-hundido disabled:cursor-not-allowed disabled:opacity-55'
+  'inline-flex h-11 items-center justify-center gap-2 rounded-md bg-superficie px-4 text-[14px] font-semibold text-tinta ring-1 ring-inset ring-linea-fuerte transition-colors hover:bg-hundido disabled:cursor-not-allowed disabled:opacity-55'
 
 /**
  * Diálogo modal: hoja inferior en el teléfono, tarjeta centrada en escritorio.
@@ -47,7 +47,7 @@ export function Dialogo({
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-linea bg-superficie/95 px-5 pt-5 pb-4 backdrop-blur md:px-6">
           <div>
             {rotulo && <div className="rotulo mb-1">{rotulo}</div>}
-            <h2 id={id} className="text-[22px] leading-tight font-extrabold">
+            <h2 id={id} className="text-[22px] leading-tight font-semibold">
               {titulo}
             </h2>
           </div>

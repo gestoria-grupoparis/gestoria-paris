@@ -97,7 +97,7 @@ export function FiltrosTramites({ filtros, catalogos, onCambiar }: Props) {
             type="search"
             aria-label="Buscar"
             placeholder="Buscar por cliente, cuenta, oferta o dominio"
-            className={cx(claseControl, 'h-12 pl-10 text-[15px] shadow-tarjeta')}
+            className={cx(claseControl, 'h-12 pl-10 text-[14px] shadow-tarjeta')}
             value={filtros.q ?? ''}
             onChange={(e) => set({ q: e.target.value })}
           />
@@ -109,7 +109,7 @@ export function FiltrosTramites({ filtros, catalogos, onCambiar }: Props) {
           aria-controls="filtros-avanzados"
           onClick={() => setAbierto(!abierto)}
           className={cx(
-            'inline-flex h-12 shrink-0 items-center gap-2 rounded-md px-4 text-[15px] font-semibold ring-1 ring-inset transition-colors',
+            'inline-flex h-12 shrink-0 items-center gap-2 rounded-md px-4 text-[14px] font-semibold ring-1 ring-inset transition-colors',
             abierto || activos.length ? 'bg-marca-suave text-marca ring-marca/30' : 'bg-superficie text-tinta ring-linea-fuerte hover:bg-hundido',
           )}
         >

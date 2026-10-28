@@ -53,7 +53,7 @@ function Pasos({ grupo }: { grupo: Grupo }) {
               i < actual
                 ? "bg-marca"
                 : i === actual
-                  ? "bg-laton"
+                  ? "bg-acento"
                   : "bg-hundido",
             )}
           />
@@ -89,7 +89,7 @@ export function TarjetaTramite({
       {sinFondos && (
         <div className="flex items-center gap-2.5 bg-sinfondos px-4 py-2.5 text-white">
           <IconoProhibido className="size-5" />
-          <p role="alert" className="text-[15px] font-bold tracking-tight">
+          <p role="alert" className="text-[14px] font-semibold tracking-tight">
             No presentar: sin fondos
           </p>
         </div>
@@ -109,12 +109,12 @@ export function TarjetaTramite({
         <div>
           <h3
             id={tituloId}
-            className="text-[20px] leading-tight font-extrabold tracking-tight"
+            className="text-[20px] leading-tight font-semibold tracking-tight"
           >
             {t.operacion.cliente_nombre}
             <span className="sr-only"> {t.numero}</span>
           </h3>
-          <p className="mt-1.5 flex items-center gap-2 text-[15px] text-tinta">
+          <p className="mt-1.5 flex items-center gap-2 text-[14px] text-tinta">
             <IconoAuto className="size-[18px] text-tenue" />
             <span className="min-w-0 truncate">{t.vehiculo_desc}</span>
           </p>
@@ -137,7 +137,7 @@ export function TarjetaTramite({
               <dt className="rotulo">Presupuesto</dt>
               <dd
                 data-testid="presupuesto"
-                className="cifra mt-0.5 font-display text-[19px] font-bold"
+                className="cifra mt-0.5 whitespace-nowrap font-display text-[19px] font-semibold tracking-[-0.02em]"
               >
                 {t.presupuesto ? formatearPesos(t.presupuesto) : "—"}
               </dd>
