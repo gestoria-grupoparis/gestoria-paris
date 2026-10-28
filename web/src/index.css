@@ -1,17 +1,61 @@
 @import "tailwindcss";
 
+/* Sistema de diseño Grupo Paris — ver design-system/MASTER.md */
 @theme {
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
-  --color-fondo: #f3f5f7;
-  --color-tinta: #1a2430;
-  --color-tenue: #5b6b7b;
-  --color-linea: #d5dce3;
-  --color-marca: #0f5e7a;
-  --color-alerta: #b42318;
+  --font-sans: "Public Sans", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Public Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Neutros cálidos */
+  --color-fondo: #f5f2eb;
+  --color-superficie: #fffdf8;
+  --color-hundido: #ece7dc;
+  --color-tinta: #1c1a16;
+  --color-tenue: #5e574b;
+  --color-linea: #e2dccf;
+  --color-linea-fuerte: #c9c0ae;
+
+  /* Marca: verde Paris (racing green) + latón */
+  --color-marca: #0f4a37;
+  --color-marca-hover: #0b3a2b;
+  --color-marca-suave: #e3eee8;
+  --color-marca-tinta: #0a2e22;
+  --color-noche: #0c1f18;
+  --color-laton: #c79a3b;
+
+  /* Semánticos de dinero */
+  --color-disponible: #17663f;
+  --color-disponible-suave: #e1f1e6;
+  --color-comprometido: #8a5a00;
+  --color-comprometido-suave: #fbf0d6;
+  --color-sinfondos: #a8261b;
+  --color-sinfondos-suave: #fbe4e0;
+  --color-alerta: #a8261b;
+  --color-info: #1f4f86;
+  --color-info-suave: #e2ebf6;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shadow-tarjeta: 0 1px 0 rgb(28 26 22 / 0.04), 0 1px 3px rgb(28 26 22 / 0.06);
+  --shadow-flotante: 0 12px 32px -8px rgb(28 26 22 / 0.18), 0 2px 6px rgb(28 26 22 / 0.06);
 }
 
+html { -webkit-font-smoothing: antialiased; }
 body {
   background: var(--color-fondo);
   color: var(--color-tinta);
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
 }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
+.cifra { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1; }
+.rotulo { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-tenue); }
+:focus-visible { outline: 2px solid var(--color-marca); outline-offset: 2px; }
+.bg-noche :focus-visible { outline-color: var(--color-laton); }
+@keyframes brillo { 0% { background-position: -200px 0 } 100% { background-position: 200px 0 } }
+.esqueleto { border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--color-hundido) 0, #f3eee4 50%, var(--color-hundido) 100%); background-size: 400px 100%; animation: brillo 1.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .esqueleto { animation: none; } * { transition: none !important; } }
