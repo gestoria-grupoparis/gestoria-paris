@@ -111,6 +111,19 @@ test.each([
   await expect(rpc(f.gestora, nombre, args(f))).rejects.toThrow(/^SIN_PERMISO: /)
 })
 
+test('gestora no ve el evento de excepciones_fondos de su trámite, pero sí los de sus trámites, presupuestos y pagos', async () => {
+  const f = await preparar()
+  await rpc(f.gerencia, 'aprobar_excepcion_fondos', { p_tramite: f.propio, p_motivo: 'motivo confidencial' })
+  expect((await sqlAdmin(`select id from public.eventos where entidad = 'excepciones_fondos'`)).length).toBe(1)
+
+  expect(await filas(f.gestora, `select id from public.eventos where entidad = 'excepciones_fondos'`)).toEqual([])
+  expect(await filas(f.gestora, `select id from public.eventos where motivo = 'motivo confidencial'`)).toEqual([])
+  const ent = (await filas(f.gestora, `select distinct entidad from public.eventos order by 1`)).map((r) => r.entidad)
+  expect(ent).toEqual(['movimientos', 'presupuestos', 'tramites'])
+  const movs = await filas(f.gestora, `select despues ->> 'creado_por' as p from public.eventos where entidad = 'movimientos'`)
+  expect(movs.map((r) => r.p)).toEqual([f.gestora])
+})
+
 test('gestora: v_saldos devuelve 0 filas; v_tramite_finanzas solo sus trámites con situacion visible', async () => {
   const f = await preparar()
 

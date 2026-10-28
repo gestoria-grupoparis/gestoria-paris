@@ -15,9 +15,11 @@ async function preparar() {
     (await rpc(quien, 'registrar_carga', { p_idem: randomUUID(), p_empresa: emp, p_importe: importe, p_fecha: fecha }))
       .rows[0].registrar_carga as string
 
-  const conciliar = async (fechaCorte: string, externo: bigint, movimientos: string[], emp = empresa) =>
-    (await rpc(contable, 'registrar_conciliacion', {
-      p_empresa: emp, p_fecha_corte: fechaCorte, p_saldo_externo: externo, p_nota: 'control semanal',
+  const conciliar = async (
+    fechaCorte: string, externo: bigint, movimientos: string[], emp = empresa, idem: string = randomUUID(), quien = contable,
+  ) =>
+    (await rpc(quien, 'registrar_conciliacion', {
+      p_idem: idem, p_empresa: emp, p_fecha_corte: fechaCorte, p_saldo_externo: externo, p_nota: 'control semanal',
       p_movimientos: movimientos,
     })).rows[0].registrar_conciliacion as string
 
@@ -82,7 +84,7 @@ test('registrar la carga faltante y reconciliar da diferencia 0', async () => {
   const gestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos' }])
   await expect(
     rpc(gestora, 'registrar_conciliacion', {
-      p_empresa: await idEmpresa('Paris Autos'), p_fecha_corte: '2026-10-25', p_saldo_externo: 0n,
+      p_idem: randomUUID(), p_empresa: await idEmpresa('Paris Autos'), p_fecha_corte: '2026-10-25', p_saldo_externo: 0n,
       p_nota: null, p_movimientos: [],
     }),
   ).rejects.toThrow(/SIN_PERMISO/)
@@ -120,4 +122,17 @@ test('extracto con saldo resultante correcto fila por fila', async () => {
   const vistas = await comoUsuario(gestora, async (c) =>
     (await c.query(`select * from public.v_movimientos_extracto`)).rows)
   expect(vistas).toEqual([])
+})
+
+test('mismo idem en registrar_conciliacion devuelve la misma conciliación; otro usuario con ese idem da DUPLICADO', async () => {
+  const { empresa, carga, conciliar } = await preparar()
+  const m1 = await carga(100_000_00n, '2026-10-20')
+  const idem = randomUUID()
+  const a = await conciliar('2026-10-25', 100_000_00n, [m1], empresa, idem)
+  const b = await conciliar('2026-10-25', 100_000_00n, [m1], empresa, idem)
+  expect(b).toBe(a)
+  expect((await sqlAdmin(`select count(*)::int as n from public.conciliaciones`))[0].n).toBe(1)
+
+  const otro = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
+  await expect(conciliar('2026-10-25', 100_000_00n, [], empresa, idem, otro)).rejects.toThrow(/DUPLICADO/)
 })

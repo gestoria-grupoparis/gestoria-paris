@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { formatearPesos, parsearPesos } from '../../lib/dinero'
 import { mensajeError } from '../../lib/errores'
+import { nuevaIdem } from '../../lib/supabase'
 import { CLASE_CAMPO, CLASE_ETIQUETA, CLASE_PRIMARIO, CLASE_SECUNDARIO, Dialogo } from '../tramites/Dialogo'
 import { hoyEnBuenosAires } from '../tramites/filtros'
 import { registrarConciliacion, TIPOS_MOVIMIENTO, type Movimiento } from './consultas'
@@ -13,6 +14,8 @@ export function FormConciliacion({ empresa, pendientes, onCerrar, onGuardado }: 
   onCerrar: () => void
   onGuardado: () => void
 }) {
+  // Una clave por apertura del formulario: un doble envío reusa la misma conciliación.
+  const [idem] = useState(() => nuevaIdem())
   const [fecha, setFecha] = useState(() => hoyEnBuenosAires())
   const [saldo, setSaldo] = useState('')
   const [nota, setNota] = useState('')
@@ -42,7 +45,7 @@ export function FormConciliacion({ empresa, pendientes, onCerrar, onGuardado }: 
     setEnviando(true)
     try {
       const verificados = candidatos.filter((m) => marcados.has(m.movimiento_id)).map((m) => m.movimiento_id)
-      await registrarConciliacion(empresa.id, fecha, cents, nota, verificados)
+      await registrarConciliacion(idem, empresa.id, fecha, cents, nota, verificados)
       onGuardado()
     } catch (err) {
       setError(mensajeError(err))

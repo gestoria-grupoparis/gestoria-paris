@@ -144,10 +144,10 @@ export async function revertirMovimiento(idem: string, movimiento: string, motiv
 }
 
 export async function registrarConciliacion(
-  empresa: string, fechaCorte: string, saldoExterno: bigint, nota: string, movimientos: string[],
+  idem: string, empresa: string, fechaCorte: string, saldoExterno: bigint, nota: string, movimientos: string[],
 ) {
   const { error } = await supabase.rpc('registrar_conciliacion', {
-    p_empresa: empresa, p_fecha_corte: fechaCorte, p_saldo_externo: saldoExterno.toString(),
+    p_idem: idem, p_empresa: empresa, p_fecha_corte: fechaCorte, p_saldo_externo: saldoExterno.toString(),
     p_nota: nota.trim() || null, p_movimientos: movimientos,
   })
   if (error) throw error

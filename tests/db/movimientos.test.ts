@@ -441,6 +441,17 @@ test('mismo idem_key en registrar_pago devuelve el mismo id', async () => {
   expect(await cantidadMovimientos()).toBe(2)
 })
 
+test('otro usuario que reusa el idem ajeno recibe DUPLICADO, no el id', async () => {
+  const gestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos' }])
+  const { id, contable } = await tramiteAutorizado(gestora)
+  const idem = randomUUID()
+  await pago(gestora, id, PAGO, { idem })
+  const otraGestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos' }])
+  await expect(pago(otraGestora, id, PAGO, { idem })).rejects.toThrow(/DUPLICADO/)
+  await expect(carga(contable, 'Paris Autos', 1_000n, idem)).rejects.toThrow(/DUPLICADO/)
+  expect(await cantidadMovimientos()).toBe(1)
+})
+
 test('delete sobre movimientos falla', async () => {
   const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
   const idCarga = await carga(contable, 'Paris Autos', 1_000_000n)

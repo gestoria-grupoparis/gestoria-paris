@@ -455,6 +455,9 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       await route.fulfill({ json: r.id })
     },
     async registrar_conciliacion(route, a) {
+      if (!a.p_idem) return errorNegocio(route, 'DATO_INVALIDO: falta la clave de idempotencia')
+      const previa = st.conciliaciones.find((x) => x.idem === a.p_idem)
+      if (previa) return route.fulfill({ json: previa.id })
       if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable')
       const externo = importe(a.p_saldo_externo)
       if (!a.p_fecha_corte || externo == null)
@@ -465,7 +468,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
         .reduce((s, m) => s + big(m.importe), 0n)
       const id = `00000000-0000-4000-8000-0000000c${String(st.conciliaciones.length + 1).padStart(4, '0')}`
       st.conciliaciones.push({
-        id, cuenta_id: c.id, fecha_corte: a.p_fecha_corte, diferencia: String(externo - interno),
+        id, idem: a.p_idem, cuenta_id: c.id, fecha_corte: a.p_fecha_corte, diferencia: String(externo - interno),
         movimientos: (a.p_movimientos as string[] | null) ?? [],
       })
       await route.fulfill({ json: id })
