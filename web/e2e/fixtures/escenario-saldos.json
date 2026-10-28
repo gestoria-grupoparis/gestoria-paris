@@ -1,0 +1,11 @@
+{
+  "_comentario": "Salida de public.v_saldos (Paris Autos, vista por una gerencia con alcance sobre toda la empresa) en cada paso del escenario integral. tests/db/escenario-integral.test.ts la verifica contra PostgreSQL real; el E2E la sirve tal cual, sin recalcular. La firma cuenta cargas, versiones de presupuesto y pagos de Paris Autos.",
+  "pasos": [
+    { "firma": "cargas=0,presupuestos=0,pagos=0", "registrado_cents": "0", "comprometido_cents": "0", "disponible_cents": "0" },
+    { "firma": "cargas=1,presupuestos=0,pagos=0", "registrado_cents": "300000000", "comprometido_cents": "0", "disponible_cents": "300000000" },
+    { "firma": "cargas=1,presupuestos=1,pagos=0", "registrado_cents": "300000000", "comprometido_cents": "70000000", "disponible_cents": "230000000" },
+    { "firma": "cargas=1,presupuestos=2,pagos=0", "registrado_cents": "300000000", "comprometido_cents": "160000000", "disponible_cents": "140000000" },
+    { "firma": "cargas=1,presupuestos=2,pagos=1", "registrado_cents": "235000000", "comprometido_cents": "90000000", "disponible_cents": "145000000" },
+    { "firma": "cargas=2,presupuestos=2,pagos=1", "registrado_cents": "435000000", "comprometido_cents": "90000000", "disponible_cents": "345000000" }
+  ]
+}

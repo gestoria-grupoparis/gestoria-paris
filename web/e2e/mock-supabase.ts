@@ -13,7 +13,7 @@ const CLAVE_SESION = 'sb-supabase-auth-token'
 
 type Fila = Record<string, unknown>
 
-interface Estado {
+export interface Estado {
   operaciones: Fila[]
   tramites: Fila[]
   marcas: Fila[]
@@ -63,7 +63,22 @@ export interface OpcionesMock {
   usuario?: string
   /** Servidor compartido con otras páginas; si falta, se crea uno con las semillas. */
   servidor?: Servidor
+  /**
+   * Alcances del perfil (como public.alcances; sucursal_id null = toda la empresa). Si se pasan, el
+   * mock aplica tiene_alcance() como la base: crear/autorizar trámites y cargar fondos exigen alcance,
+   * trámites y finanzas se filtran por alcance y v_saldos solo muestra empresas con alcance completo.
+   * Sin alcances, el perfil ve todo (specs que no prueban permisos).
+   */
+  alcances?: { empresa_id: string; sucursal_id: string | null }[]
+  /**
+   * Fuente fija de v_saldos (salida real de la base, p. ej. fixtures/escenario-saldos.json). Recibe el
+   * estado y devuelve las filas, o undefined si el estado no tiene salida registrada: en ese caso la
+   * consulta responde 500 y el test falla en lugar de mostrar un saldo calculado por el mock.
+   */
+  saldosFijos?: (st: Estado) => Fila[] | undefined
 }
+
+class SaldoSinFixture extends Error {}
 
 const ESTADOS_EN_CURSO = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro']
 
@@ -185,6 +200,12 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   const rol = nombreDe(catalogos.perfiles, yo)?.rol
   const sesionActiva = { ...sesion, user: { ...sesion.user, id: yo } }
   const rutasPedidas: string[] = []
+  /** URL completa (con select y filtros) de cada pedido, para verificar qué columnas se piden. */
+  const urlsPedidas: string[] = []
+  const alcances = opciones.alcances
+  const tieneAlcance = (empresa: unknown, sucursal: unknown) =>
+    !alcances || alcances.some((a) => a.empresa_id === empresa && (a.sucursal_id == null || a.sucursal_id === sucursal))
+  const veTramite = (t: Fila) => rol === 'gestora' || tieneAlcance(t.empresa_id, t.sucursal_id)
   const servidor = opciones.servidor ?? crearServidor(semillas)
   const { st, situacionForzada } = servidor
 
@@ -307,6 +328,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
 
   const rpcs: Record<string, (route: Route, a: Fila) => Promise<void>> = {
     async crear_tramite(route, a) {
+      if (!tieneAlcance(a.p_empresa, a.p_sucursal))
+        return errorNegocio(route, 'SIN_PERMISO: sin alcance sobre esa razón social y sucursal')
       const tipo = catalogos.tipos_tramite.find((t) => t.codigo === a.p_tipo)!
       const dominio = a.p_dominio ? String(a.p_dominio).trim().toUpperCase() : null
       let op = st.operaciones.find((o) => o.empresa_id === a.p_empresa && o.oferta_ref === a.p_oferta)
@@ -346,6 +369,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     async autorizar_tramite(route, a) {
       const t = tramite(a.p_tramite)
       if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if (!tieneAlcance(t.empresa_id, t.sucursal_id))
+        return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable con alcance autorizan trámites')
       if (t.version !== a.p_version) return errorNegocio(route, 'VERSION_CONFLICTO: recargá')
       if (t.estado !== 'borrador') return errorNegocio(route, `TRANSICION_INVALIDA: está ${t.estado}`)
       registrarEvento({ entidad: 'tramites', entidad_id: t.id, accion: 'update', estado_antes: t.estado, estado_despues: 'autorizado', gestora_antes: t.gestora_id, gestora_despues: a.p_gestora, motivo: '' })
@@ -397,7 +422,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       await route.fulfill({ json: a.p_idem })
     },
     async registrar_carga(route, a) {
-      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable cargan fondos')
+      if ((rol !== 'gerencia' && rol !== 'contable') || !tieneAlcance(a.p_empresa, null))
+        return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable con alcance cargan fondos')
       const imp = importe(a.p_importe)
       if (imp == null || imp <= 0n) return errorNegocio(route, 'DATO_INVALIDO: el importe de la carga debe ser mayor a cero')
       if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha de la carga es obligatoria')
@@ -469,10 +495,15 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     sucursales: () => catalogos.sucursales,
     tipos_tramite: () => catalogos.tipos_tramite,
     operaciones: () => st.operaciones,
-    tramites: () => st.tramites,
-    v_tramite_finanzas: () => st.tramites.map(finanzas),
+    tramites: () => st.tramites.filter(veTramite),
+    v_tramite_finanzas: () => st.tramites.filter(veTramite).map(finanzas),
     movimientos: () => st.movimientos.map(({ id, cuenta_id, revierte_id, created_at }) => ({ id, cuenta_id, revierte_id, created_at })),
-    v_saldos: saldos,
+    v_saldos: () => {
+      if (rol !== 'gerencia' && rol !== 'contable') return []
+      const filas = opciones.saldosFijos ? opciones.saldosFijos(st) : saldos()
+      if (!filas) throw new SaldoSinFixture()
+      return filas.filter((f) => tieneAlcance(f.empresa_id, null))
+    },
     v_movimientos_extracto: extracto,
     eventos: () => st.eventos,
   }
@@ -504,6 +535,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     const req = route.request()
     const url = new URL(req.url())
     rutasPedidas.push(url.pathname)
+    urlsPedidas.push(decodeURIComponent(url.pathname + url.search))
     if (url.pathname.startsWith('/auth/v1/user')) return route.fulfill({ json: sesionActiva.user })
     if (url.pathname.startsWith('/auth/v1/logout')) return route.fulfill({ status: 204, body: '' })
     const rpc = /^\/rest\/v1\/rpc\/(\w+)$/.exec(url.pathname)
@@ -515,7 +547,14 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     const tabla = /^\/rest\/v1\/(\w+)$/.exec(url.pathname)?.[1]
     const fuente = tabla && tablas[tabla]
     if (!fuente || !['GET', 'HEAD'].includes(req.method())) throw new Error(`Ruta sin mock: ${req.method()} ${url.pathname}`)
-    let filas = filtrar(fuente(), url.searchParams)
+    let base: Fila[]
+    try {
+      base = fuente()
+    } catch (e) {
+      if (e instanceof SaldoSinFixture) return route.fulfill({ status: 500, json: { message: 'estado sin v_saldos registrado' } })
+      throw e
+    }
+    let filas = filtrar(base, url.searchParams)
     if (req.method() === 'HEAD') {
       const total = filas.length
       return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range', 'content-range': total ? `0-${total - 1}/${total}` : `*/0` }, body: '' })
@@ -542,5 +581,5 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     }
     return route.fulfill({ json: filas })
   })
-  return { rutasPedidas }
+  return { rutasPedidas, urlsPedidas }
 }

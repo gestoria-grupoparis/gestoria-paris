@@ -70,6 +70,12 @@
       "nombre": "Gustavo Gerente",
       "rol": "gerencia",
       "activo": true
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a2",
+      "nombre": "Gisela Gerente",
+      "rol": "gerencia",
+      "activo": true
     }
   ],
   "cuentas": [
