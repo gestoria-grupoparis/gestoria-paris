@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 const CLASE_INPUT =
   'mt-1 w-full border border-linea px-2 py-2 focus-visible:outline-2 focus-visible:outline-marca'
 
-export function Login() {
+export function Login({ aviso }: { aviso?: string } = {}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +34,11 @@ export function Login() {
         </label>
         <input id="password" type="password" autoComplete="current-password" required value={password}
           onChange={(e) => setPassword(e.target.value)} className={`mb-4 ${CLASE_INPUT}`} />
+        {aviso && !error && (
+          <p role="alert" className="mb-3 text-sm text-alerta">
+            {aviso}
+          </p>
+        )}
         {error && (
           <p role="alert" className="mb-3 text-sm text-alerta">
             {error}
