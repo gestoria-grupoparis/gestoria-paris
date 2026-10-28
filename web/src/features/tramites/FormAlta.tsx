@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { cloneElement, useState, type FormEvent, type ReactElement } from 'react'
 import { codigoError, mensajeError } from '../../lib/errores'
 import { nuevaIdem } from '../../lib/supabase'
 import { buscarDuplicados, crearTramite, type Catalogos } from './consultas'
-import { CLASE_CAMPO, CLASE_ETIQUETA, CLASE_PRIMARIO, CLASE_SECUNDARIO, Dialogo } from './Dialogo'
+import { Button, claseControl, Field } from '../../ui'
+import { Dialogo } from './Dialogo'
 import { etiquetaEstado } from './filtros'
 
 interface Props {
@@ -52,94 +53,102 @@ export function FormAlta({ catalogos, onCerrar, onCreado }: Props) {
     }
   }
 
+  const sel = claseControl
   return (
-    <Dialogo titulo="Nuevo trámite" onCerrar={onCerrar}>
-      <form onSubmit={guardar} className="grid grid-cols-2 gap-x-3 gap-y-2">
-        <label className="col-span-2 sm:col-span-1">
-          <span className={CLASE_ETIQUETA}>Cliente</span>
-          <input required className={CLASE_CAMPO} {...campo('cliente')} />
-        </label>
-        <label className="col-span-2 sm:col-span-1">
-          <span className={CLASE_ETIQUETA}>Cuenta personal</span>
-          <input required className={CLASE_CAMPO} {...campo('cuentaPersonal')} />
-        </label>
-        <label>
-          <span className={CLASE_ETIQUETA}>Oferta</span>
-          <input required className={CLASE_CAMPO} {...campo('oferta')} />
-        </label>
-        <label>
-          <span className={CLASE_ETIQUETA}>Dominio</span>
-          <input className={`${CLASE_CAMPO} uppercase`} {...campo('dominio')} />
-        </label>
-        <label className="col-span-2 sm:col-span-1">
-          <span className={CLASE_ETIQUETA}>Vehículo</span>
-          <input required className={CLASE_CAMPO} {...campo('vehiculo')} />
-        </label>
-        <label className="col-span-2 sm:col-span-1">
-          <span className={CLASE_ETIQUETA}>Chasis</span>
-          <input className={`${CLASE_CAMPO} uppercase`} {...campo('chasis')} />
-        </label>
-        <label className="col-span-2">
-          <span className={CLASE_ETIQUETA}>Tipo</span>
-          <select required className={CLASE_CAMPO} {...campo('tipo')}>
-            <option value="">Elegí el tipo</option>
-            {catalogos.tipos.map((t) => (
-              <option key={t.id} value={t.codigo}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className={CLASE_ETIQUETA}>Razón social</span>
-          <select required className={CLASE_CAMPO} {...campo('empresa')}>
-            <option value="">Elegí</option>
-            {catalogos.empresas.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className={CLASE_ETIQUETA}>Sucursal</span>
-          <select required className={CLASE_CAMPO} {...campo('sucursal')}>
-            <option value="">Elegí</option>
-            {catalogos.sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre} ({s.provincia})
-              </option>
-            ))}
-          </select>
-        </label>
+    <Dialogo titulo="Nuevo trámite" rotulo="Alta" onCerrar={onCerrar} ancho="md:max-w-2xl">
+      <form onSubmit={guardar} className="space-y-6">
+        <fieldset className="grid grid-cols-2 gap-x-4 gap-y-4">
+          <legend className="rotulo col-span-2 mb-3">Cliente y operación</legend>
+          <Campo label="Cliente" className="col-span-2 sm:col-span-1">
+            <input required className={sel} placeholder="Nombre y apellido" {...campo('cliente')} />
+          </Campo>
+          <Campo label="Cuenta personal" className="col-span-2 sm:col-span-1">
+            <input required className={sel} placeholder="CP-0000" {...campo('cuentaPersonal')} />
+          </Campo>
+          <Campo label="Razón social">
+            <select required className={sel} {...campo('empresa')}>
+              <option value="">Elegí</option>
+              {catalogos.empresas.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+          <Campo label="Sucursal">
+            <select required className={sel} {...campo('sucursal')}>
+              <option value="">Elegí</option>
+              {catalogos.sucursales.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre} ({s.provincia})
+                </option>
+              ))}
+            </select>
+          </Campo>
+          <Campo label="Oferta">
+            <input required className={sel} placeholder="OF-0000" {...campo('oferta')} />
+          </Campo>
+          <Campo label="Tipo">
+            <select required className={sel} {...campo('tipo')}>
+              <option value="">Elegí el tipo</option>
+              {catalogos.tipos.map((t) => (
+                <option key={t.id} value={t.codigo}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+        </fieldset>
+
+        <fieldset className="grid grid-cols-2 gap-x-4 gap-y-4">
+          <legend className="rotulo col-span-2 mb-3">Vehículo</legend>
+          <Campo label="Vehículo" className="col-span-2">
+            <input required className={sel} placeholder="Marca, modelo y versión" {...campo('vehiculo')} />
+          </Campo>
+          <Campo label="Dominio" ayuda="Si todavía no tiene, dejalo vacío.">
+            <input className={`${sel} font-mono tracking-widest uppercase`} placeholder="AA000AA" {...campo('dominio')} />
+          </Campo>
+          <Campo label="Chasis">
+            <input className={`${sel} font-mono uppercase`} {...campo('chasis')} />
+          </Campo>
+        </fieldset>
 
         {duplicados && (
-          <div role="alert" className="col-span-2 border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-sm">
-            <p className="font-semibold">Posible duplicado en la misma razón social:</p>
-            <ul className="mt-1 list-inside list-disc">
+          <div role="alert" className="rounded-md bg-comprometido-suave px-4 py-3 text-[14px] text-tinta ring-1 ring-comprometido/30">
+            <p className="font-semibold text-comprometido">Posible duplicado en la misma razón social:</p>
+            <ul className="mt-1.5 space-y-0.5">
               {duplicados.map((x) => (
-                <li key={x.id}>
-                  {x.numero} ({etiquetaEstado(x.estado)})
+                <li key={x.id} className="cifra font-medium">
+                  {x.numero} <span className="font-normal text-tenue">({etiquetaEstado(x.estado)})</span>
                 </li>
               ))}
             </ul>
-            <p className="mt-1 text-tenue">Revisá antes de crear otro. Si es un trámite distinto, guardalo de todos modos.</p>
+            <p className="mt-1.5 text-tenue">Revisá antes de crear otro. Si es un trámite distinto, guardalo de todos modos.</p>
           </div>
         )}
         {error && (
-          <p role="alert" className="col-span-2 text-sm text-alerta">
+          <p role="alert" className="rounded-md bg-sinfondos-suave px-4 py-3 text-sm font-medium text-sinfondos">
             {error}
           </p>
         )}
-        <div className="col-span-2 mt-2 flex justify-end gap-2">
-          <button type="button" className={CLASE_SECUNDARIO} onClick={onCerrar}>
+        <div className="flex flex-col-reverse gap-2 border-t border-linea pt-4 sm:flex-row sm:justify-end">
+          <Button variante="secundario" onClick={onCerrar}>
             Cancelar
-          </button>
-          <button type="submit" className={CLASE_PRIMARIO} disabled={enviando}>
+          </Button>
+          <Button type="submit" cargando={enviando}>
             {duplicados?.length ? 'Guardar de todos modos' : 'Guardar trámite'}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialogo>
+  )
+}
+
+/** Campo del alta: rótulo asociado al control por id (Field del kit). */
+function Campo({ label, className, ayuda, children }: { label: string; className?: string; ayuda?: string; children: ReactElement<Record<string, unknown>> }) {
+  return (
+    <Field label={label} ayuda={ayuda} className={className ?? 'col-span-2 sm:col-span-1'}>
+      {(p) => cloneElement(children, p as unknown as Record<string, unknown>)}
+    </Field>
   )
 }

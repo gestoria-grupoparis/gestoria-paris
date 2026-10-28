@@ -82,7 +82,7 @@ const SELECT_TRAMITE =
 
 const SELECT_FINANZAS = 'tramite_id,presupuesto:presupuesto_cents::text,pagado:pagado_cents::text,situacion'
 
-const LIMITE = 500
+export const LIMITE = 500
 
 function sinResultados<T>(): T[] {
   return []

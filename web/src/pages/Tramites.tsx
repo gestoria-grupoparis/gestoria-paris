@@ -2,8 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { supabase } from '../lib/supabase'
-import { cargarCatalogos, listarTramites } from '../features/tramites/consultas'
-import { CLASE_PRIMARIO } from '../features/tramites/Dialogo'
+import { cargarCatalogos, LIMITE, listarTramites } from '../features/tramites/consultas'
+import { Button, Cargando, EmptyState, ErrorState, PageHeader } from '../ui'
+import { IconoMas } from '../ui/Iconos'
 import { filtrosAURL, filtrosDesdeURL, type FiltrosTramites as Filtros } from '../features/tramites/filtros'
 import { FiltrosTramites } from '../features/tramites/FiltrosTramites'
 import { FormAlta } from '../features/tramites/FormAlta'
@@ -50,51 +51,72 @@ export function Tramites() {
   )
   const nombre = useCallback((id: string | null) => (id ? (nombres.get(id) ?? 'Usuario desconocido') : '—'), [nombres])
 
-  const cambiarFiltros = (f: Filtros) => setParams((p) => filtrosAURL(f, p), { replace: true })
+  // Se parte siempre de la URL actual: el updater de react-router recibe los parámetros del último
+  // render y, si dos cambios llegan seguidos (cerrar detalle y tipear), el segundo pisaría al primero.
+  const actuales = () => new URLSearchParams(window.location.search)
+  const cambiarFiltros = (f: Filtros) => setParams(() => filtrosAURL(f, actuales()), { replace: true })
   const seleccionar = (id: string | null) =>
-    setParams((p) => {
-      const n = new URLSearchParams(p)
+    setParams(() => {
+      const n = actuales()
       if (id) n.set('t', id)
       else n.delete('t')
       return n
     })
 
+  const n = lista.data?.length
+  const conteo = n == null ? undefined : n === 1 ? '1 trámite' : `${n} trámites`
   return (
     <div className="flex min-h-dvh flex-col md:h-dvh md:flex-row">
-      <div className="flex min-w-0 flex-1 flex-col md:overflow-hidden">
-        <header className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
-          <h1 className="text-lg font-semibold">Trámites</h1>
-          <div className="flex items-center gap-3">
-            {lista.data && (
-              <span className="text-xs text-tenue" aria-live="polite">
-                {lista.data.length === 1 ? '1 trámite' : `${lista.data.length} trámites`}
-              </span>
-            )}
-            <button
-              type="button"
-              className={CLASE_PRIMARIO}
-              disabled={!catalogos.data}
-              onClick={() => setAltaAbierta(true)}
-            >
+      <div className="min-w-0 flex-1 px-4 pt-5 pb-8 md:overflow-y-auto md:px-8 md:pt-8">
+        <PageHeader
+          rotulo="Operación"
+          titulo="Trámites"
+          descripcion={
+            <span aria-live="polite">
+              {conteo ? `${conteo} ${Object.values(filtros).some(Boolean) ? 'con los filtros aplicados' : 'en tu alcance'}.` : 'Altas, autorizaciones y seguimiento.'}
+            </span>
+          }
+          acciones={
+            <Button icono={<IconoMas className="size-[18px]" />} disabled={!catalogos.data} onClick={() => setAltaAbierta(true)}>
               Nuevo trámite
-            </button>
-          </div>
-        </header>
+            </Button>
+          }
+        />
         <FiltrosTramites filtros={filtros} catalogos={catalogos.data} onCambiar={cambiarFiltros} />
-        <div className="min-h-0 flex-1 overflow-auto md:p-3">
+        <div className="mt-5">
           {lista.isError ? (
-            <p role="alert" className="p-4 text-sm text-alerta">
-              No se pudieron cargar los trámites.{' '}
-              <button type="button" className="underline" onClick={() => void lista.refetch()}>
-                Reintentar
-              </button>
-            </p>
+            <ErrorState
+              titulo="No se pudieron cargar los trámites"
+              descripcion="Revisá la conexión y probá de nuevo."
+              accion={
+                <Button variante="secundario" tamano="sm" className="self-start" onClick={() => void lista.refetch()}>
+                  Reintentar
+                </Button>
+              }
+            />
           ) : !lista.data ? (
-            <p className="p-4 text-sm text-tenue">Cargando trámites…</p>
+            <Cargando filas={6} etiqueta="Cargando trámites…" />
           ) : lista.data.length === 0 ? (
-            <p className="p-4 text-sm text-tenue">Ningún trámite coincide con los filtros. Probá con otra búsqueda o limpiá los filtros.</p>
+            <EmptyState
+              titulo="Ningún trámite coincide"
+              descripcion="Probá con otra búsqueda o limpiá los filtros."
+              accion={
+                Object.values(filtros).some(Boolean) ? (
+                  <Button variante="secundario" tamano="sm" onClick={() => cambiarFiltros({})}>
+                    Limpiar filtros
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
-            <TablaTramites filas={lista.data} seleccionado={seleccionado} onSeleccionar={seleccionar} nombreGestora={nombre} />
+            <TablaTramites
+              filas={lista.data}
+              seleccionado={seleccionado}
+              onSeleccionar={seleccionar}
+              nombreGestora={nombre}
+              compacto={!!seleccionado}
+              pie={lista.data.length >= LIMITE ? 'Se muestran los 500 más recientes. Afiná la búsqueda para ver otros.' : undefined}
+            />
           )}
         </div>
       </div>

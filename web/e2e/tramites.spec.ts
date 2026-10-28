@@ -85,3 +85,38 @@ test('observar exige motivo y el historial muestra autor y fecha', async ({ page
   await expect(ultimo).toContainText('Carla Contable')
   await expect(ultimo).toContainText('28/10/2026 10:45')
 })
+
+test('suspender y reanudar vuelve al estado previo; marcas documentales y cancelación con motivo', async ({ page }) => {
+  await montarSupabase(page, [borrador])
+  await page.goto('/tramites')
+  await page.getByRole('row', { name: /T-2026-00001/ }).click()
+  const detalle = page.getByRole('complementary', { name: 'Detalle del trámite' })
+
+  await detalle.getByRole('button', { name: 'Marcar legajo recibido' }).click()
+  const marcas = detalle.getByRole('list', { name: 'Marcas documentales' })
+  await expect(marcas.getByRole('listitem').first()).toContainText('Carla Contable')
+  await expect(detalle.getByRole('button', { name: 'Marcar legajo recibido' })).toHaveCount(0)
+
+  await detalle.getByRole('button', { name: 'Suspender' }).click()
+  const suspender = page.getByRole('dialog', { name: 'Suspender trámite' })
+  await suspender.getByRole('button', { name: 'Confirmar suspensión' }).click()
+  await expect(suspender.getByRole('alert')).toHaveText('Indicá el motivo de la suspensión.')
+  await suspender.getByLabel('Motivo').fill('Cliente de viaje')
+  await suspender.getByRole('button', { name: 'Confirmar suspensión' }).click()
+  await expect(detalle.getByTestId('estado')).toHaveText('Suspendido')
+
+  await detalle.getByRole('button', { name: 'Reanudar' }).click()
+  const reanudar = page.getByRole('dialog', { name: 'Reanudar trámite' })
+  await expect(reanudar).toContainText('Vuelve a Borrador.')
+  await reanudar.getByLabel('Motivo').fill('Volvió')
+  await reanudar.getByRole('button', { name: 'Confirmar' }).click()
+  await expect(detalle.getByTestId('estado')).toHaveText('Borrador')
+
+  await detalle.getByRole('button', { name: 'Cancelar trámite' }).click()
+  const cancelar = page.getByRole('dialog', { name: 'Cancelar trámite' })
+  await cancelar.getByLabel('Motivo').fill('Se cayó la venta')
+  await cancelar.getByRole('button', { name: 'Confirmar cancelación' }).click()
+  await expect(detalle.getByTestId('estado')).toHaveText('Cancelado')
+  await expect(detalle.getByRole('button', { name: 'Cancelar trámite' })).toHaveCount(0)
+  await expect(detalle.getByRole('list', { name: 'Historial' }).getByRole('listitem').first()).toContainText('Se cayó la venta')
+})
