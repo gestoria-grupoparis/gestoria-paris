@@ -1,0 +1,44 @@
+{
+  "operacion": {
+    "id": "00000000-0000-4000-8000-000000000092",
+    "empresa_id": "00000000-0000-4000-8000-0000000000e1",
+    "sucursal_id": "00000000-0000-4000-8000-0000000000d1",
+    "cliente_nombre": "Lucía Funes",
+    "cuenta_personal": "CP-5120",
+    "oferta_ref": "OF-7300",
+    "referencia_mail": null,
+    "created_at": "2026-10-26T12:00:00.000Z"
+  },
+  "autorizado": {
+    "id": "00000000-0000-4000-8000-0000000000b1",
+    "numero": "T-2026-00011",
+    "operacion_id": "00000000-0000-4000-8000-000000000092",
+    "tipo_id": "00000000-0000-4000-8000-0000000000f1",
+    "empresa_id": "00000000-0000-4000-8000-0000000000e1",
+    "sucursal_id": "00000000-0000-4000-8000-0000000000d1",
+    "estado": "autorizado",
+    "vehiculo_desc": "Fiat Cronos Drive",
+    "dominio": "AF200BB",
+    "chasis": null,
+    "gestora_id": "00000000-0000-4000-8000-000000000071",
+    "autorizado_at": "2026-10-27T13:00:00.000Z",
+    "version": 2,
+    "created_at": "2026-10-26T12:00:00.000Z"
+  },
+  "presentado": {
+    "id": "00000000-0000-4000-8000-0000000000b2",
+    "numero": "T-2026-00012",
+    "operacion_id": "00000000-0000-4000-8000-000000000092",
+    "tipo_id": "00000000-0000-4000-8000-0000000000f2",
+    "empresa_id": "00000000-0000-4000-8000-0000000000e1",
+    "sucursal_id": "00000000-0000-4000-8000-0000000000d1",
+    "estado": "presentado",
+    "vehiculo_desc": "Renault Kangoo 2021",
+    "dominio": "AC333DD",
+    "chasis": null,
+    "gestora_id": "00000000-0000-4000-8000-000000000071",
+    "autorizado_at": "2026-10-20T13:00:00.000Z",
+    "version": 3,
+    "created_at": "2026-10-19T12:00:00.000Z"
+  }
+}

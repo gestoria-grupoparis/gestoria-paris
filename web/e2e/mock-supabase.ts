@@ -15,13 +15,26 @@ interface Estado {
   tramites: Fila[]
   marcas: Fila[]
   eventos: Fila[]
+  presupuestos: Fila[]
+  pagos: Fila[]
   siguienteEvento: number
 }
 
 export interface Semilla {
   operacion: Fila
   tramite: Fila
+  /** Totales en centavos (texto) de las versiones del presupuesto, de la 1 en adelante. */
+  presupuestos?: string[]
+  /** Fuerza la situación financiera (p. ej. sin_fondos, que depende del saldo de la cuenta). */
+  situacion?: string
 }
+
+export interface OpcionesMock {
+  /** Id de perfil (de fixtures/catalogos.json) con el que se inicia la sesión. Por defecto, Carla Contable. */
+  usuario?: string
+}
+
+const ESTADOS_EN_CURSO = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro']
 
 const nombreDe = (lista: Fila[], id: unknown) => lista.find((x) => x.id === id)
 
@@ -97,14 +110,20 @@ function filtrar(filas: Fila[], params: URLSearchParams): Fila[] {
 }
 
 // --- Mock --------------------------------------------------------------------------------------
-export async function montarSupabase(page: Page, semillas: Semilla[] = []) {
+export async function montarSupabase(page: Page, semillas: Semilla[] = [], opciones: OpcionesMock = {}) {
   const ahora = catalogos.ahora
-  const yo = sesion.user.id
+  const yo = opciones.usuario ?? sesion.user.id
+  const sesionActiva = { ...sesion, user: { ...sesion.user, id: yo } }
+  const rutasPedidas: string[] = []
+  const situacionForzada = new Map(semillas.filter((s) => s.situacion).map((s) => [s.tramite.id, s.situacion!]))
   const st: Estado = {
     operaciones: semillas.map((s) => ({ ...s.operacion })),
     tramites: semillas.map((s) => ({ ...s.tramite })),
     marcas: [],
     eventos: [],
+    presupuestos: semillas.flatMap((s) =>
+      (s.presupuestos ?? []).map((total, i) => ({ tramite_id: s.tramite.id, version: i + 1, total }))),
+    pagos: [],
     siguienteEvento: 1,
   }
 
@@ -132,8 +151,26 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = []) {
     }
   }
 
+  // Réplica simplificada de v_tramite_finanzas (sin saldo de cuenta: sin_fondos llega forzado por semilla).
   function finanzas(t: Fila): Fila {
-    return { tramite_id: t.id, presupuesto: null, pagado: '0', situacion: 'no_aplica' }
+    const versiones = st.presupuestos.filter((p) => p.tramite_id === t.id)
+    const presupuesto = versiones.length ? String(versiones[versiones.length - 1].total) : null
+    const pagos = st.pagos.filter((p) => p.tramite_id === t.id)
+    const pagado = pagos.reduce((s, p) => s + BigInt(String(p.total)), 0n)
+    const enCurso = ESTADOS_EN_CURSO.includes(String(t.estado))
+    let situacion = 'no_aplica'
+    if (pagos.some((p) => p.es_final)) situacion = 'pagado'
+    else if (situacionForzada.has(t.id)) situacion = situacionForzada.get(t.id)!
+    else if (enCurso && presupuesto && pagado === 0n) situacion = 'comprometido'
+    else if (enCurso && !presupuesto) situacion = 'sin_presupuesto'
+    else if (enCurso && pagado > 0n) situacion = 'pagado_parcial'
+    return { tramite_id: t.id, presupuesto, pagado: String(pagado), situacion }
+  }
+
+  function conceptos(a: Fila): bigint | null {
+    const v = [a.p_arancel, a.p_prenda, a.p_sellado, a.p_otros]
+    if (v.some((x) => x == null || !/^\d+$/.test(String(x)))) return null
+    return v.reduce<bigint>((s, x) => s + BigInt(String(x)), 0n)
   }
 
   function tramite(id: unknown) {
@@ -205,6 +242,30 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = []) {
       }
       await route.fulfill({ status: 204, body: '' })
     },
+    async registrar_presupuesto(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if (!['autorizado', 'en_gestoria', 'presentado'].includes(String(t.estado)))
+        return errorNegocio(route, `NO_AUTORIZADO: está ${t.estado}`)
+      const total = conceptos(a)
+      if (total == null || total <= 0n) return errorNegocio(route, 'DATO_INVALIDO: importes inválidos')
+      const version = st.presupuestos.filter((p) => p.tramite_id === t.id).length + 1
+      if (version >= 2 && !String(a.p_motivo ?? '').trim())
+        return errorNegocio(route, 'DATO_INVALIDO: una nueva versión del presupuesto requiere motivo')
+      st.presupuestos.push({ tramite_id: t.id, version, total: String(total) })
+      await route.fulfill({ json: version })
+    },
+    async registrar_pago(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if (!ESTADOS_EN_CURSO.includes(String(t.estado))) return errorNegocio(route, `NO_AUTORIZADO: está ${t.estado}`)
+      const total = conceptos(a)
+      if (total == null || total <= 0n) return errorNegocio(route, 'DATO_INVALIDO: importes inválidos')
+      if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha del pago es obligatoria')
+      if (!st.pagos.some((p) => p.idem === a.p_idem))
+        st.pagos.push({ idem: a.p_idem, tramite_id: t.id, total: String(total), es_final: a.p_es_final === true, fecha: a.p_fecha })
+      await route.fulfill({ json: a.p_idem })
+    },
     async reasignar_gestora(route, a) {
       let n = 0
       for (const id of a.p_tramites as string[]) {
@@ -232,7 +293,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = []) {
 
   await page.addInitScript(
     ([clave, valor]) => window.localStorage.setItem(clave, valor),
-    [CLAVE_SESION, JSON.stringify(sesion)] as const,
+    [CLAVE_SESION, JSON.stringify(sesionActiva)] as const,
   )
   await page.routeWebSocket(/\/realtime\/v1\//, () => {
     // Acepta la conexión de Realtime sin servidor detrás: los specs no dependen de eventos en vivo.
@@ -240,7 +301,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = []) {
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const req = route.request()
     const url = new URL(req.url())
-    if (url.pathname.startsWith('/auth/v1/user')) return route.fulfill({ json: sesion.user })
+    rutasPedidas.push(url.pathname)
+    if (url.pathname.startsWith('/auth/v1/user')) return route.fulfill({ json: sesionActiva.user })
     if (url.pathname.startsWith('/auth/v1/logout')) return route.fulfill({ status: 204, body: '' })
     const rpc = /^\/rest\/v1\/rpc\/(\w+)$/.exec(url.pathname)
     if (rpc) {
@@ -272,4 +334,5 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = []) {
     }
     return route.fulfill({ json: filas })
   })
+  return { rutasPedidas }
 }
