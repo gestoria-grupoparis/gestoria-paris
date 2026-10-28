@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { parsearPesos } from '../../lib/dinero'
 import { mensajeError } from '../../lib/errores'
-import { CLASE_CAMPO, CLASE_ETIQUETA, CLASE_PRIMARIO, CLASE_SECUNDARIO, Dialogo } from '../tramites/Dialogo'
+import { Dialogo } from '../tramites/Dialogo'
+import { Button, ErrorState, Field, Input } from '../../ui'
 import { registrarPresupuesto, type Conceptos } from './consultas'
 
 const CONCEPTOS = [
@@ -22,21 +23,30 @@ export function leerConceptos(v: TextoConceptos): Conceptos {
 
 export function CamposConceptos({ valor, onCambio }: { valor: TextoConceptos; onCambio: (v: TextoConceptos) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {CONCEPTOS.map((c) => (
-        <label key={c.id} className={CLASE_ETIQUETA}>
-          {c.etiqueta}
-          <input
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="0"
-            value={valor[c.id]}
-            onChange={(e) => onCambio({ ...valor, [c.id]: e.target.value })}
-            className={`${CLASE_CAMPO} py-2.5 text-right text-base`}
-          />
-        </label>
-      ))}
-    </div>
+    <fieldset className="rounded-lg bg-fondo p-4 ring-1 ring-linea">
+      <legend className="rotulo float-left mb-3 w-full">Conceptos en pesos</legend>
+      <div className="clear-both grid grid-cols-2 gap-3">
+        {CONCEPTOS.map((c) => (
+          <Field key={c.id} label={c.etiqueta}>
+            {(p) => (
+              <div className="relative">
+                <span aria-hidden className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-tenue">$</span>
+                <Input
+                  {...p}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="0"
+                  value={valor[c.id]}
+                  onChange={(e) => onCambio({ ...valor, [c.id]: e.target.value })}
+                  className="cifra h-12 pl-7 text-right text-[17px] font-semibold"
+                />
+              </div>
+            )}
+          </Field>
+        ))}
+      </div>
+      <p className="mt-3 text-[13px] text-tenue">Dejá en blanco lo que no corresponda. El total lo calcula el sistema.</p>
+    </fieldset>
   )
 }
 
@@ -70,14 +80,13 @@ export function FormPresupuesto({ tramite, onCerrar, onGuardado }: {
   }
 
   return (
-    <Dialogo titulo="Cargar presupuesto" onCerrar={onCerrar}>
+    <Dialogo titulo="Cargar presupuesto" rotulo={`Trámite ${tramite.numero}`} onCerrar={onCerrar}>
       <form onSubmit={enviar} className="space-y-4">
-        <p className="text-sm text-tenue">Trámite {tramite.numero}. El total lo calcula el sistema.</p>
         <CamposConceptos valor={valor} onCambio={setValor} />
-        {error && <p role="alert" className="text-sm text-alerta">{error}</p>}
-        <div className="flex gap-2">
-          <button type="button" onClick={onCerrar} className={`${CLASE_SECUNDARIO} flex-1 py-3`}>Cancelar</button>
-          <button type="submit" disabled={enviando} className={`${CLASE_PRIMARIO} flex-1 py-3`}>Guardar presupuesto</button>
+        {error && <ErrorState titulo="Revisá los importes" descripcion={error} />}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <Button variante="secundario" tamano="lg" onClick={onCerrar}>Cancelar</Button>
+          <Button type="submit" tamano="lg" cargando={enviando}>Guardar presupuesto</Button>
         </div>
       </form>
     </Dialogo>

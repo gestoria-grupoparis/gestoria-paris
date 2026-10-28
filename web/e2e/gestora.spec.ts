@@ -65,3 +65,17 @@ test('gestora no ve el menú Habitualista ni importes de saldo', async ({ page }
   await expect(page.getByText(/saldo|disponible|comprometido/i)).toHaveCount(0)
   expect(mock.rutasPedidas.filter((r) => /v_saldos|cuentas|movimientos/.test(r))).toEqual([])
 })
+
+test('gestora ve el resumen cuenta por grupo', async ({ page }) => {
+  await montarSupabase(page, [{ operacion: f.operacion, tramite: f.autorizado }], { usuario: GABRIELA })
+  await page.goto('/mis-tramites')
+  const resumen = page.getByRole('navigation', { name: 'Resumen' })
+  await expect(resumen.getByRole('link', { name: /Presupuestar/ })).toContainText('1')
+  await expect(page.getByText('Próximo paso:')).toContainText('Presupuesto')
+})
+
+test('gestora sin trámites asignados ve el estado vacío', async ({ page }) => {
+  await montarSupabase(page, [], { usuario: GABRIELA })
+  await page.goto('/mis-tramites')
+  await expect(page.getByRole('heading', { name: 'Estás al día' })).toBeVisible()
+})
