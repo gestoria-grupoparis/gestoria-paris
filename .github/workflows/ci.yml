@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Dependencias (raíz)
+        run: npm ci
+
+      - name: Dependencias (web)
+        run: npm --prefix web ci
+
+      # PostgreSQL 17 real vía embedded-postgres (scripts/test-db.mjs); no usa Supabase ni credenciales.
+      - name: Pruebas de base de datos
+        run: npx vitest run tests/db
+
+      - name: Pruebas unitarias del frontend
+        run: npm --prefix web test
+
+      # El build no necesita el proyecto real: las variables solo se embeben en el bundle.
+      - name: Build del frontend
+        run: npm --prefix web run build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+
+# Los E2E de Playwright (web/e2e) no corren en CI: se corren a mano (ver docs/OPERACION.md).
