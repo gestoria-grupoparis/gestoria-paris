@@ -28,7 +28,7 @@ export function PantallaMensaje({ titulo, descripcion, acciones, tono = 'neutro'
   return (
     <div className="tema-oscuro grid min-h-dvh place-items-center bg-noche px-4 py-10 text-tinta">
       <div role={tono === 'error' ? 'alert' : undefined} className="w-full max-w-[420px] rounded-xl bg-superficie p-8 ring-1 ring-linea">
-        <LogoGrupoParis className="mb-10 h-16" />
+        <LogoGrupoParis tono="claro" className="mb-10 h-10" />
         {icono && (
           <span aria-hidden className={cx('mb-4 grid size-12 place-items-center rounded-full', tono === 'error' ? 'bg-sinfondos-suave text-sinfondos' : 'bg-hundido text-tinta ring-1 ring-linea')}>
             {icono}

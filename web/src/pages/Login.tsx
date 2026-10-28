@@ -69,7 +69,7 @@ export function Login({ aviso }: { aviso?: string } = {}) {
       </div>
 
       <header className="flex items-center justify-between px-5 pt-6 md:px-10 md:pt-8">
-        <LogoGrupoParis className="h-20 md:h-24" />
+        <LogoGrupoParis tono="claro" className="h-10 md:h-12" />
         <span className="rotulo-marca hidden text-white/60 sm:inline">Gestoría interna</span>
       </header>
 
