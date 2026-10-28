@@ -1,0 +1,87 @@
+import { expect, test, type Page } from '@playwright/test'
+import { montarSupabase } from './mock-supabase'
+import borrador from './fixtures/tramite-borrador.json' with { type: 'json' }
+
+async function completarAlta(page: Page) {
+  const form = page.getByRole('dialog', { name: 'Nuevo trámite' })
+  await form.getByLabel('Razón social').selectOption({ label: 'Paris Autos' })
+  await form.getByLabel('Sucursal').selectOption({ label: 'Casa central (San Luis)' })
+  await form.getByLabel('Tipo').selectOption({ label: 'Patentamiento 0 km' })
+  await form.getByLabel('Cliente').fill('María Gómez')
+  await form.getByLabel('Cuenta personal').fill('CP-7788')
+  await form.getByLabel('Oferta').fill('OF-5521')
+  await form.getByLabel('Vehículo').fill('Peugeot 208 Allure')
+  await form.getByLabel('Dominio').fill('ab123cd')
+  return form
+}
+
+test('contable da de alta, ve el aviso de duplicado al repetir, autoriza asignando gestora y lo encuentra buscando por dominio', async ({ page }) => {
+  await montarSupabase(page)
+  await page.goto('/tramites')
+
+  await page.getByRole('button', { name: 'Nuevo trámite' }).click()
+  let form = await completarAlta(page)
+  await form.getByRole('button', { name: 'Guardar trámite' }).click()
+  await expect(form).toBeHidden()
+
+  const detalle = page.getByRole('complementary', { name: 'Detalle del trámite' })
+  await expect(detalle.getByRole('heading', { name: 'T-2026-00001' })).toBeVisible()
+  await expect(detalle.getByTestId('estado')).toHaveText('Borrador')
+
+  await page.getByRole('button', { name: 'Nuevo trámite' }).click()
+  form = await completarAlta(page)
+  await form.getByRole('button', { name: 'Guardar trámite' }).click()
+  await expect(form.getByRole('alert')).toContainText('Posible duplicado')
+  await expect(form.getByRole('alert')).toContainText('T-2026-00001')
+  await form.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(form).toBeHidden()
+
+  await detalle.getByRole('button', { name: 'Autorizar' }).click()
+  const autorizar = page.getByRole('dialog', { name: 'Autorizar trámite' })
+  await autorizar.getByLabel('Gestora').selectOption({ label: 'Gabriela Gestora' })
+  await autorizar.getByRole('button', { name: 'Confirmar autorización' }).click()
+  await expect(autorizar).toBeHidden()
+  await expect(detalle.getByTestId('estado')).toHaveText('Autorizado')
+  await expect(detalle.getByTestId('gestora')).toHaveText('Gabriela Gestora')
+
+  await detalle.getByRole('button', { name: 'Cerrar detalle' }).click()
+  await page.getByRole('searchbox', { name: 'Buscar' }).fill('AB123CD')
+  await expect(page).toHaveURL(/q=AB123CD/)
+  const filas = page.getByRole('table', { name: 'Trámites' }).getByRole('row')
+  await expect(filas).toHaveCount(2) // encabezado + 1
+  await expect(filas.nth(1)).toContainText('T-2026-00001')
+  await expect(filas.nth(1)).toContainText('AB123CD')
+  await expect(filas.nth(1)).toContainText('Autorizado')
+  await expect(filas.nth(1)).toContainText('Gabriela Gestora')
+
+  await page.reload()
+  await expect(page.getByRole('searchbox', { name: 'Buscar' })).toHaveValue('AB123CD')
+  await expect(page.getByRole('table', { name: 'Trámites' }).getByRole('row')).toHaveCount(2)
+})
+
+test('observar exige motivo y el historial muestra autor y fecha', async ({ page }) => {
+  await montarSupabase(page, [borrador])
+  await page.goto('/tramites')
+
+  await page.getByRole('row', { name: /T-2026-00001/ }).click()
+  const detalle = page.getByRole('complementary', { name: 'Detalle del trámite' })
+  await expect(page).toHaveURL(/t=00000000-0000-4000-8000-0000000000a1/)
+
+  await detalle.getByRole('button', { name: 'Observar' }).click()
+  const observar = page.getByRole('dialog', { name: 'Observar trámite' })
+  await observar.getByRole('button', { name: 'Confirmar observación' }).click()
+  await expect(observar.getByRole('alert')).toHaveText('Indicá el motivo de la observación.')
+  await expect(detalle.getByTestId('estado')).toHaveText('Borrador')
+
+  await observar.getByLabel('Motivo').fill('Falta la firma del titular')
+  await observar.getByRole('button', { name: 'Confirmar observación' }).click()
+  await expect(observar).toBeHidden()
+  await expect(detalle.getByTestId('estado')).toHaveText('Observado')
+
+  const historial = detalle.getByRole('list', { name: 'Historial' })
+  const ultimo = historial.getByRole('listitem').first()
+  await expect(ultimo).toContainText('Borrador → Observado')
+  await expect(ultimo).toContainText('Falta la firma del titular')
+  await expect(ultimo).toContainText('Carla Contable')
+  await expect(ultimo).toContainText('28/10/2026 10:45')
+})

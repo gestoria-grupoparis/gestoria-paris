@@ -1,13 +1,22 @@
+import type { ComponentType } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import { useSesion } from '../lib/sesion'
 import { Login } from '../pages/Login'
 import { Layout } from './Layout'
 import { navegacionPorRol } from './navegacion'
 import { pantallaPara } from '../lib/perfil'
+import { Tramites } from '../pages/Tramites'
+
+const PANTALLAS: Record<string, ComponentType> = { '/tramites': Tramites }
 
 // Las pantallas reales llegan en las tareas siguientes.
 function Pendiente({ titulo }: { titulo: string }) {
   return <h1 className="px-4 py-4 text-lg font-semibold">{titulo}</h1>
+}
+
+function elementoDe(ruta: string, etiqueta: string) {
+  const Pantalla = PANTALLAS[ruta]
+  return Pantalla ? <Pantalla /> : <Pendiente titulo={etiqueta} />
 }
 
 export function Rutas() {
@@ -41,7 +50,7 @@ export function Rutas() {
     <Routes>
       <Route element={<Layout />}>
         {items.map((i) => (
-          <Route key={i.ruta} path={i.ruta} element={<Pendiente titulo={i.etiqueta} />} />
+          <Route key={i.ruta} path={i.ruta} element={elementoDe(i.ruta, i.etiqueta)} />
         ))}
         <Route
           path="*"

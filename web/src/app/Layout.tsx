@@ -29,7 +29,7 @@ export function Layout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="min-w-0 flex-1 pb-16 md:pb-0">
         <Outlet />
       </main>
       <nav

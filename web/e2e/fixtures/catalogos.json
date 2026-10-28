@@ -1,0 +1,22 @@
+{
+  "ahora": "2026-10-28T13:45:00.000Z",
+  "empresas": [
+    { "id": "00000000-0000-4000-8000-0000000000e1", "nombre": "Paris Autos" },
+    { "id": "00000000-0000-4000-8000-0000000000e2", "nombre": "Paris Cars" },
+    { "id": "00000000-0000-4000-8000-0000000000e3", "nombre": "Paris Motor" }
+  ],
+  "sucursales": [
+    { "id": "00000000-0000-4000-8000-0000000000d1", "nombre": "Casa central", "provincia": "San Luis" },
+    { "id": "00000000-0000-4000-8000-0000000000d2", "nombre": "Rivadavia", "provincia": "San Juan" }
+  ],
+  "tipos_tramite": [
+    { "id": "00000000-0000-4000-8000-0000000000f1", "codigo": "patentamiento_0km", "nombre": "Patentamiento 0 km", "activo": true },
+    { "id": "00000000-0000-4000-8000-0000000000f2", "codigo": "transferencia_usado", "nombre": "Transferencia usado", "activo": true },
+    { "id": "00000000-0000-4000-8000-0000000000f3", "codigo": "transferencia_parte_pago", "nombre": "Transferencia parte de pago", "activo": true }
+  ],
+  "perfiles": [
+    { "id": "00000000-0000-4000-8000-0000000000c1", "nombre": "Carla Contable", "rol": "contable", "activo": true },
+    { "id": "00000000-0000-4000-8000-000000000071", "nombre": "Gabriela Gestora", "rol": "gestora", "activo": true },
+    { "id": "00000000-0000-4000-8000-000000000072", "nombre": "Silvia Gestora", "rol": "gestora", "activo": true }
+  ]
+}
