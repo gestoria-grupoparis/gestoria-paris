@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
 import ExcelJS from 'exceljs'
 import { crearServidor, montarSupabase, type Extra, type Semilla, type Servidor } from './mock-supabase'
@@ -99,4 +102,63 @@ test('importa la planilla desde Excel: 3 filas, vincula 2 por dominio y marca 1 
   await expect(page.getByText('Planilla guardada.')).toBeVisible()
   await page.reload()
   await expect(page.getByRole('table', { name: 'Filas de la planilla' }).locator('tbody tr')).toHaveCount(3)
+})
+
+// --- Comprobantes: la lectura se simula con el texto de los fixtures (window.__ocrSimulado) -----
+const FIX = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'features', 'rendiciones', '__fixtures__')
+const texto = (n: string) => readFileSync(join(FIX, n), 'utf8')
+export const FILA_GODOY = '00000000-0000-4000-8000-00000000ab01'
+
+export function conPlanilla(extra: Extra = {}) {
+  return escenario({
+    rendicionFilas: [{ id: FILA_GODOY, rendicion_id: REND, orden: 1, nombre: 'GODOY MARIO ESTEBAN', dominio: null, pago: '94015398', honorarios: '3250000', tramite_id: T_GODOY.tramite.id, vinculo: 'auto', candidatos: [T_GODOY.tramite.id] }],
+    ...extra,
+  })
+}
+
+async function simularOcr(page: Page, textos: Record<string, string>) {
+  await page.addInitScript((t) => { (window as unknown as { __ocrSimulado: Record<string, string> }).__ocrSimulado = t }, textos)
+}
+const archivo = (name: string, contenido = name) => ({ name, mimeType: name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg', buffer: Buffer.from(contenido) })
+
+test('sube un recibo y una retención, los asigna a GODOY por nombre y dominio, y al confirmar quedan vinculados', async ({ page }) => {
+  await simularOcr(page, { 'recibo.pdf': texto('recibo-dnrpa.txt'), 'sellos.jpg': texto('retencion-sellos.txt') })
+  await abrir(page, GESTORA, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
+  await page.getByLabel('Archivos de comprobantes').setInputFiles([archivo('recibo.pdf'), archivo('sellos.jpg')])
+  const lista = page.getByRole('list', { name: 'Lista de comprobantes' })
+  await expect(lista.getByRole('listitem')).toHaveCount(2)
+  await expect(lista.getByText('GODOY MARIO ESTEBAN')).toHaveCount(2)
+  const form = page.getByRole('form', { name: 'Datos del comprobante' })
+  await form.getByRole('button', { name: 'Confirmar' }).click()
+  await expect(lista.getByText('Confirmado')).toHaveCount(1)
+  // Enter confirma el siguiente pendiente.
+  await form.getByRole('textbox').first().press('Enter')
+  await expect(lista.getByText('Confirmado')).toHaveCount(2)
+  await expect(lista).toContainText('$ 431.539,69')
+  await expect(lista).toContainText('$ 508.614,29')
+})
+
+test('el mismo archivo dos veces avisa duplicado', async ({ page }) => {
+  await simularOcr(page, { 'recibo.pdf': texto('recibo-dnrpa.txt') })
+  await abrir(page, GESTORA, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
+  const subir = page.getByLabel('Archivos de comprobantes')
+  await subir.setInputFiles([archivo('recibo.pdf')])
+  await expect(page.getByRole('list', { name: 'Lista de comprobantes' }).getByRole('listitem')).toHaveCount(1)
+  await subir.setInputFiles([archivo('recibo.pdf')])
+  const lista = page.getByRole('list', { name: 'Lista de comprobantes' })
+  await expect(lista.getByRole('listitem')).toHaveCount(2)
+  await expect(lista.getByText('Posible duplicado')).toHaveCount(2)
+  await expect(page.getByRole('alert').filter({ hasText: 'el mismo archivo ya se cargó' })).toBeVisible()
+})
+
+test('un archivo ilegible queda pendiente con todos los campos para completar', async ({ page }) => {
+  await simularOcr(page, { 'borroso.jpg': '%%% ###' })
+  await abrir(page, GESTORA, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
+  await page.getByLabel('Archivos de comprobantes').setInputFiles([archivo('borroso.jpg')])
+  const lista = page.getByRole('list', { name: 'Lista de comprobantes' })
+  await expect(lista.getByText('Otro comprobante')).toBeVisible()
+  await expect(lista.getByText('Pendiente')).toBeVisible()
+  const form = page.getByRole('form', { name: 'Datos del comprobante' })
+  await expect(form.getByText('Revisar', { exact: true })).toHaveCount(7)
+  await expect(form.getByText('Pendiente de revisión')).toBeVisible()
 })
