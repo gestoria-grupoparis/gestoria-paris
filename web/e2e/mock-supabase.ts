@@ -493,6 +493,51 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       Object.assign(t, { estado: a.p_estado, version: Number(t.version) + 1 })
       await route.fulfill({ status: 204, body: '' })
     },
+    async resumen_tablero(route, a) {
+      const vis = st.tramites.filter(veTramite)
+      const corte = Date.parse(String(a.p_corte))
+      const filas = catalogos.empresas
+        .filter((e) => (!alcances || alcances.some((x) => x.empresa_id === e.id)) || vis.some((t) => t.empresa_id === e.id))
+        .map((e) => {
+          const ts = vis.filter((t) => t.empresa_id === e.id).map((t) => ({ t, f: finanzas(t) }))
+          const n = (pred: (x: { t: Fila; f: Fila }) => boolean) => ts.filter(pred).length
+          const antes = (x: { t: Fila }) => ['autorizado', 'en_gestoria'].includes(String(x.t.estado))
+          return {
+            empresa_id: e.id, empresa: e.nombre,
+            abiertos: n((x) => !['cerrado', 'cancelado', 'rechazado'].includes(String(x.t.estado))),
+            por_aprobar: n((x) => antes(x) && x.f.presupuesto_version != null && !x.f.presupuesto_aprobado),
+            listos: n((x) => antes(x) && !!x.f.presupuesto_aprobado),
+            presentados: n((x) => x.t.estado === 'presentado'),
+            finalizados: n((x) => x.t.estado === 'finalizado_registro'),
+            devueltos: n((x) => x.t.estado === 'devuelto'),
+            sin_fondos: n((x) => x.f.situacion === 'sin_fondos'),
+            demorados: n((x) => antes(x) && !!x.t.autorizado_at && Date.parse(String(x.t.autorizado_at)) < corte),
+          }
+        })
+        .sort((x, y) => x.empresa.localeCompare(y.empresa))
+      await route.fulfill({ json: filas })
+    },
+    async tramites_intervencion(route, a) {
+      const corte = Date.parse(String(a.p_corte))
+      const filas = st.tramites
+        .filter(veTramite)
+        .filter((t) => !['cerrado', 'cancelado', 'rechazado'].includes(String(t.estado)))
+        .map((t) => {
+          const f = finanzas(t)
+          const antes = ['autorizado', 'en_gestoria'].includes(String(t.estado))
+          const motivos = [
+            t.estado === 'observado' && 'observado',
+            antes && f.presupuesto_version != null && !f.presupuesto_aprobado && 'por_aprobar',
+            f.situacion === 'sin_fondos' && 'sin_fondos',
+            antes && t.autorizado_at && Date.parse(String(t.autorizado_at)) < corte && 'demorado',
+          ].filter(Boolean)
+          const op = st.operaciones.find((o) => o.id === t.operacion_id)!
+          return { id: t.id, numero: t.numero, cliente: op.cliente_nombre, empresa: nombreDe(catalogos.empresas, t.empresa_id)!.nombre, motivos }
+        })
+        .filter((t) => t.motivos.length)
+        .sort((x, y) => String(x.numero).localeCompare(String(y.numero)))
+      await route.fulfill({ json: filas })
+    },
     async estado_previo_suspension(route, a) {
       const t = tramite(a.p_tramite)
       if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')

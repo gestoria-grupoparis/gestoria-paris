@@ -4,7 +4,7 @@ import { formatearPesos } from '../lib/dinero'
 import { listarSaldos, type Saldo } from '../features/habitualista/consultas'
 import { useFinanzasEnVivo } from '../features/habitualista/enVivo'
 import { conciliacionVencida, fechaOperativa, necesidadRecarga } from '../features/habitualista/saldos'
-import { contarPorEstado, listarIntervencion, type Motivo } from '../features/tablero/consultas'
+import { contarPorEstado, listarIntervencion, resumenTablero, sumar, type Motivo } from '../features/tablero/consultas'
 import { ESTADOS, hoyEnBuenosAires } from '../features/tramites/filtros'
 import {
   Card, CardHeader, Chip, EmptyState, ErrorState, IconoAlerta, IconoCheck, IconoChevron, IconoDoc, IconoProhibido,
@@ -13,12 +13,19 @@ import {
 
 const MOTIVOS: Record<Motivo, { texto: string; tono: TonoChip }> = {
   observado: { texto: 'Observado', tono: 'comprometido' },
+  por_aprobar: { texto: 'Presupuesto por aprobar', tono: 'comprometido' },
   sin_fondos: { texto: 'Sin fondos', tono: 'sinfondos' },
   demorado: { texto: 'Demorado sin presentar', tono: 'info' },
 }
 
-/** Estados que ya no requieren trabajo: no cuentan como "abiertos". */
-const TERMINALES = new Set(['cerrado', 'cancelado', 'rechazado'])
+/** Etapas del ping pong con la gestoría, en orden. */
+const ETAPAS = [
+  { campo: 'por_aprobar', texto: 'Presupuesto por aprobar', enlace: '/tramites?por_aprobar=1' },
+  { campo: 'listos', texto: 'Para retirar y presentar', enlace: '/tramites?estado=autorizado' },
+  { campo: 'presentados', texto: 'Presentados', enlace: '/tramites?estado=presentado' },
+  { campo: 'finalizados', texto: 'Finalizados, para devolver', enlace: '/tramites?estado=finalizado_registro' },
+  { campo: 'devueltos', texto: 'Devueltos sin cerrar', enlace: '/tramites?estado=devuelto' },
+] as const
 
 /** Color de la barra por tono de estado (mismo código que los chips). */
 const BARRA: Record<TonoChip, string> = {
@@ -100,10 +107,11 @@ export function Tablero() {
   const saldos = useQuery({ queryKey: ['tablero', 'saldos'], queryFn: listarSaldos })
   const conteo = useQuery({ queryKey: ['tablero', 'conteo'], queryFn: contarPorEstado })
   const intervencion = useQuery({ queryKey: ['tablero', 'intervencion'], queryFn: listarIntervencion })
+  const resumen = useQuery({ queryKey: ['tablero', 'resumen'], queryFn: resumenTablero })
   const hoy = hoyEnBuenosAires()
 
   // Conteos de trámites (enteros, no montos).
-  const abiertos = conteo.data ? ESTADOS.filter((e) => !TERMINALES.has(e.id)).reduce((n, e) => n + (conteo.data[e.id] ?? 0), 0) : null
+  const porAprobar = resumen.data ? sumar(resumen.data, 'por_aprobar') : null
   const maximo = conteo.data ? Math.max(1, ...ESTADOS.map((e) => conteo.data[e.id] ?? 0)) : 1
   const cuenta = (m: Motivo) => intervencion.data?.filter((t) => t.motivos.includes(m)).length ?? null
   const conRecarga = saldos.data?.filter((s) => necesidadRecarga(s.disponible) !== '0').length ?? null
@@ -118,20 +126,22 @@ export function Tablero() {
       />
 
       <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 lg:grid-cols-4">
-        <KpiTile rotulo="Trámites abiertos" tono="destacado" icono={<IconoDoc />} valor={kpi(abiertos)} detalle="Sin contar cerrados, cancelados ni rechazados" />
+        <Link to="/tramites?por_aprobar=1" aria-label={`Por aprobar: ${porAprobar ?? 'cargando'} presupuestos`} className="flex min-w-0 rounded-lg">
+          <KpiTile rotulo="Por aprobar" tono="destacado" icono={<IconoDoc />} valor={kpi(porAprobar)} detalle="Presupuestos de la gestora esperando aprobación" className="w-full" />
+        </Link>
         <KpiTile
           rotulo="Requieren intervención"
           tono={intervencion.data?.length ? 'comprometido' : 'neutro'}
           icono={<IconoAlerta />}
           valor={kpi(intervencion.data?.length ?? null)}
-          detalle="Observados, sin fondos o demorados"
+          detalle="Observados, por aprobar, sin fondos o demorados"
         />
         <KpiTile
           rotulo="Sin fondos"
           tono={cuenta('sin_fondos') ? 'sinfondos' : 'neutro'}
           icono={<IconoProhibido />}
           valor={kpi(cuenta('sin_fondos'))}
-          detalle="No se pueden presentar todavía"
+          detalle="La gestora no puede presentarlos"
         />
         <KpiTile
           rotulo="Cuentas a recargar"
@@ -141,6 +151,60 @@ export function Tablero() {
           detalle={conRecarga ? 'El disponible no cubre lo comprometido' : 'Todas cubren lo comprometido'}
         />
       </div>
+
+      <section aria-labelledby="t-pingpong" className="mt-10">
+        <Card>
+          <CardHeader rotulo="Gestoría" titulo={<span id="t-pingpong">Ping pong con la gestoría</span>} />
+          {resumen.isError ? (
+            <div className="p-5">
+              <ErrorState titulo="No se pudo cargar el resumen." accion={<button type="button" className="w-fit text-sm font-semibold underline" onClick={() => void resumen.refetch()}>Reintentar</button>} />
+            </div>
+          ) : (
+            <>
+              <ol aria-label="Etapas del ping pong" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,160px),1fr))] gap-px bg-linea">
+                {ETAPAS.map((e, i) => (
+                  <li key={e.campo} className="bg-superficie">
+                    <Link to={e.enlace} className="flex h-full min-w-0 flex-col gap-1 px-5 py-4 hover:bg-marca-suave/40">
+                      <span className="text-[12px] font-medium text-tenue">{i + 1}. {e.texto}</span>
+                      <strong data-testid={`etapa-${e.campo}`} className="cifra font-display text-2xl">
+                        {resumen.data ? sumar(resumen.data, e.campo) : <Skeleton className="h-7 w-10" />}
+                      </strong>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+              {resumen.data && resumen.data.length > 0 && (
+                <div className="overflow-x-auto border-t border-linea">
+                  <table aria-label="Por razón social" className="w-full min-w-[520px] text-sm">
+                    <thead>
+                      <tr className="text-left text-[12px] text-tenue">
+                        <th className="px-5 py-2 font-medium">Razón social</th>
+                        <th className="px-3 py-2 text-right font-medium">Abiertos</th>
+                        <th className="px-3 py-2 text-right font-medium">Por aprobar</th>
+                        <th className="px-3 py-2 text-right font-medium">Presentados</th>
+                        <th className="px-3 py-2 text-right font-medium">Sin fondos</th>
+                        <th className="px-5 py-2 text-right font-medium">Demorados</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-linea">
+                      {resumen.data.map((r) => (
+                        <tr key={r.empresa_id}>
+                          <th scope="row" className="max-w-[14rem] truncate px-5 py-2 text-left font-semibold" title={r.empresa}>{r.empresa}</th>
+                          <td className="cifra px-3 py-2 text-right">{r.abiertos}</td>
+                          <td className="cifra px-3 py-2 text-right">{r.por_aprobar}</td>
+                          <td className="cifra px-3 py-2 text-right">{r.presentados}</td>
+                          <td className="cifra px-3 py-2 text-right">{r.sin_fondos}</td>
+                          <td className="cifra px-5 py-2 text-right">{r.demorados}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      </section>
 
       <section aria-labelledby="t-saldos" className="mt-10">
         <div className="mb-4 flex items-end justify-between gap-3">
@@ -172,7 +236,7 @@ export function Tablero() {
           <Card className="h-full">
             <CardHeader rotulo="Trámites" titulo={<span id="t-estados">Trámites por estado</span>} />
             {conteo.isError ? (
-              <div className="p-5"><ErrorState titulo="No se pudieron contar los trámites." /></div>
+              <div className="p-5"><ErrorState titulo="No se pudieron contar los trámites." accion={<button type="button" className="w-fit text-sm font-semibold underline" onClick={() => void conteo.refetch()}>Reintentar</button>} /></div>
             ) : !conteo.data ? (
               <div role="status" className="flex flex-col gap-3 p-5">
                 <span className="sr-only">Contando trámites…</span>
@@ -211,7 +275,7 @@ export function Tablero() {
               acciones={intervencion.data?.length ? <Chip tono="comprometido">{intervencion.data.length}</Chip> : undefined}
             />
             {intervencion.isError ? (
-              <div className="p-5"><ErrorState titulo="No se pudo cargar la lista." /></div>
+              <div className="p-5"><ErrorState titulo="No se pudo cargar la lista." accion={<button type="button" className="w-fit text-sm font-semibold underline" onClick={() => void intervencion.refetch()}>Reintentar</button>} /></div>
             ) : !intervencion.data ? (
               <div role="status" className="flex flex-col gap-3 p-5">
                 <span className="sr-only">Cargando…</span>
@@ -223,7 +287,7 @@ export function Tablero() {
                 <EmptyState
                   icono={<IconoCheck className="size-6" />}
                   titulo="Nada pendiente"
-                  descripcion="No hay observados, sin fondos ni demorados."
+                  descripcion="No hay observados, por aprobar, sin fondos ni demorados."
                 />
               </div>
             ) : (
@@ -232,9 +296,9 @@ export function Tablero() {
                   <li key={t.id}>
                     <Link to={`/tramites?t=${t.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-marca-suave/40">
                       <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-baseline gap-x-2">
-                          <span className="cifra font-semibold">{t.numero}</span>
-                          <span className="truncate">{t.cliente}</span>
+                        <span className="flex min-w-0 items-baseline gap-x-2">
+                          <span className="cifra shrink-0 font-semibold">{t.numero}</span>
+                          <span className="min-w-0 truncate" title={t.cliente}>{t.cliente}</span>
                         </span>
                         <span className="block text-[13px] text-tenue">{t.empresa}</span>
                         <span className="mt-1.5 flex flex-wrap gap-1.5">

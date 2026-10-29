@@ -23,7 +23,7 @@ export async function contarPorEstado(): Promise<Record<string, number>> {
   return cuenta
 }
 
-export type Motivo = 'observado' | 'sin_fondos' | 'demorado'
+export type Motivo = 'observado' | 'por_aprobar' | 'sin_fondos' | 'demorado'
 export interface Intervencion {
   id: string
   numero: string
@@ -32,46 +32,36 @@ export interface Intervencion {
   motivos: Motivo[]
 }
 
-const SELECT = 'id,numero,estado,autorizado_at,operacion:operaciones(cliente_nombre,empresa:empresas(nombre))'
-type FilaTramite = {
-  id: string
-  numero: string
-  estado: string
-  autorizado_at: string | null
-  operacion: { cliente_nombre: string; empresa: { nombre: string } }
+/** Corte de "demorado": autorizados hace más de N días hábiles (la base no conoce feriados). */
+const corteDemora = () => inicioDelDia(restarDiasHabiles(hoyEnBuenosAires(), DIAS_DEMORA_AUTORIZADO))
+
+/** Observados, por aprobar, sin fondos y demorados, resuelto en la base en una sola llamada. */
+export async function listarIntervencion(): Promise<Intervencion[]> {
+  const { data, error } = await supabase.rpc('tramites_intervencion', { p_corte: corteDemora() })
+  if (error) throw error
+  return (data ?? []) as Intervencion[]
 }
 
-/** Observados, sin fondos y autorizados con más de 5 días hábiles sin presentar (P8, provisorio). */
-export async function listarIntervencion(): Promise<Intervencion[]> {
-  const corte = inicioDelDia(restarDiasHabiles(hoyEnBuenosAires(), DIAS_DEMORA_AUTORIZADO))
-  const [tr, fin] = await Promise.all([
-    supabase
-      .from('tramites')
-      .select(SELECT)
-      .or(`estado.eq.observado,and(estado.in.(autorizado,en_gestoria),autorizado_at.lt.${corte})`),
-    supabase.from('v_tramite_finanzas').select('tramite_id').eq('situacion', 'sin_fondos'),
-  ])
-  if (tr.error) throw tr.error
-  if (fin.error) throw fin.error
-  const sinFondos = new Set(((fin.data ?? []) as { tramite_id: string }[]).map((f) => f.tramite_id))
-  const filas = (tr.data ?? []) as unknown as FilaTramite[]
-  const faltan = [...sinFondos].filter((id) => !filas.some((t) => t.id === id))
-  if (faltan.length) {
-    const extra = await supabase.from('tramites').select(SELECT).in('id', faltan)
-    if (extra.error) throw extra.error
-    filas.push(...((extra.data ?? []) as unknown as FilaTramite[]))
-  }
-  return filas
-    .map((t) => {
-      const motivos: Motivo[] = []
-      if (t.estado === 'observado') motivos.push('observado')
-      if (sinFondos.has(t.id)) motivos.push('sin_fondos')
-      if (['autorizado', 'en_gestoria'].includes(t.estado) && t.autorizado_at && Date.parse(t.autorizado_at) < Date.parse(corte))
-        motivos.push('demorado')
-      return {
-        id: t.id, numero: t.numero, cliente: t.operacion.cliente_nombre, empresa: t.operacion.empresa.nombre, motivos,
-      }
-    })
-    .filter((t) => t.motivos.length)
-    .sort((a, b) => a.numero.localeCompare(b.numero))
+export interface ResumenEmpresa {
+  empresa_id: string
+  empresa: string
+  abiertos: number
+  por_aprobar: number
+  listos: number
+  presentados: number
+  finalizados: number
+  devueltos: number
+  sin_fondos: number
+  demorados: number
+}
+
+/** Conteos por razón social y etapa del ping pong con la gestoría (respeta el alcance). */
+export async function resumenTablero(): Promise<ResumenEmpresa[]> {
+  const { data, error } = await supabase.rpc('resumen_tablero', { p_corte: corteDemora() })
+  if (error) throw error
+  return (data ?? []) as ResumenEmpresa[]
+}
+
+export function sumar(filas: ResumenEmpresa[], campo: Exclude<keyof ResumenEmpresa, 'empresa_id' | 'empresa'>): number {
+  return filas.reduce((n, f) => n + Number(f[campo] ?? 0), 0)
 }

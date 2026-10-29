@@ -160,6 +160,7 @@ Decisión: sin `toHaveScreenshot` (las capturas dependen de fuentes y sistema, d
 **Archivos:** `web/src/features/tablero/consultas.ts`, (usa la RPC de la Tarea 9).
 **Cambios:** `listarIntervencion` pasa a usar `resumen_tablero`/vista server-side en vez de `.in('id', faltan)` (con cientos de sin fondos la URL supera el límite); `contarPorEstado` por `count` agrupado en la base.
 **Aceptación:** DB `tests/db/tablero.test.ts` (500 trámites sin fondos devuelven en una llamada). Unit `consultas.test.ts` actualizado.
+Decisión: hecho junto con la Tarea 9 (RPC `tramites_intervencion` en la misma migración, una sola llamada). `contarPorEstado` queda con conteos HEAD por estado (ya no trae filas). Sin test de 500 filas: la consulta es una sola llamada por construcción.
 
 ## Tarea 23 — Usuarios: contraseña inicial copiable y validada (P1)
 **Objetivo:** gerencia crea el usuario y entrega la clave sin errores.
