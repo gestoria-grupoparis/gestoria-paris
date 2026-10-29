@@ -2,16 +2,19 @@ import { useState, type FormEvent } from 'react'
 import { formatearPesos } from '../../lib/dinero'
 import { mensajeError } from '../../lib/errores'
 import { Dialogo } from '../tramites/Dialogo'
-import { Button, ErrorState, Field, Input } from '../../ui'
-import { hoyEnBuenosAires } from '../tramites/filtros'
+import { Button, claseControl, ErrorState, Field, Input } from '../../ui'
+import { etiquetaEstado, hoyEnBuenosAires } from '../tramites/filtros'
 import { registrarPago, type Conceptos } from './consultas'
 import { CamposConceptos, CONCEPTOS_VACIOS, leerConceptos } from './FormPresupuesto'
 
-export function FormPago({ tramite, onCerrar, onGuardado }: {
-  tramite: { id: string; numero: string; presupuesto: string | null }
+export function FormPago({ tramite, onCerrar, onGuardado, excepcion }: {
+  tramite: { id: string; numero: string; presupuesto: string | null; estado?: string }
   onCerrar: () => void
   onGuardado: () => void
+  /** R24: el trámite no está autorizado ni en curso; la oficina lo registra con motivo de excepción. */
+  excepcion?: boolean
 }) {
+  const [motivo, setMotivo] = useState('')
   // Una clave por apertura del formulario: un reintento no duplica el pago.
   const [idem] = useState(() => crypto.randomUUID())
   const [fecha, setFecha] = useState(() => hoyEnBuenosAires())
@@ -29,9 +32,10 @@ export function FormPago({ tramite, onCerrar, onGuardado }: {
     } catch (err) {
       return setError((err as Error).message)
     }
+    if (excepcion && !motivo.trim()) return setError('Indicá el motivo de la excepción: por qué se pagó un trámite no autorizado.')
     setEnviando(true)
     try {
-      await registrarPago(idem, tramite.id, fecha, c, esFinal)
+      await registrarPago(idem, tramite.id, fecha, c, esFinal, excepcion ? motivo.trim() : undefined)
       onGuardado()
     } catch (err) {
       setError(mensajeError(err))
@@ -42,7 +46,15 @@ export function FormPago({ tramite, onCerrar, onGuardado }: {
 
   return (
     <Dialogo titulo="Registrar pago" rotulo={`Trámite ${tramite.numero}`} onCerrar={onCerrar}>
-      <form onSubmit={enviar} className="space-y-4">
+      <form onSubmit={enviar} noValidate className="space-y-4">
+        {excepcion && (
+          <div className="rounded-lg bg-comprometido-suave px-4 py-3 text-[14px] text-comprometido ring-1 ring-comprometido/25">
+            <strong className="block font-semibold">Pago de excepción</strong>
+            <span className="text-tinta">
+              El trámite está {tramite.estado ? etiquetaEstado(tramite.estado).toLowerCase() : 'fuera de curso'}. Solo se registra si el pago ya ocurrió, con el motivo.
+            </span>
+          </div>
+        )}
         <div className="flex items-end justify-between gap-3 rounded-lg bg-noche px-4 py-3 text-superficie">
           <div>
             <div className="text-[12px] font-medium text-white/60">Presupuesto cargado</div>
@@ -68,6 +80,11 @@ export function FormPago({ tramite, onCerrar, onGuardado }: {
             <span className="block text-[13px] text-tenue">Desmarcalo si vas a pagar el resto otro día.</span>
           </span>
         </label>
+        {excepcion && (
+          <Field label="Motivo de la excepción">
+            {(p) => <textarea {...p} rows={2} className={`${claseControl} h-auto py-2.5`} value={motivo} onChange={(e) => setMotivo(e.target.value)} />}
+          </Field>
+        )}
         {error && <ErrorState titulo="No se pudo guardar el pago" descripcion={error} />}
         <div className="grid grid-cols-2 gap-2 pt-1">
           <Button variante="secundario" tamano="lg" onClick={onCerrar}>Cancelar</Button>

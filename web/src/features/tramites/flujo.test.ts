@@ -30,3 +30,53 @@ describe('flujo del trámite', () => {
     expect(estadoPrevioSuspension([])).toBeNull()
   })
 })
+
+describe('acciones de edición y dinero desde el panel', () => {
+  it('solo se editan borradores y observados', async () => {
+    const { puedeEditar } = await import('./flujo')
+    expect(puedeEditar('borrador')).toBe(true)
+    expect(puedeEditar('observado')).toBe(true)
+    expect(puedeEditar('autorizado')).toBe(false)
+    expect(puedeEditar('cancelado')).toBe(false)
+  })
+  it('presupuesto solo en autorizado, en gestoría o presentado', async () => {
+    const { puedePresupuestar } = await import('./flujo')
+    expect(['autorizado', 'en_gestoria', 'presentado'].every(puedePresupuestar)).toBe(true)
+    expect(puedePresupuestar('borrador')).toBe(false)
+    expect(puedePresupuestar('finalizado_registro')).toBe(false)
+  })
+  it('un pago fuera de curso es una excepción R24 que exige motivo', async () => {
+    const { pagoEsExcepcion } = await import('./flujo')
+    expect(pagoEsExcepcion('autorizado')).toBe(false)
+    expect(pagoEsExcepcion('finalizado_registro')).toBe(false)
+    expect(pagoEsExcepcion('borrador')).toBe(true)
+    expect(pagoEsExcepcion('cancelado')).toBe(true)
+  })
+  it('la excepción de fondos la aprueba gerencia sobre un trámite sin fondos', async () => {
+    const { puedeAprobarExcepcion } = await import('./flujo')
+    expect(puedeAprobarExcepcion('gerencia', 'sin_fondos')).toBe(true)
+    expect(puedeAprobarExcepcion('contable', 'sin_fondos')).toBe(false)
+    expect(puedeAprobarExcepcion('gerencia', 'comprometido')).toBe(false)
+  })
+  it('nombra cada movimiento del trámite', async () => {
+    const { etiquetaMovimiento } = await import('./flujo')
+    expect(etiquetaMovimiento('pago_tramite', true)).toBe('Pago final')
+    expect(etiquetaMovimiento('pago_tramite', false)).toBe('Pago')
+    expect(etiquetaMovimiento('reintegro', false)).toBe('Reintegro')
+    expect(etiquetaMovimiento('reversion', false)).toBe('Reversión')
+  })
+})
+
+describe('selección de filas para reasignar en lote', () => {
+  it('alterna una fila y todas las visibles', async () => {
+    const { alternar, alternarTodas } = await import('./flujo')
+    let s = alternar(new Set<string>(), 'a')
+    expect([...s]).toEqual(['a'])
+    s = alternar(s, 'a')
+    expect(s.size).toBe(0)
+    s = alternarTodas(new Set(['a']), ['a', 'b', 'c'])
+    expect([...s].sort()).toEqual(['a', 'b', 'c'])
+    s = alternarTodas(s, ['a', 'b', 'c'])
+    expect(s.size).toBe(0)
+  })
+})

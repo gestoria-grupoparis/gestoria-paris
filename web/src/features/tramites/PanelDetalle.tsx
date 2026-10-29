@@ -1,14 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { useSesion } from '../../lib/sesion'
+import { FormPago } from '../gestora/FormPago'
+import { FormPresupuesto } from '../gestora/FormPresupuesto'
 import { formatearPesos } from '../../lib/dinero'
 import { mensajeError } from '../../lib/errores'
 import { Button, cx, ErrorState, Patente, Skeleton } from '../../ui'
-import { IconoAlerta, IconoCerrar, IconoCheck } from '../../ui/Iconos'
-import { AccionesTramite } from './AccionesTramite'
-import { marcar, obtenerTramite, type Catalogos, type TramiteDetalle } from './consultas'
+import { IconoAlerta, IconoCerrar, IconoCheck, IconoEscudo, IconoMas, IconoPesos, IconoRetorno } from '../../ui/Iconos'
+import { AccionesTramite, FormAccion } from './AccionesTramite'
+import { aprobarExcepcionFondos, marcar, obtenerTramite, type Catalogos, type TramiteDetalle } from './consultas'
 import { EstadoChip, SituacionChip } from './EstadoChip'
 import { etiquetaEstado, formatearFecha, formatearFechaHora } from './filtros'
-import { indicePaso, PASOS } from './flujo'
+import { etiquetaMovimiento, indicePaso, pagoEsExcepcion, PASOS, puedeAprobarExcepcion, puedePresupuestar } from './flujo'
+import { FormReintegro } from './FormReintegro'
 import { HistorialEventos, MARCAS } from './HistorialEventos'
 
 interface Props {
@@ -126,9 +130,20 @@ function MarcasDocumentales({ t, nombre }: { t: TramiteDetalle; nombre: (id: str
   )
 }
 
+type FormDinero = 'presupuesto' | 'pago' | 'reintegro' | 'excepcion' | null
+
 export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
   const q = useQuery({ queryKey: ['tramites', 'detalle', id], queryFn: () => obtenerTramite(id) })
   const t = q.data
+  const { rol } = useSesion()
+  const qc = useQueryClient()
+  const [form, setForm] = useState<FormDinero>(null)
+  const cerrarForm = () => setForm(null)
+  const guardado = () => {
+    setForm(null)
+    void qc.invalidateQueries({ queryKey: ['tramites'] })
+  }
+  const tienePagos = !!t?.pagos.some((p) => p.tipo === 'pago_tramite')
 
   return (
     <aside
@@ -203,6 +218,16 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
                 <SituacionChip situacion={t.finanzas.situacion} />
               </div>
               )}
+              {puedeAprobarExcepcion(rol, t.finanzas?.situacion) && (
+                <div className="col-span-2 rounded-md bg-sinfondos-suave px-3.5 py-3 ring-1 ring-sinfondos/20">
+                  <p className="text-[13px] text-tinta">
+                    La gestora ve <strong className="font-semibold text-sinfondos">No presentar: sin fondos</strong>. Si igual tiene que salir, liberalo con un motivo.
+                  </p>
+                  <Button variante="secundario" tamano="sm" className="mt-2.5" icono={<IconoEscudo className="size-4" />} onClick={() => setForm('excepcion')}>
+                    Aprobar excepción de fondos
+                  </Button>
+                </div>
+              )}
             </div>
             <AccionesTramite tramite={t} catalogos={catalogos} />
           </div>
@@ -232,7 +257,16 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
             <MarcasDocumentales t={t} nombre={nombre} />
           </Seccion>
 
-          <Seccion titulo="Presupuesto">
+          <Seccion
+            titulo="Presupuesto"
+            extra={
+              puedePresupuestar(t.estado) && (
+                <Button variante="fantasma" tamano="sm" className="-my-1.5 -mr-2" icono={<IconoMas className="size-4" />} onClick={() => setForm('presupuesto')}>
+                  {t.presupuestos.length ? 'Nueva versión' : 'Cargar presupuesto'}
+                </Button>
+              )
+            }
+          >
             {t.presupuestos.length > 0 ? (
               <table className="w-full text-[14px]">
                 <caption className="sr-only">Versiones del presupuesto</caption>
@@ -257,7 +291,11 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
                 </tbody>
               </table>
             ) : (
-              <p className="text-sm text-tenue">La gestora todavía no cargó el presupuesto.</p>
+              <p className="text-sm text-tenue">
+                {puedePresupuestar(t.estado)
+                  ? 'Todavía no hay presupuesto. Lo carga la gestora, o vos con el botón de arriba.'
+                  : 'Se presupuesta cuando el trámite está autorizado.'}
+              </p>
             )}
           </Seccion>
 
@@ -269,7 +307,7 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
                   {t.pagos.map((p) => (
                     <tr key={p.id} className="border-t border-linea first:border-t-0">
                       <td className="py-2 text-tenue">{formatearFecha(`${p.fecha_operacion}T12:00:00Z`)}</td>
-                      <td className="py-2">{p.es_pago_final ? 'Pago final' : p.tipo === 'pago_tramite' ? 'Pago' : p.tipo}</td>
+                      <td className="py-2">{etiquetaMovimiento(p.tipo, p.es_pago_final)}</td>
                       <td className="cifra py-2 text-right font-semibold">{formatearPesos(p.importe)}</td>
                     </tr>
                   ))}
@@ -278,11 +316,48 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
             ) : (
               <p className="text-sm text-tenue">Sin pagos registrados.</p>
             )}
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <Button variante="secundario" tamano="sm" icono={<IconoPesos className="size-4" />} onClick={() => setForm('pago')}>
+                Registrar pago
+              </Button>
+              {tienePagos && (
+                <Button variante="fantasma" tamano="sm" icono={<IconoRetorno className="size-4" />} onClick={() => setForm('reintegro')}>
+                  Registrar reintegro
+                </Button>
+              )}
+            </div>
+            {pagoEsExcepcion(t.estado) && (
+              <p className="mt-2 text-[12px] text-tenue">Está {etiquetaEstado(t.estado).toLowerCase()}: un pago acá es una excepción y pide motivo.</p>
+            )}
           </Seccion>
 
           <Seccion titulo="Historial">
             <HistorialEventos tramiteId={t.id} nombre={nombre} />
           </Seccion>
+
+          {form === 'presupuesto' && (
+            <FormPresupuesto tramite={t} nuevaVersion={t.presupuestos.length > 0} onCerrar={cerrarForm} onGuardado={guardado} />
+          )}
+          {form === 'pago' && (
+            <FormPago
+              tramite={{ id: t.id, numero: t.numero, estado: t.estado, presupuesto: t.finanzas?.presupuesto ?? null }}
+              excepcion={pagoEsExcepcion(t.estado)}
+              onCerrar={cerrarForm}
+              onGuardado={guardado}
+            />
+          )}
+          {form === 'reintegro' && <FormReintegro tramite={t} onCerrar={cerrarForm} />}
+          {form === 'excepcion' && (
+            <FormAccion
+              titulo="Aprobar excepción de fondos"
+              rotulo={t.numero}
+              boton="Aprobar excepción"
+              aviso={`El trámite se libera aunque ${t.operacion.empresa.nombre} no tenga saldo disponible. Queda registrado con tu usuario.`}
+              pideMotivo="Indicá el motivo de la excepción."
+              ejecutar={(_, motivo) => aprobarExcepcionFondos(t.id, motivo)}
+              onCerrar={cerrarForm}
+            />
+          )}
         </>
       )}
     </aside>

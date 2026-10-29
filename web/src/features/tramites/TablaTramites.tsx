@@ -104,9 +104,18 @@ interface Props {
   pie?: string
   /** Con el detalle abierto se ocultan columnas secundarias para que la tabla no se corte. */
   compacto?: boolean
+  /** Filas marcadas para una acción en lote (reasignar gestora, caso K). */
+  marcadas?: Set<string>
+  onMarcar?: (id: string) => void
+  onMarcarTodas?: () => void
 }
 
-export function TablaTramites({ filas, seleccionado, onSeleccionar, nombreGestora, pie, compacto }: Props) {
+const claseCasilla = 'size-4 cursor-pointer rounded accent-marca'
+
+export function TablaTramites({ filas, seleccionado, onSeleccionar, nombreGestora, pie, compacto, marcadas, onMarcar, onMarcarTodas }: Props) {
+  const conMarcas = !!(marcadas && onMarcar && onMarcarTodas)
+  const todas = conMarcas && filas.length > 0 && filas.every((f) => marcadas!.has(f.id))
+  const algunas = conMarcas && !todas && filas.some((f) => marcadas!.has(f.id))
   const columns = useMemo(() => columnas(nombreGestora), [nombreGestora])
   const table = useTable<typeof features, TramiteFila>({
     features,
@@ -122,6 +131,20 @@ export function TablaTramites({ filas, seleccionado, onSeleccionar, nombreGestor
           <thead>
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
+                {conMarcas && (
+                  <th scope="col" className="w-10 pr-0!">
+                    <input
+                      type="checkbox"
+                      aria-label="Seleccionar todos los trámites visibles"
+                      className={claseCasilla}
+                      checked={todas}
+                      ref={(el) => {
+                        if (el) el.indeterminate = algunas
+                      }}
+                      onChange={onMarcarTodas}
+                    />
+                  </th>
+                )}
                 {hg.headers.filter((h) => !(compacto && OCULTAS.includes(h.column.id))).map((h) => (
                   <th key={h.id} scope="col" className={cx('whitespace-nowrap', (h.column.columnDef.meta as Meta | undefined)?.numero && 'text-right!')}>
                     <table.FlexRender header={h} />
@@ -142,8 +165,21 @@ export function TablaTramites({ filas, seleccionado, onSeleccionar, nombreGestor
                   'cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-marca',
                   r.original.finanzas?.situacion === 'sin_fondos' && '[&>td:first-child]:shadow-[inset_3px_0_0_var(--color-sinfondos)]',
                   r.id === seleccionado && '[&>td:first-child]:shadow-[inset_3px_0_0_var(--color-marca)]',
+                  marcadas?.has(r.id) && 'bg-acento/5',
                 )}
               >
+                {conMarcas && (
+                  <td className="w-10 pr-0!" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Seleccionar ${r.original.numero}`}
+                      className={claseCasilla}
+                      checked={marcadas!.has(r.id)}
+                      onChange={() => onMarcar!(r.id)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </td>
+                )}
                 {r.getAllCells().filter((c) => !(compacto && OCULTAS.includes(c.column.id))).map((c) => (
                   <td key={c.id} className={cx('h-16!', (c.column.columnDef.meta as Meta | undefined)?.numero && celdaMonto)}>
                     <table.FlexRender cell={c} />

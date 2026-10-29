@@ -246,7 +246,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
         sucursal: { nombre: suc.nombre, provincia: suc.provincia },
       },
       marcas: st.marcas.filter((m) => m.tramite_id === t.id).map(({ marca, at, por }) => ({ marca, at, por })),
-      presupuestos: [],
+      presupuestos: st.presupuestos.filter((p) => p.tramite_id === t.id)
+        .map((p) => ({ version: p.version, total: p.total, motivo: p.motivo ?? null, created_at: p.created_at ?? ahora })),
     }
   }
 
@@ -449,13 +450,18 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       const version = st.presupuestos.filter((p) => p.tramite_id === t.id).length + 1
       if (version >= 2 && !conMotivo(a))
         return errorNegocio(route, 'DATO_INVALIDO: una nueva versión del presupuesto requiere motivo')
-      st.presupuestos.push({ tramite_id: t.id, version, total: String(total) })
+      st.presupuestos.push({ tramite_id: t.id, version, total: String(total), motivo: a.p_motivo ?? null, created_at: ahora })
+      servidor.notificar('presupuestos')
       await route.fulfill({ json: version })
     },
     async registrar_pago(route, a) {
       const t = tramite(a.p_tramite)
       if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
-      if (!ESTADOS_EN_CURSO.includes(String(t.estado))) return errorNegocio(route, `NO_AUTORIZADO: está ${t.estado}`)
+      if (!ESTADOS_EN_CURSO.includes(String(t.estado))) {
+        // R24: fuera de curso solo paga la oficina, con motivo de excepción.
+        if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, `NO_AUTORIZADO: está ${t.estado}`)
+        if (!conMotivo(a)) return errorNegocio(route, `NO_AUTORIZADO: pagar un trámite ${t.estado} requiere motivo de excepción`)
+      }
       const total = conceptos(a)
       if (total == null || total <= 0n) return errorNegocio(route, 'DATO_INVALIDO: importes inválidos')
       if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha del pago es obligatoria')
@@ -523,6 +529,45 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       situacionForzada.delete(a.p_tramite)
       await route.fulfill({ status: 204, body: '' })
     },
+    async editar_tramite(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if ((rol !== 'gerencia' && rol !== 'contable') || !tieneAlcance(t.empresa_id, t.sucursal_id))
+        return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable con alcance editan trámites')
+      if (t.version !== a.p_version) return errorNegocio(route, 'VERSION_CONFLICTO: recargá')
+      if (!['borrador', 'observado'].includes(String(t.estado)))
+        return errorNegocio(route, `TRANSICION_INVALIDA: solo se edita un trámite en borrador u observado (está ${t.estado})`)
+      const txt = (x: unknown) => String(x ?? '').trim()
+      if (![a.p_cliente, a.p_cuenta_personal, a.p_oferta, a.p_vehiculo].every((x) => txt(x)))
+        return errorNegocio(route, 'DATO_INVALIDO: cliente, cuenta personal, oferta y vehículo son obligatorios')
+      let op = st.operaciones.find((o) => o.empresa_id === t.empresa_id && o.oferta_ref === txt(a.p_oferta))
+      if (!op) {
+        op = {
+          id: `00000000-0000-4000-8000-${String(900 + st.operaciones.length).padStart(12, '0')}`,
+          empresa_id: t.empresa_id, sucursal_id: t.sucursal_id, oferta_ref: txt(a.p_oferta), referencia_mail: null, created_at: ahora,
+        }
+        st.operaciones.push(op)
+      }
+      Object.assign(op, { cliente_nombre: txt(a.p_cliente), cuenta_personal: txt(a.p_cuenta_personal) })
+      registrarEvento({ entidad: 'tramites', entidad_id: t.id, accion: 'update', estado_antes: t.estado, estado_despues: t.estado, motivo: txt(a.p_motivo) || 'edición de trámite' })
+      Object.assign(t, {
+        operacion_id: op.id, vehiculo_desc: txt(a.p_vehiculo), dominio: txt(a.p_dominio).toUpperCase() || null,
+        chasis: txt(a.p_chasis).toUpperCase() || null, version: Number(t.version) + 1,
+      })
+      servidor.notificar('tramites')
+      await route.fulfill({ status: 204, body: '' })
+    },
+    async registrar_reintegro(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable registran reintegros')
+      const imp = importe(a.p_importe)
+      if (imp == null || imp <= 0n) return errorNegocio(route, 'DATO_INVALIDO: el importe del reintegro debe ser mayor a cero')
+      if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha del reintegro es obligatoria')
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: el motivo del reintegro es obligatorio')
+      const m = nuevoMovimiento({ idem: a.p_idem, cuenta_id: cuentaDe(t.empresa_id).id, tipo: 'reintegro', importe: String(imp), fecha_operacion: a.p_fecha, tramite_id: t.id })
+      await route.fulfill({ json: m.id })
+    },
     async reasignar_gestora(route, a) {
       let n = 0
       for (const id of a.p_tramites as string[]) {
@@ -545,7 +590,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     operaciones: () => st.operaciones,
     tramites: () => st.tramites.filter(veTramite),
     v_tramite_finanzas: () => st.tramites.filter(veTramite).map(finanzas),
-    movimientos: () => st.movimientos.map(({ id, cuenta_id, revierte_id, created_at, fecha_operacion, tipo }) => ({ id, cuenta_id, revierte_id, created_at, fecha_operacion, tipo })),
+    movimientos: () => st.movimientos.map(({ id, cuenta_id, revierte_id, created_at, fecha_operacion, tipo, tramite_id, importe, es_pago_final }) =>
+      ({ id, cuenta_id, revierte_id, created_at, fecha_operacion, tipo, tramite_id, importe, es_pago_final: !!es_pago_final })),
     v_saldos: () => {
       if (rol !== 'gerencia' && rol !== 'contable') return []
       const filas = opciones.saldosFijos ? opciones.saldosFijos(st) : saldos()

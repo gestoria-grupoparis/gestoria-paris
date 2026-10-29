@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { mensajeError } from '../../lib/errores'
 import { Button, claseControl, Field } from '../../ui'
-import { IconoCheck, IconoFlecha, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
+import { IconoCheck, IconoFlecha, IconoLapiz, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
 import { autorizarTramite, cambiarEstado, historial, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
 import { Dialogo } from './Dialogo'
 import { etiquetaEstado } from './filtros'
-import { AVANCE, estadoPrevioSuspension, puedeCancelar, puedeRechazar, puedeSuspender } from './flujo'
+import { AVANCE, estadoPrevioSuspension, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
+import { FormEdicion } from './FormEdicion'
 
-type Accion = 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
+type Accion = 'editar' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
 
 const ESTADOS_ASIGNABLES = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro', 'devuelto', 'suspendido']
 const PELIGRO_SUAVE = 'text-sinfondos hover:bg-sinfondos-suave'
@@ -29,6 +30,12 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
   const cambio = (hacia: string) => (_: string, motivo: string) => cambiarEstado(tramite.id, hacia, motivo, tramite.version)
 
   const secundarias: ReactNode[] = []
+  if (puedeEditar(e))
+    secundarias.push(
+      <Button key="edit" variante="secundario" tamano="sm" icono={<IconoLapiz className="size-4" />} onClick={() => setAbierta('editar')}>
+        Editar datos
+      </Button>,
+    )
   if (e === 'borrador')
     secundarias.push(
       <Button key="obs" variante="secundario" tamano="sm" onClick={() => setAbierta('observar')}>
@@ -84,6 +91,7 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
       )}
       {secundarias.length > 0 && <div className="flex flex-wrap gap-1.5">{secundarias}</div>}
 
+      {abierta === 'editar' && <FormEdicion tramite={tramite} onCerrar={cerrar} />}
       {abierta === 'autorizar' && (
         <FormAccion
           titulo="Autorizar trámite"
@@ -179,7 +187,7 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
   )
 }
 
-interface PropsForm {
+export interface PropsForm {
   titulo: string
   rotulo?: string
   boton: string
@@ -190,11 +198,14 @@ interface PropsForm {
   peligro?: boolean
   gestoras?: { id: string; nombre: string }[]
   aviso?: string
-  ejecutar: (gestora: string, motivo: string) => Promise<void>
+  ejecutar: (gestora: string, motivo: string) => Promise<unknown>
   onCerrar: () => void
+  /** Se llama tras un éxito, antes de cerrar (p. ej. para avisar el resultado). */
+  onHecho?: () => void
+  etiquetaMotivo?: string
 }
 
-function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, motivoOpcional, peligro, gestoras = [], aviso, ejecutar, onCerrar }: PropsForm) {
+export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, motivoOpcional, peligro, gestoras = [], aviso, ejecutar, onCerrar, onHecho, etiquetaMotivo }: PropsForm) {
   const qc = useQueryClient()
   const [gestora, setGestora] = useState('')
   const [motivo, setMotivo] = useState('')
@@ -202,7 +213,10 @@ function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, motivoOpci
 
   const m = useMutation({
     mutationFn: () => ejecutar(gestora, motivo.trim()),
-    onSuccess: onCerrar,
+    onSuccess: () => {
+      onHecho?.()
+      onCerrar()
+    },
     onError: (e) => setError(mensajeError(e)),
     onSettled: () => qc.invalidateQueries({ queryKey: ['tramites'] }),
   })
@@ -234,7 +248,7 @@ function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, motivoOpci
           </Field>
         )}
         {(pideMotivo || motivoOpcional) && (
-          <Field label={motivoOpcional ? 'Nota (opcional)' : 'Motivo'}>
+          <Field label={etiquetaMotivo ?? (motivoOpcional ? 'Nota (opcional)' : 'Motivo')}>
             {(p) => (
               <textarea {...p} rows={3} className={`${claseControl} h-auto py-2.5`} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
             )}

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { claseControl } from '../../ui'
 import { IconoCerrar } from '../../ui/Iconos'
 
@@ -12,7 +13,8 @@ export const CLASE_SECUNDARIO =
 
 /**
  * Diálogo modal: hoja inferior en el teléfono, tarjeta centrada en escritorio.
- * Título accesible, Escape cierra, foco inicial en el primer campo.
+ * Título accesible, Escape cierra, foco inicial en el primer campo. Se monta en body (portal) para
+ * quedar por encima de la navegación móvil y de los encabezados sticky aunque se abra desde un panel.
  */
 export function Dialogo({
   titulo,
@@ -35,8 +37,8 @@ export function Dialogo({
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
   }, [onCerrar])
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-noche/55 md:items-center md:p-6">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-noche/55 md:items-center md:p-6">
       <div
         ref={ref}
         role="dialog"
@@ -62,6 +64,7 @@ export function Dialogo({
         </div>
         <div className="px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

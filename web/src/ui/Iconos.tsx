@@ -28,4 +28,7 @@ export const IconoFlecha = (p: P) => <Base {...p}><path d="M5 12h14M13 6l6 6-6 6
 export const IconoChevron = (p: P) => <Base {...p}><path d="m9 6 6 6-6 6" /></Base>
 export const IconoProhibido = (p: P) => <Base {...p}><circle cx="12" cy="12" r="8.5" /><path d="m6 6 12 12" /></Base>
 export const IconoDescarga = (p: P) => <Base {...p}><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14" /></Base>
+export const IconoLapiz = (p: P) => <Base {...p}><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></Base>
+export const IconoPesos = (p: P) => <Base {...p}><path d="M12 3.5v17M16.5 7.5c-.6-1.4-2.3-2.3-4.5-2.3-2.6 0-4.3 1.3-4.3 3.2 0 4.5 9 2.3 9 6.8 0 2-1.9 3.4-4.7 3.4-2.3 0-4-1-4.6-2.6" /></Base>
+export const IconoRetorno = (p: P) => <Base {...p}><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></Base>
 export const IconoEscudo = (p: P) => <Base {...p}><path d="M12 3.5 19 6v5.5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z" /><path d="m9 12 2 2 4-4" /></Base>

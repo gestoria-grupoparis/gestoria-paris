@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { parsearPesos } from '../../lib/dinero'
 import { mensajeError } from '../../lib/errores'
 import { Dialogo } from '../tramites/Dialogo'
-import { Button, ErrorState, Field, Input } from '../../ui'
+import { Button, claseControl, ErrorState, Field, Input } from '../../ui'
 import { registrarPresupuesto, type Conceptos } from './consultas'
 
 const CONCEPTOS = [
@@ -50,12 +50,15 @@ export function CamposConceptos({ valor, onCambio }: { valor: TextoConceptos; on
   )
 }
 
-export function FormPresupuesto({ tramite, onCerrar, onGuardado }: {
+export function FormPresupuesto({ tramite, onCerrar, onGuardado, nuevaVersion }: {
   tramite: { id: string; numero: string }
   onCerrar: () => void
   onGuardado: () => void
+  /** Ya hay un presupuesto: la nueva versión exige motivo (queda en el historial). */
+  nuevaVersion?: boolean
 }) {
   const [valor, setValor] = useState(CONCEPTOS_VACIOS)
+  const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
@@ -68,9 +71,10 @@ export function FormPresupuesto({ tramite, onCerrar, onGuardado }: {
     } catch (err) {
       return setError((err as Error).message)
     }
+    if (nuevaVersion && !motivo.trim()) return setError('Indicá el motivo del cambio de presupuesto.')
     setEnviando(true)
     try {
-      await registrarPresupuesto(tramite.id, c)
+      await registrarPresupuesto(tramite.id, c, motivo.trim())
       onGuardado()
     } catch (err) {
       setError(mensajeError(err))
@@ -80,9 +84,14 @@ export function FormPresupuesto({ tramite, onCerrar, onGuardado }: {
   }
 
   return (
-    <Dialogo titulo="Cargar presupuesto" rotulo={`Trámite ${tramite.numero}`} onCerrar={onCerrar}>
-      <form onSubmit={enviar} className="space-y-4">
+    <Dialogo titulo={nuevaVersion ? 'Nueva versión del presupuesto' : 'Cargar presupuesto'} rotulo={`Trámite ${tramite.numero}`} onCerrar={onCerrar}>
+      <form onSubmit={enviar} noValidate className="space-y-4">
         <CamposConceptos valor={valor} onCambio={setValor} />
+        {nuevaVersion && (
+          <Field label="Motivo del cambio" ayuda="Queda en el historial junto a la versión anterior.">
+            {(p) => <textarea {...p} rows={2} className={`${claseControl} h-auto py-2.5`} value={motivo} onChange={(e) => setMotivo(e.target.value)} />}
+          </Field>
+        )}
         {error && <ErrorState titulo="Revisá los importes" descripcion={error} />}
         <div className="grid grid-cols-2 gap-2 pt-1">
           <Button variante="secundario" tamano="lg" onClick={onCerrar}>Cancelar</Button>

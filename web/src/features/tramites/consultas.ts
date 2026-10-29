@@ -282,5 +282,37 @@ export const cambiarEstado = (id: string, estado: string, motivo: string, versio
 export const marcar = (id: string, marca: string) =>
   sinRetorno(supabase.rpc('marcar', { p_tramite: id, p_marca: marca }))
 
-export const reasignarGestora = (ids: string[], gestora: string, motivo: string) =>
-  sinRetorno(supabase.rpc('reasignar_gestora', { p_tramites: ids, p_gestora: gestora, p_motivo: motivo }))
+/** Reasignación en lote (caso K), todo o nada. Devuelve cuántos trámites cambiaron de gestora. */
+export async function reasignarGestora(ids: string[], gestora: string, motivo: string): Promise<number> {
+  const { data, error } = await supabase.rpc('reasignar_gestora', { p_tramites: ids, p_gestora: gestora, p_motivo: motivo })
+  if (error) throw error
+  return Number(data ?? 0)
+}
+
+export interface EdicionTramite {
+  cliente: string
+  cuentaPersonal: string
+  oferta: string
+  vehiculo: string
+  dominio: string
+  chasis: string
+  motivo: string
+}
+
+export const editarTramite = (id: string, version: number, d: EdicionTramite) =>
+  sinRetorno(supabase.rpc('editar_tramite', {
+    p_tramite: id, p_version: version, p_cliente: d.cliente, p_cuenta_personal: d.cuentaPersonal,
+    p_oferta: d.oferta, p_vehiculo: d.vehiculo, p_dominio: d.dominio || null, p_chasis: d.chasis || null,
+    p_motivo: d.motivo || null,
+  }))
+
+export const aprobarExcepcionFondos = (id: string, motivo: string) =>
+  sinRetorno(supabase.rpc('aprobar_excepcion_fondos', { p_tramite: id, p_motivo: motivo }))
+
+/** Reintegro de fondos del trámite a su cuenta (caso F). Importe en centavos, viaja como texto. */
+export async function registrarReintegro(idem: string, tramite: string, importe: bigint, fecha: string, motivo: string) {
+  const { error } = await supabase.rpc('registrar_reintegro', {
+    p_idem: idem, p_tramite: tramite, p_importe: importe.toString(), p_fecha: fecha, p_motivo: motivo,
+  })
+  if (error) throw error
+}

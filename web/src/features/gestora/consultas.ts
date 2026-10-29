@@ -80,14 +80,14 @@ const comoTexto = (c: Conceptos) => ({
   p_arancel: c.arancel.toString(), p_prenda: c.prenda.toString(), p_sellado: c.sellado.toString(), p_otros: c.otros.toString(),
 })
 
-export async function registrarPresupuesto(tramite: string, c: Conceptos) {
-  const { error } = await supabase.rpc('registrar_presupuesto', { p_tramite: tramite, ...comoTexto(c) })
+export async function registrarPresupuesto(tramite: string, c: Conceptos, motivo?: string) {
+  const { error } = await supabase.rpc('registrar_presupuesto', { p_tramite: tramite, ...comoTexto(c), p_motivo: motivo || null })
   if (error) throw error
 }
 
-export async function registrarPago(idem: string, tramite: string, fecha: string, c: Conceptos, esFinal: boolean) {
+export async function registrarPago(idem: string, tramite: string, fecha: string, c: Conceptos, esFinal: boolean, motivo?: string) {
   const { error } = await supabase.rpc('registrar_pago', {
-    p_idem: idem, p_tramite: tramite, p_fecha: fecha, ...comoTexto(c), p_es_final: esFinal,
+    p_idem: idem, p_tramite: tramite, p_fecha: fecha, ...comoTexto(c), p_es_final: esFinal, p_motivo: motivo || null,
   })
   if (error) throw error
 }
