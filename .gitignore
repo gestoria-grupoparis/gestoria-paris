@@ -10,3 +10,5 @@ web/playwright-report/
 *.tsbuildinfo
 web/dist-presupuesto/
 web/public/ocr/
+
+graphify-out/
