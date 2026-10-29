@@ -398,7 +398,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   }
   function veRendicion(r: Fila | undefined): boolean {
     if (!r) return false
-    if (rol === 'gestora') return r.gestora_id === yo
+    // Módulo interno: solo gerencia y contable con alcance.
     if (rol === 'gerencia' || rol === 'contable') return tieneAlcance(r.empresa_id, null)
     return false
   }
@@ -465,13 +465,12 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     return {
       async crear_rendicion(route, a) {
         let gestora: unknown
-        if (rol === 'gestora') gestora = yo
-        else if (rol === 'gerencia' || rol === 'contable') {
+        if (rol === 'gerencia' || rol === 'contable') {
           if (!tieneAlcance(a.p_empresa, null)) return errorNegocio(route, 'SIN_PERMISO: sin alcance sobre esa razón social')
           const g = perfiles.find((p) => p.id === a.p_gestora && p.rol === 'gestora' && p.activo)
           if (!g) return errorNegocio(route, 'DATO_INVALIDO: elegí una gestora activa')
           gestora = g.id
-        } else return errorNegocio(route, 'SIN_PERMISO: solo la gestora, gerencia o contable crean rendiciones')
+        } else return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable crean rendiciones')
         if (!a.p_periodo) return errorNegocio(route, 'DATO_INVALIDO: el mes de la rendición es obligatorio')
         const hon = importe(a.p_honorario ?? '3250000')
         if (hon == null || hon <= 0n) return errorNegocio(route, 'DATO_INVALIDO: el honorario debe ser mayor a cero')
@@ -557,18 +556,15 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
         await route.fulfill({ json: c.id })
       },
       async cambiar_estado_rendicion(route, a) {
+        if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable cambian el estado de una rendición')
         const r = rendicion(a.p_rendicion)
         if (!r || !veRendicion(r)) return errorNegocio(route, 'NO_ENCONTRADO: rendición inexistente')
         const hacia = String(a.p_estado)
-        if (hacia === 'enviada') {
-          if (rol !== 'gestora') return errorNegocio(route, 'SIN_PERMISO: solo la gestora envía su rendición a control')
-        } else if (hacia === 'observada' || hacia === 'aprobada') {
-          if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable observan o aprueban rendiciones')
-        } else return errorNegocio(route, 'DATO_INVALIDO: estado de rendición desconocido')
         if (r.version !== a.p_version) return errorNegocio(route, 'VERSION_CONFLICTO: otro usuario modificó esta rendición; recargá')
-        if ((hacia === 'enviada' && !['borrador', 'observada'].includes(String(r.estado))) || (hacia !== 'enviada' && r.estado !== 'enviada'))
-          return errorNegocio(route, `TRANSICION_INVALIDA: no se puede pasar de ${r.estado} a ${hacia}`)
-        if (hacia === 'observada' && !conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: observar exige un motivo')
+        const ok = [['borrador', 'enviada'], ['observada', 'enviada'], ['enviada', 'observada'], ['enviada', 'aprobada'], ['aprobada', 'borrador']]
+        if (!ok.some(([d, h]) => d === r.estado && h === hacia)) return errorNegocio(route, `TRANSICION_INVALIDA: no se puede pasar de ${r.estado} a ${hacia}`)
+        if ((hacia === 'observada' || hacia === 'borrador') && !conMotivo(a))
+          return errorNegocio(route, `DATO_INVALIDO: ${hacia === 'observada' ? 'observar' : 'reabrir'} exige un motivo`)
         Object.assign(r, { estado: hacia, version: Number(r.version) + 1, ...(hacia === 'observada' ? { motivo_observacion: String(a.p_motivo).trim() } : {}) })
         await route.fulfill({ status: 204, body: '' })
       },

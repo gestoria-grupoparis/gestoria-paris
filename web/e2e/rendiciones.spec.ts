@@ -22,12 +22,13 @@ async function crearJulio(page: Page) {
   const d = page.getByRole('dialog', { name: 'Nueva rendición' })
   await d.getByLabel('Razón social').selectOption({ label: 'Paris Autos' })
   await d.getByLabel('Mes').fill('2026-07')
+  await d.getByLabel('Gestora').selectOption({ label: 'Gabriela Gestora' })
   await d.getByRole('button', { name: 'Crear rendición' }).click()
   return d
 }
 
-test('gestora crea la rendición de julio 2026 de Paris Autos y la ve en la lista', async ({ page }) => {
-  await abrir(page, GESTORA)
+test('contable crea la rendición de julio 2026 de Paris Autos y la ve en la lista', async ({ page }) => {
+  await abrir(page, CONTABLE)
   await expect(page.getByText('Todavía no hay rendiciones.')).toBeVisible()
   await crearJulio(page)
   await expect(page.getByRole('heading', { name: 'Paris Autos · Julio 2026' })).toBeVisible()
@@ -40,7 +41,7 @@ test('gestora crea la rendición de julio 2026 de Paris Autos y la ve en la list
 })
 
 test('no deja crear dos veces el mismo mes', async ({ page }) => {
-  await abrir(page, GESTORA)
+  await abrir(page, CONTABLE)
   await crearJulio(page)
   await page.getByRole('button', { name: 'Rendiciones', exact: true }).click()
   const d = await crearJulio(page)
@@ -84,7 +85,7 @@ export function escenario(extra: Extra = {}, semillas: Semilla[] = [T_GODOY, T_J
 
 test('importa la planilla desde Excel: 3 filas, vincula 2 por dominio y marca 1 sin vincular; el total suma $ 1.864.715,82', async ({ page }) => {
   // GODOY no tiene trámite en este escenario: queda sin vincular.
-  await abrir(page, GESTORA, escenario({}, [T_JOFRE, T_SUAREZ]), `/rendiciones?r=${REND}`)
+  await abrir(page, CONTABLE, escenario({}, [T_JOFRE, T_SUAREZ]), `/rendiciones?r=${REND}`)
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Julio')
   ws.addRow(['NOMBRE', 'PAGO', 'HONORARIOS'])
@@ -123,7 +124,7 @@ const archivo = (name: string, contenido = name) => ({ name, mimeType: name.ends
 
 test('sube un recibo y una retención, los asigna a GODOY por nombre y dominio, y al confirmar quedan vinculados', async ({ page }) => {
   await simularOcr(page, { 'recibo.pdf': texto('recibo-dnrpa.txt'), 'sellos.jpg': texto('retencion-sellos.txt') })
-  await abrir(page, GESTORA, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
+  await abrir(page, CONTABLE, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
   await page.getByLabel('Archivos de comprobantes').setInputFiles([archivo('recibo.pdf'), archivo('sellos.jpg')])
   const lista = page.getByRole('list', { name: 'Lista de comprobantes' })
   await expect(lista.getByRole('listitem')).toHaveCount(2)
@@ -140,7 +141,7 @@ test('sube un recibo y una retención, los asigna a GODOY por nombre y dominio, 
 
 test('el mismo archivo dos veces avisa duplicado', async ({ page }) => {
   await simularOcr(page, { 'recibo.pdf': texto('recibo-dnrpa.txt') })
-  await abrir(page, GESTORA, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
+  await abrir(page, CONTABLE, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
   const subir = page.getByLabel('Archivos de comprobantes')
   await subir.setInputFiles([archivo('recibo.pdf')])
   await expect(page.getByRole('list', { name: 'Lista de comprobantes' }).getByRole('listitem')).toHaveCount(1)
@@ -153,7 +154,7 @@ test('el mismo archivo dos veces avisa duplicado', async ({ page }) => {
 
 test('un archivo ilegible queda pendiente con todos los campos para completar', async ({ page }) => {
   await simularOcr(page, { 'borroso.jpg': '%%% ###' })
-  await abrir(page, GESTORA, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
+  await abrir(page, CONTABLE, conPlanilla(), `/rendiciones?r=${REND}&vista=comprobantes`)
   await page.getByLabel('Archivos de comprobantes').setInputFiles([archivo('borroso.jpg')])
   const lista = page.getByRole('list', { name: 'Lista de comprobantes' })
   await expect(lista.getByText('Otro comprobante')).toBeVisible()
@@ -161,4 +162,10 @@ test('un archivo ilegible queda pendiente con todos los campos para completar', 
   const form = page.getByRole('form', { name: 'Datos del comprobante' })
   await expect(form.getByText('Revisar', { exact: true })).toHaveCount(7)
   await expect(form.getByText('Pendiente de revisión')).toBeVisible()
+})
+
+test('la gestora no ve Rendiciones en el menú y /rendiciones la redirige', async ({ page }) => {
+  await abrir(page, GESTORA, escenario())
+  await expect(page).toHaveURL(/\/mis-tramites/)
+  await expect(page.getByRole('link', { name: 'Rendiciones' })).toHaveCount(0)
 })

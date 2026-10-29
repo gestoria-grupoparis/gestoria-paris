@@ -20,7 +20,7 @@ export function navegacionPorRol(rol: Rol | null): ItemNav[] {
     case 'contable':
       return [TRAMITES, HABITUALISTA, INFORMES, RENDICIONES, TABLERO]
     case 'gestora':
-      return [MIS_TRAMITES, RENDICIONES]
+      return [MIS_TRAMITES]
     case 'admin':
       return [USUARIOS]
     default:

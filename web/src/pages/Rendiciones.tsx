@@ -4,7 +4,6 @@ import { useSearchParams } from 'react-router'
 import { formatearPesos, parsearPesos } from '../lib/dinero'
 import { mensajeError } from '../lib/errores'
 import { useMutacionUnica } from '../lib/consultas'
-import { useSesion } from '../lib/sesion'
 import { supabase } from '../lib/supabase'
 import { etiquetaMes } from '../features/informes/meses'
 import { hoyEnBuenosAires } from '../features/tramites/filtros'
@@ -97,7 +96,7 @@ function Lista({ onAbrir }: { onAbrir: (id: string) => void }) {
       <PageHeader
         rotulo="Cierre del mes"
         titulo="Rendiciones"
-        descripcion="La gestora carga la planilla del mes y sus comprobantes; el sistema los lee y controla importes, autorizaciones y honorarios. La rendición no mueve dinero: solo compara."
+        descripcion="Control interno de lo que rindió cada gestora: se cargan la planilla del mes y sus comprobantes, el sistema los lee y controla importes, autorizaciones y honorarios. La rendición no mueve dinero: solo compara."
         acciones={<Button onClick={() => setCreando(true)}>Nueva rendición</Button>}
       />
       <div className="mb-6 grid grid-cols-1 gap-3 rounded-lg bg-superficie p-4 ring-1 ring-linea sm:grid-cols-2 md:flex md:gap-4">
@@ -194,9 +193,8 @@ function DialogoNueva({ empresas, onCerrar, onCreada }: {
   onCerrar: () => void
   onCreada: (id: string) => void
 }) {
-  const { rol } = useSesion()
   const qc = useQueryClient()
-  const eligeGestora = rol === 'gerencia' || rol === 'contable'
+  const eligeGestora = true
   const gestoras = useQuery({ queryKey: ['gestoras'], queryFn: gestorasActivas, enabled: eligeGestora })
   const [empresa, setEmpresa] = useState('')
   const [mes, setMes] = useState(mesAnterior(hoyEnBuenosAires()))

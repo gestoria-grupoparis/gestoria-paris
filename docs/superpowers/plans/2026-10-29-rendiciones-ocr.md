@@ -93,6 +93,10 @@
 - [ ] **Step 4:** Run the full DB suite → all green.
 - [ ] **Step 5:** Commit `feat(db): rendiciones, comprobantes y permisos`.
 
+Decisión: módulo interno (pedido del dueño). Solo gerencia/contable con alcance completo sobre la empresa ven y operan rendiciones (RLS, RPC y Storage vía `puede_ver_rendicion`); `crear_rendicion` exige `p_gestora` (la gestora es solo referencia). Transiciones: borrador/observada → enviada → observada (motivo) | aprobada; aprobada → borrador (reabrir, motivo). Se aplicó con la migración `20261101000400_rendiciones_internas.sql` (no se editó la 000100).
+
+Decisión: `guardar_filas` hace upsert por `id` (actualiza, crea y borra las que faltan) para no perder la asignación de comprobantes a filas; guardar filas o comprobantes no incrementa `version` (solo los cambios de estado).
+
 ### Task 2: Argentine amounts and normalization (pure)
 
 **Files:**

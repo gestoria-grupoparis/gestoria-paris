@@ -46,7 +46,7 @@ Es un módulo aparte del circuito de trámites (ping pong). Es el último paso: 
   - Del mismo comprobante escaneado otra vez: se detectan por la misma combinación de tipo + número + emisor.
 - **Montos argentinos:** se aceptan "431539,69", "1.163.855,24" y "508 614.29", y siempre se guardan en centavos (bigint).
 - **Sin servicios pagos ni IA generativa.** El OCR corre en el navegador con Tesseract.js (español), con los modelos alojados en la propia web. Los PDF con texto se leen con PDF.js, sin OCR.
-- **Permisos:** la gestora carga sus propias rendiciones; gerencia y contable las controlan y las aprueban. Todo queda auditado con el trigger `auditar` existente.
+- **Permisos:** módulo interno (pedido del dueño). Solo gerencia y contable con alcance sobre la razón social crean, cargan, controlan y aprueban rendiciones; la gestora es solo un dato de referencia de cada rendición y no ve el módulo (ni menú, ni tablas, ni RPC, ni archivos). Estados: borrador/observada → enviada a control → observada o aprobada; una aprobada se reabre a borrador con motivo. Todo queda auditado con el trigger `auditar` existente.
 - **Uso:** pensado para escritorio, porque se cargan pilas de papeles escaneados, pero también funciona en celular.
 
 ## Flujo

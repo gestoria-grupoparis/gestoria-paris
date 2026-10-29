@@ -6,6 +6,6 @@ it('ordena la navegación según el rol', () => {
   expect(et('gerencia')).toEqual(['Tablero', 'Trámites', 'Habitualista', 'Informes', 'Rendiciones', 'Usuarios'])
   expect(et('admin')).toEqual(['Usuarios'])
   expect(et('contable')).toEqual(['Trámites', 'Habitualista', 'Informes', 'Rendiciones', 'Tablero'])
-  expect(et('gestora')).toEqual(['Mis trámites', 'Rendiciones'])
+  expect(et('gestora')).toEqual(['Mis trámites'])
   expect(et(null)).toEqual([])
 })
