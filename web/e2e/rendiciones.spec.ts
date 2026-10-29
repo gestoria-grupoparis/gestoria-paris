@@ -169,3 +169,67 @@ test('la gestora no ve Rendiciones en el menú y /rendiciones la redirige', asyn
   await expect(page).toHaveURL(/\/mis-tramites/)
   await expect(page.getByRole('link', { name: 'Rendiciones' })).toHaveCount(0)
 })
+
+// --- Controles y aprobación -----------------------------------------------------------------------
+function paraControlar(estado: string, totalSellos = '50861429') {
+  const comp = (n: number, tipo: string, numero: string, total: string) => ({
+    id: `00000000-0000-4000-8000-00000000ac0${n}`, rendicion_id: REND, fila_id: FILA_GODOY, tipo, archivo_path: null,
+    archivo_sha256: `h${n}`, pagina: 1, numero, emisor: null, emisor_cuit: null, fecha: '2026-07-01', total, dominio: 'AA111AA',
+    documento: null, datos_extraidos: {}, revision: 'confirmado', created_at: '2026-08-01T12:00:00.000Z',
+  })
+  const s = conPlanilla({
+    movimientos: [pago(1, T_GODOY.tramite.id, '94015398')],
+    comprobantes: [
+      comp(1, 'recibo_dnrpa', '171648', '43153969'),
+      comp(2, 'retencion_sellos', '0000115277', totalSellos),
+      comp(3, 'factura_honorarios', '0001-00010391', '3250000'),
+    ],
+  })
+  s.st.rendiciones[0].estado = estado
+  return s
+}
+
+const tarjeta = (page: Page, nombre: string) => page.getByRole('region', { name: `Control de ${nombre}` })
+
+test('contable ve los tres controles en verde y aprueba', async ({ page }) => {
+  const s = paraControlar('enviada')
+  const mock = await abrir(page, CONTABLE, s, `/rendiciones?r=${REND}&vista=controles`)
+  for (const n of ['importes', 'autorizados', 'honorarios']) await expect(tarjeta(page, n)).toContainText('OK')
+  await expect(page.getByTestId('detalle-honorarios')).toHaveText('1 trámites × $ 32.500,00 = $ 32.500,00 — facturado $ 32.500,00')
+  await expect(page.getByText('Monto a pagar de honorarios: $ 32.500,00')).toBeVisible()
+  await page.getByRole('button', { name: 'Aprobar' }).click()
+  const d = page.getByRole('dialog', { name: 'Aprobar rendición' })
+  await expect(d).toContainText('Los tres controles están en verde.')
+  await d.getByRole('button', { name: 'Aprobar' }).click()
+  await expect(page.getByText('Aprobada').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reabrir' })).toBeVisible()
+  // Aprobar no crea movimientos.
+  expect(s.st.movimientos).toHaveLength(1)
+  expect(mock.rutasPedidas.filter((r) => /registrar_|revertir_/.test(r))).toEqual([])
+})
+
+test('con un peso de diferencia el control de importes queda en rojo y muestra la fila', async ({ page }) => {
+  await abrir(page, CONTABLE, paraControlar('borrador', '50861529'), `/rendiciones?r=${REND}&vista=controles`)
+  const imp = tarjeta(page, 'importes')
+  await expect(imp).toContainText('Con diferencias')
+  await expect(imp.getByRole('list', { name: 'Filas con diferencia' })).toContainText('GODOY MARIO ESTEBAN · $ 1,00')
+  await imp.getByRole('button', { name: 'Ver comprobantes' }).click()
+  await expect(page.getByText('Mostrando los comprobantes de GODOY MARIO ESTEBAN.')).toBeVisible()
+})
+
+test('aprobar con diferencias pide confirmación', async ({ page }) => {
+  await abrir(page, CONTABLE, paraControlar('enviada', '50861529'), `/rendiciones?r=${REND}&vista=controles`)
+  await page.getByRole('button', { name: 'Aprobar' }).click()
+  const d = page.getByRole('dialog', { name: 'Aprobar rendición' })
+  await expect(d).toContainText('Hay diferencias sin resolver. ¿Aprobar igual?')
+  await d.getByRole('button', { name: 'Aprobar' }).click()
+  await expect(page.getByRole('button', { name: 'Reabrir' })).toBeVisible()
+})
+
+test('en borrador no se ofrece aprobar: primero se envía a control', async ({ page }) => {
+  await abrir(page, CONTABLE, paraControlar('borrador'), `/rendiciones?r=${REND}&vista=controles`)
+  await expect(page.getByRole('button', { name: 'Aprobar' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Enviar a control' }).click()
+  await page.getByRole('dialog', { name: 'Enviar a control' }).getByRole('button', { name: 'Enviar a control' }).click()
+  await expect(page.getByRole('button', { name: 'Aprobar' })).toBeVisible()
+})
