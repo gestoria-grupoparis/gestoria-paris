@@ -657,6 +657,9 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       if (imp == null || imp <= 0n) return errorNegocio(route, 'DATO_INVALIDO: el importe de la carga debe ser mayor a cero')
       if (!a.p_fecha) return errorNegocio(route, 'DATO_INVALIDO: la fecha de la carga es obligatoria')
       const m = nuevoMovimiento({ idem: a.p_idem, cuenta_id: cuentaDe(a.p_empresa).id, tipo: 'carga', importe: String(imp), fecha_operacion: a.p_fecha })
+      // Aproximación de la base: una carga cubre a los trámites marcados sin fondos de esa empresa.
+      for (const t of st.tramites)
+        if (t.empresa_id === a.p_empresa && situacionForzada.get(t.id) === 'sin_fondos') situacionForzada.delete(t.id)
       await route.fulfill({ json: m.id })
     },
     async registrar_ajuste(route, a) {

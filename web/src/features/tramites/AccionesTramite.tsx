@@ -10,8 +10,11 @@ import { Dialogo } from './Dialogo'
 import { etiquetaEstado } from './filtros'
 import { AVANCE, RETROCESO, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
 import { FormEdicion } from './FormEdicion'
+import { FormCarga } from '../habitualista/FormCarga'
+import { aprobarExcepcionFondos } from '../habitualista/consultas'
+import { useSesion } from '../../lib/sesion'
 
-type Accion = 'editar' | 'aprobar' | 'revocar' | 'retroceder' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
+type Accion = 'editar' | 'carga' | 'excepcion' | 'aprobar' | 'revocar' | 'retroceder' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
 
 const ESTADOS_ASIGNABLES = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro', 'devuelto', 'suspendido']
 const PELIGRO_SUAVE = 'text-sinfondos hover:bg-sinfondos-suave'
@@ -19,6 +22,8 @@ const PELIGRO_SUAVE = 'text-sinfondos hover:bg-sinfondos-suave'
 // Acciones del panel (spec G.1 y D): autorizar, observar, asignar, avanzar, rechazar, suspender/reanudar, cancelar.
 export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetalle; catalogos: Catalogos }) {
   const [abierta, setAbierta] = useState<Accion>(null)
+  const { rol } = useSesion()
+  const qc = useQueryClient()
   const gestoras = catalogos.perfiles.filter((p) => p.rol === 'gestora' && p.activo)
   const cerrar = () => setAbierta(null)
   const e = tramite.estado
@@ -108,6 +113,18 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
             <Button ancho icono={<IconoCheck className="size-4" />} onClick={() => setAbierta('aprobar')}>
               Aprobar presupuesto
             </Button>
+          )}
+          {sinFondos && (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button ancho onClick={() => setAbierta('carga')}>
+                Registrar carga
+              </Button>
+              {rol === 'gerencia' && (
+                <Button ancho variante="secundario" onClick={() => setAbierta('excepcion')}>
+                  Aprobar excepción de fondos
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -236,6 +253,30 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
           aviso={previo ? `Vuelve a ${etiquetaEstado(previo)}.` : previoQ.isError ? mensajeError(previoQ.error) : 'Vuelve al estado en que estaba.'}
           pideMotivo="Indicá el motivo para reanudarlo."
           ejecutar={(_, motivo) => reanudarTramite(tramite.id, motivo, tramite.version)}
+          onCerrar={cerrar}
+        />
+      )}
+      {abierta === 'carga' && (
+        <FormCarga
+          empresa={{ id: tramite.empresa_id, nombre: tramite.operacion.empresa.nombre }}
+          onCerrar={cerrar}
+          onGuardado={() => {
+            cerrar()
+            void qc.invalidateQueries({ queryKey: ['tramites'] })
+            void qc.invalidateQueries({ queryKey: ['habitualista'] })
+            void qc.invalidateQueries({ queryKey: ['tablero'] })
+          }}
+        />
+      )}
+      {abierta === 'excepcion' && (
+        <FormAccion
+          titulo="Aprobar excepción de fondos"
+          rotulo={tramite.numero}
+          boton="Aprobar excepción"
+          aviso="Libera el trámite aunque la cuenta no tenga fondos. Queda registrado con tu nombre."
+          pideMotivo="Indicá el motivo de la excepción."
+          hecho="Excepción de fondos aprobada"
+          ejecutar={(_, motivo) => aprobarExcepcionFondos(tramite.id, motivo)}
           onCerrar={cerrar}
         />
       )}
