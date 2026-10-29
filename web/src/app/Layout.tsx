@@ -79,7 +79,7 @@ export function Layout() {
           <LogoGrupoParis tono="claro" className="h-8" />
           <Campana tono="oscuro" />
         </div>
-        <p className="rotulo-marca px-6 pb-3 text-[9px] text-white/35">Menú</p>
+        <p className="rotulo-marca px-6 pb-3 text-[10px] text-white/60">Menú</p>
         <nav aria-label="Principal" className="flex flex-1 flex-col gap-1 px-3">
           {items.map((i) => (
             <NavLink
@@ -87,8 +87,8 @@ export function Layout() {
               to={i.ruta}
               className={({ isActive }) =>
                 cx(
-                  'flex h-10 items-center gap-3 rounded-md px-3 text-[14px] font-medium transition-colors',
-                  isActive ? 'bg-white/[0.08] text-white ring-1 ring-inset ring-white/[0.06]' : 'text-white/55 hover:bg-white/[0.04] hover:text-white',
+                  'flex h-10 items-center gap-3 rounded-md px-3 text-[14px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[#7aa2f7]',
+                  isActive ? 'bg-white/[0.08] text-white ring-1 ring-inset ring-white/[0.06] shadow-[inset_3px_0_0_#7aa2f7]' : 'text-white/70 hover:bg-white/[0.04] hover:text-white',
                 )
               }
             >
@@ -104,14 +104,14 @@ export function Layout() {
             </span>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-[13px] font-medium">{perfil?.nombre}</div>
-              <div className="mt-0.5 truncate text-[12px] text-white/50">
+              <div className="mt-0.5 truncate text-[12px] text-white/65">
                 {rolTexto} · {EMPRESA}
               </div>
             </div>
           </div>
           <button
             type="button"
-            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 hover:bg-white/[0.05] hover:text-white"
+            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 hover:bg-white/[0.05] hover:text-white focus-visible:outline-2 focus-visible:outline-[#7aa2f7]"
             onClick={cambiarClave}
           >
             <IconoLlave className="size-4" />
@@ -119,7 +119,7 @@ export function Layout() {
           </button>
           <button
             type="button"
-            className="mt-1.5 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 ring-1 ring-white/[0.12] hover:bg-white/[0.05] hover:text-white"
+            className="mt-1.5 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 ring-1 ring-white/[0.12] hover:bg-white/[0.05] hover:text-white focus-visible:outline-2 focus-visible:outline-[#7aa2f7]"
             onClick={salir}
           >
             <IconoSalir className="size-4" />
