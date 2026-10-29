@@ -206,6 +206,8 @@ Decisión: `guardar_filas` hace upsert por `id` (actualiza, crea y borra las que
 - [ ] **Step 4:** PASS. `npm run build` OK; check that `dist/ocr/spa.traineddata.gz` exists and that the main bundle did not grow by more than 5 kB gzip.
 - [ ] **Step 5:** Commit `feat(web): lectura de PDF y fotos en el navegador (PDF.js + Tesseract)`.
 
+Decisión: la orientación se elige probando 0/90/180/270 grados y quedándose con la mayor confianza del OCR (`detect` de Tesseract necesita el motor legacy y el modelo OSD, que no se sirven). Se copian solo los núcleos LSTM (`*-lstm.wasm.js`) y el modelo `4.0.0_best_int` (~14 MB en `public/ocr/`, ignorado por git). `window.__ocrSimulado` también se honra en el dev server (`import.meta.env.DEV`), porque los E2E corren contra `vite dev`; el build de producción no lo incluye. El bundle principal no creció (el código de lectura carga con import() dinámico en la ruta de rendiciones).
+
 ### Task 5: Linking rows and receipts to trámites (pure + query)
 
 **Files:**
@@ -228,6 +230,8 @@ Decisión: `guardar_filas` hace upsert por `id` (actualiza, crea y borra las que
   - a retención with dominio AA111AA is assigned to the row of that dominio
 - [ ] **Step 2–4:** FAIL → implement → PASS.
 - [ ] **Step 5:** Commit `feat(web): vinculación de filas y comprobantes con trámites`.
+
+Decisión: `asignarComprobante` compara el DNI contra el documento de un comprobante ya confirmado de esa fila (los trámites no guardan DNI); el dominio de una fila sin dominio se toma del trámite vinculado. Por nombre: coincidencia exacta normalizada y, si no hay, todas las palabras de la fila contenidas en el otro nombre; más de una = ambiguo.
 
 ### Task 6: Duplicates and the three controls in the database
 
@@ -262,6 +266,8 @@ Decisión: `guardar_filas` hace upsert por `id` (actualiza, crea y borra las que
   - the same número with a different file → 'mismo_numero'
 - [ ] **Step 2–4:** FAIL → implement → full DB suite green.
 - [ ] **Step 5:** Commit `feat(db): controles de rendición y detección de duplicados`.
+
+Decisión: los importes del jsonb de `controles_rendicion` van como texto (centavos) para que el front nunca los reciba como number. Las facturas de honorarios no suman al control de importes por fila.
 
 ### Task 7: Queries and mock
 
@@ -301,6 +307,8 @@ Decisión: `guardar_filas` hace upsert por `id` (actualiza, crea y borra las que
   - "gestora crea la rendición de julio 2026 de Paris Autos y la ve en la lista"
   - "no deja crear dos veces el mismo mes" (shows the DUPLICADO message)
 - [ ] Commit `feat(web): pantalla de rendiciones`.
+
+Decisión: módulo interno (pedido del dueño): el alta la hacen gerencia/contable y siempre eligen la gestora; no hay pestaña para la gestora. El detalle de una rendición vive en la misma ruta con `?r=<id>` y pestañas Planilla / Comprobantes / Controles.
 
 ### Task 9: Load the planilla (Excel/CSV or photo/PDF)
 
@@ -374,6 +382,8 @@ Actions:
   - "aprobar con diferencias pide confirmación"
   - "la gestora no ve los botones de aprobar"
 - [ ] Commit `feat(web): controles de la rendición y aprobación`.
+
+Decisión: además de enviar/observar/aprobar se agregó "Reabrir" (aprobada a borrador, con motivo). Aprobar siempre abre una confirmación; con algún control en rojo muestra "Hay diferencias sin resolver. ¿Aprobar igual?". El E2E "la gestora no ve los botones de aprobar" se reemplazó por "en borrador no se ofrece aprobar: primero se envía a control" y "la gestora no ve Rendiciones en el menú y /rendiciones la redirige".
 
 ### Task 12: Final review and documentation
 

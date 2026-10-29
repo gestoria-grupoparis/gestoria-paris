@@ -233,3 +233,20 @@ test('en borrador no se ofrece aprobar: primero se envía a control', async ({ p
   await page.getByRole('dialog', { name: 'Enviar a control' }).getByRole('button', { name: 'Enviar a control' }).click()
   await expect(page.getByRole('button', { name: 'Aprobar' })).toBeVisible()
 })
+
+test.describe('celular (375 px)', () => {
+  test.use({ viewport: { width: 375, height: 812 } })
+  const sinScrollHorizontal = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+
+  test('la lista y la revisión de comprobantes entran sin scroll horizontal', async ({ page }) => {
+    await simularOcr(page, { 'recibo.pdf': texto('recibo-dnrpa.txt') })
+    await abrir(page, CONTABLE, conPlanilla())
+    await expect(page.getByRole('list', { name: 'Rendiciones (lista)' })).toContainText('Paris Autos')
+    expect(await sinScrollHorizontal(page)).toBe(true)
+    await page.getByRole('list', { name: 'Rendiciones (lista)' }).getByRole('button').first().click()
+    await page.getByRole('tab', { name: 'Comprobantes' }).click()
+    await page.getByLabel('Archivos de comprobantes').setInputFiles([archivo('recibo.pdf')])
+    await expect(page.getByRole('form', { name: 'Datos del comprobante' })).toBeVisible()
+    expect(await sinScrollHorizontal(page)).toBe(true)
+  })
+})
