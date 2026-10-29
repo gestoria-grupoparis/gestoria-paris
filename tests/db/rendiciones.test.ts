@@ -140,3 +140,130 @@ test('storage: el bucket comprobantes es privado', async () => {
   expect(b).toEqual({ public: false })
 })
 
+
+// ---------------------------------------------------------------------------------------
+// Controles y duplicados
+// ---------------------------------------------------------------------------------------
+
+async function escenarioControles() {
+  const f = await preparar()
+  await rpc(f.gerencia, 'registrar_carga', { p_idem: randomUUID(), p_empresa: f.empresa, p_importe: 500000000n, p_fecha: '2026-07-01' })
+  let n = 0
+  const tramite = async (cliente: string, pago: bigint) => {
+    n += 1
+    const id = (
+      await rpc(f.contable, 'crear_tramite', {
+        p_idem: randomUUID(), p_empresa: f.empresa, p_sucursal: f.sucursal, p_tipo: 'transferencia_usado',
+        p_cliente: cliente, p_cuenta_personal: 'CP-' + n, p_oferta: 'OF-' + n,
+        p_vehiculo: 'Peugeot 208', p_dominio: 'AA' + n + n + n + 'AA',
+      })
+    ).rows[0].crear_tramite as string
+    await rpc(f.contable, 'autorizar_tramite', { p_tramite: id, p_gestora: f.gestora, p_version: 1 })
+    const mov = (
+      await rpc(f.gestora, 'registrar_pago', {
+        p_idem: randomUUID(), p_tramite: id, p_fecha: FECHA,
+        p_arancel: pago, p_prenda: 0n, p_sellado: 0n, p_otros: 0n, p_es_final: true,
+      })
+    ).rows[0].registrar_pago as string
+    return { id, mov }
+  }
+  const t1 = await tramite('GODOY MARIO ESTEBAN', 116385524n)
+  const t2 = await tramite('JOFRE FABRICIO ALEJANDRO', 43153969n)
+  const r = await f.crear(f.gestora)
+  await rpc(f.gestora, 'guardar_filas', {
+    p_rendicion: r,
+    p_filas: JSON.stringify([
+      { nombre: 'GODOY MARIO ESTEBAN', pago_cents: '116385524', honorarios_cents: '3250000', tramite_id: t1.id, vinculo: 'auto' },
+      { nombre: 'JOFRE FABRICIO ALEJANDRO', pago_cents: '43153969', honorarios_cents: '3250000', tramite_id: t2.id, vinculo: 'auto' },
+    ]),
+  })
+  const filas = (await sqlAdmin('select id from public.rendicion_filas where rendicion_id = $1 order by orden', [r])).map((x) => x.id as string)
+  const comprobante = async (datos: Record<string, unknown>) =>
+    (await rpc(f.gestora, 'guardar_comprobante', { p_rendicion: r, p_datos: JSON.stringify(datos) })).rows[0].guardar_comprobante as string
+  // GODOY = recibo + retención; JOFRE = un recibo. Facturas de honorarios confirmadas.
+  await comprobante({ tipo: 'recibo_dnrpa', fila_id: filas[0], numero: '171648', emisor: 'Registro 19008', total_cents: '65524095', archivo_sha256: 'h1', archivo_path: `${r}/h1.pdf` })
+  const sellos = await comprobante({ tipo: 'retencion_sellos', fila_id: filas[0], numero: '0000115277', emisor_cuit: '27111111114', total_cents: '50861429', archivo_sha256: 'h2' })
+  await comprobante({ tipo: 'recibo_dnrpa', fila_id: filas[1], numero: '171649', emisor: 'Registro 19008', total_cents: '43153969', archivo_sha256: 'h3' })
+  await comprobante({ tipo: 'factura_honorarios', fila_id: filas[0], numero: '0001-00010391', total_cents: '3250000', revision: 'confirmado', archivo_sha256: 'h4' })
+  const factura2 = await comprobante({ tipo: 'factura_honorarios', fila_id: filas[1], numero: '0001-00010392', total_cents: '3250000', revision: 'confirmado', archivo_sha256: 'h5' })
+  const controles = async () =>
+    (await rpc(f.contable, 'controles_rendicion', { p_rendicion: r })).rows[0].controles_rendicion
+  const duplicados = async () =>
+    (await rpc(f.gestora, 'comprobantes_duplicados', { p_rendicion: r })).rows
+  return { ...f, r, t1, t2, filas, comprobante, sellos, factura2, controles, duplicados, tramite }
+}
+
+test('controles: todo coincide, los tres en verde', async () => {
+  const e = await escenarioControles()
+  const c = await e.controles()
+  expect(c.importes).toMatchObject({
+    ok: true, total_planilla_cents: '159539493', debitado_habitualista_cents: '159539493', diferencia_cents: '0',
+    movimientos_sin_rendir: [],
+  })
+  expect(c.importes.filas.every((x: { ok: boolean }) => x.ok)).toBe(true)
+  expect(c.autorizados).toEqual({ ok: true, filas_no_autorizadas: [] })
+  expect(c.honorarios).toMatchObject({
+    ok: true, cantidad_tramites: 2, honorario_unitario_cents: '3250000', esperado_cents: '6500000', facturado_cents: '6500000', diferencia_cents: '0',
+  })
+  // La gestora también los ve; otra gestora no. Calcular no crea movimientos.
+  await rpc(e.gestora, 'controles_rendicion', { p_rendicion: e.r })
+  await expect(rpc(e.otraGestora, 'controles_rendicion', { p_rendicion: e.r })).rejects.toThrow(/^NO_ENCONTRADO:/)
+})
+
+test('controles: un peso de más en un comprobante da la diferencia exacta', async () => {
+  const e = await escenarioControles()
+  await e.comprobante({ id: e.sellos, tipo: 'retencion_sellos', fila_id: e.filas[0], numero: '0000115277', emisor_cuit: '27111111114', total_cents: '50861529' })
+  const c = await e.controles()
+  expect(c.importes.ok).toBe(false)
+  expect(c.importes.filas[0]).toMatchObject({ fila_id: e.filas[0], pago_cents: '116385524', comprobantes_cents: '116385624', diferencia_cents: '100', ok: false })
+  expect(c.importes.filas[1].ok).toBe(true)
+})
+
+test('control habitualista: un pago del mes de un trámite fuera de la rendición queda sin rendir', async () => {
+  const e = await escenarioControles()
+  const t3 = await e.tramite('OTRO CLIENTE', 1234500n)
+  const c = await e.controles()
+  expect(c.importes).toMatchObject({ ok: false, debitado_habitualista_cents: String(159539493 + 1234500), diferencia_cents: '-1234500' })
+  expect(c.importes.movimientos_sin_rendir).toEqual([
+    expect.objectContaining({ movimiento_id: t3.mov, importe_cents: '1234500', fecha: FECHA }),
+  ])
+  expect(c.importes.movimientos_sin_rendir[0].tramite_numero).toMatch(/^T-/)
+  // Revertido, ya no cuenta.
+  await rpc(e.contable, 'revertir_movimiento', { p_idem: randomUUID(), p_movimiento: t3.mov, p_motivo: 'pago duplicado' })
+  expect((await e.controles()).importes).toMatchObject({ ok: true, movimientos_sin_rendir: [] })
+})
+
+test('control autorizados: una fila sin trámite', async () => {
+  const e = await escenarioControles()
+  await rpc(e.gestora, 'guardar_filas', {
+    p_rendicion: e.r,
+    p_filas: JSON.stringify([
+      { id: e.filas[0], nombre: 'GODOY MARIO ESTEBAN', pago_cents: '116385524', honorarios_cents: '3250000', tramite_id: e.t1.id, vinculo: 'auto' },
+      { id: e.filas[1], nombre: 'JOFRE FABRICIO ALEJANDRO', pago_cents: '43153969', honorarios_cents: '3250000', tramite_id: null, vinculo: 'sin_vincular' },
+    ]),
+  })
+  const c = await e.controles()
+  expect(c.autorizados).toEqual({
+    ok: false, filas_no_autorizadas: [{ fila_id: e.filas[1], nombre: 'JOFRE FABRICIO ALEJANDRO', motivo: 'sin_vincular' }],
+  })
+})
+
+test('control honorarios: falta una factura', async () => {
+  const e = await escenarioControles()
+  await e.comprobante({ id: e.factura2, tipo: 'factura_honorarios', revision: 'pendiente', total_cents: '3250000' })
+  const c = await e.controles()
+  expect(c.honorarios).toMatchObject({ ok: false, facturado_cents: '3250000', diferencia_cents: '-3250000' })
+})
+
+test('duplicado por número y por archivo: avisa pero no bloquea', async () => {
+  const e = await escenarioControles()
+  expect(await e.duplicados()).toEqual([])
+  const copia = await e.comprobante({ tipo: 'recibo_dnrpa', numero: '999', emisor: 'X', archivo_sha256: 'h1' })
+  const reescaneo = await e.comprobante({ tipo: 'retencion_sellos', numero: '0000115277', emisor_cuit: '27111111114', archivo_sha256: 'h9' })
+  const d = await e.duplicados()
+  expect(d).toEqual(expect.arrayContaining([
+    expect.objectContaining({ comprobante_id: copia, motivo: 'mismo_archivo', otra_rendicion: e.r }),
+    expect.objectContaining({ comprobante_id: reescaneo, motivo: 'mismo_numero', otro_id: e.sellos }),
+  ]))
+  expect(d.find((x) => x.comprobante_id === copia && x.motivo === 'mismo_numero')).toBeUndefined()
+})
