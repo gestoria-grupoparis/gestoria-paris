@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { parsearPesos } from '../../lib/dinero'
+import { formatearPesos, parsearPesos } from '../../lib/dinero'
+import { useAviso } from '../../ui'
 import { mensajeError } from '../../lib/errores'
 import { CLASE_CAMPO, CLASE_ETIQUETA, CLASE_PRIMARIO, CLASE_SECUNDARIO, Dialogo } from '../tramites/Dialogo'
 import { hoyEnBuenosAires } from '../tramites/filtros'
@@ -17,6 +18,7 @@ export function FormCarga({ empresa, onCerrar, onGuardado }: {
   const [nota, setNota] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const avisar = useAviso()
 
   async function enviar(e: FormEvent) {
     e.preventDefault()
@@ -31,6 +33,7 @@ export function FormCarga({ empresa, onCerrar, onGuardado }: {
     setEnviando(true)
     try {
       await registrarCarga(idem, empresa.id, cents, fecha, nota)
+      avisar({ texto: `Carga de ${formatearPesos(cents.toString())} registrada` })
       onGuardado()
     } catch (err) {
       setError(mensajeError(err))

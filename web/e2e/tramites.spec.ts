@@ -150,3 +150,15 @@ test('el diálogo conserva el foco y lo escrito aunque lleguen cambios en vivo; 
   await expect(dialogo).toBeHidden()
   await expect(detalle.getByTestId('estado')).toHaveText('Suspendido')
 })
+
+test('cada acción del panel confirma con un aviso', async ({ page }) => {
+  await montarSupabase(page, [borrador])
+  await page.goto('/tramites')
+  await page.getByRole('row', { name: /T-2026-00001/ }).click()
+  const detalle = page.getByRole('complementary', { name: 'Detalle del trámite' })
+  await detalle.getByRole('button', { name: 'Suspender' }).click()
+  const d = page.getByRole('dialog', { name: 'Suspender trámite' })
+  await d.getByLabel('Motivo').fill('Cliente de viaje')
+  await d.getByRole('button', { name: 'Confirmar suspensión' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Trámite suspendido · T-2026-00001' })).toBeVisible()
+})

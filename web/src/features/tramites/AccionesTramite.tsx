@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { mensajeError } from '../../lib/errores'
 import { useMutacionUnica } from '../../lib/consultas'
-import { Button, claseControl, Field } from '../../ui'
+import { Button, claseControl, Field, useAviso } from '../../ui'
 import { IconoCheck, IconoFlecha, IconoLapiz, IconoRetorno, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
 import { formatearPesos } from '../../lib/dinero'
 import { aprobarPresupuesto, autorizarTramite, cambiarEstado, revocarAprobacion, estadoPrevio, reanudarTramite, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
@@ -271,10 +271,25 @@ export interface PropsForm {
   /** Se llama tras un éxito, antes de cerrar (p. ej. para avisar el resultado). */
   onHecho?: () => void
   etiquetaMotivo?: string
+  /** Texto del aviso de éxito (si no hay onHecho). Por defecto se deduce del título. */
+  hecho?: string
 }
 
-export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, motivoOpcional, peligro, gestoras = [], aviso, ejecutar, onCerrar, onHecho, etiquetaMotivo }: PropsForm) {
+const HECHO: Record<string, string> = {
+  'Aprobar presupuesto': 'Presupuesto aprobado',
+  'Autorizar trámite': 'Trámite autorizado',
+  'Retirar aprobación': 'Aprobación retirada',
+  'Observar trámite': 'Trámite observado',
+  'Asignar gestora': 'Gestora asignada',
+  'Rechazar trámite': 'Trámite rechazado',
+  'Suspender trámite': 'Trámite suspendido',
+  'Reanudar trámite': 'Trámite reanudado',
+  'Cancelar trámite': 'Trámite cancelado',
+}
+
+export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, motivoOpcional, peligro, gestoras = [], aviso, ejecutar, onCerrar, onHecho, etiquetaMotivo, hecho }: PropsForm) {
   const qc = useQueryClient()
+  const avisar = useAviso()
   const [gestora, setGestora] = useState('')
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -282,7 +297,8 @@ export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, mot
   const m = useMutacionUnica({
     mutationFn: () => ejecutar(gestora, motivo.trim()),
     onSuccess: () => {
-      onHecho?.()
+      if (onHecho) onHecho()
+      else avisar({ texto: `${hecho ?? HECHO[titulo] ?? `${titulo}: listo`}${rotulo ? ` · ${rotulo}` : ''}` })
       onCerrar()
     },
     onError: (e) => setError(mensajeError(e)),

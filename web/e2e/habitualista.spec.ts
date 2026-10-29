@@ -43,6 +43,7 @@ test('contable registra carga y las tarjetas se actualizan; el movimiento aparec
   await form.getByLabel('Importe').fill('500.000')
   await form.getByLabel('Fecha de la carga').fill('2026-10-28')
   await form.getByRole('button', { name: 'Guardar carga' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Carga de $ 500.000,00 registrada' })).toBeVisible()
   await expect(form).toBeHidden()
 
   await expect(tarjeta(page, 'Saldo registrado').getByTestId('importe')).toHaveText('$ 1.750.000,00')
