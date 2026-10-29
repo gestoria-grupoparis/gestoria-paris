@@ -1,0 +1,20 @@
+DNRPA  Direcci6n Nacional de los Registros Nacionales de la
+Propiedad del Automotor y de Créditos Prendarios
+RECIBO
+Registro Seccional 19008 SAN LUIS N° 3
+Fecha: 01/07/2026        Referencia: 4471
+N°Control Recibo: 171648     N°Trámites: 2     Control Web: 8F3A-22C1
+Valor Declarado: $ 21576984,50     Valor C.Prenda: $ 0,00
+Dominio: AA111AA
+Concepto                              Valor Unit.     Cant.    Importe
+Arancel transferencia                 $ 323654,77     1        $ 323654,77
+Formulario 08                         $ 45200,00      1        $ 45200,00
+Formulario 12                         $ 18500,00      1        $ 18500,00
+Cédula de identificación              $ 22400,00      1        $ 22400,00
+Título del automotor                  $ 15800,00      1        $ 15800,00
+Informe verificación                  $ 16564,92      1        $ 16564,92
+Bonificación cédula                   $ -5290,00      1        $ -5290,00
+Bonificación título                   $ -3500,00      1        $ -3500,00
+Bonificación trámite web              $ -1790,00      1        $ -1790,00
+Total: $ 431539,69
+Son pesos: cuatrocientos treinta y un mil quinientos treinta y nueve con 69/100
