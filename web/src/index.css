@@ -106,3 +106,13 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; font-wei
   .esqueleto, .marquee-pista { animation: none; }
   * { transition: none !important; }
 }
+
+/* Impresión (A4): solo el contenido del reporte; el menú y los controles llevan print:hidden. */
+@page { size: A4; margin: 12mm; }
+@media print {
+  html, body { background: #fff !important; color: #111113; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  main > * { max-width: none !important; padding-left: 0 !important; padding-right: 0 !important; }
+  section, figure, table, .recharts-wrapper { break-inside: avoid; }
+  .recharts-responsive-container, .recharts-wrapper, .recharts-surface { max-width: 100% !important; }
+}

@@ -97,6 +97,28 @@ test('la gestora no ve el menú Análisis y la ruta la devuelve a su inicio', as
   expect(mock.rutasPedidas.filter((r) => /analisis|prevision|estimad|parametros/.test(r))).toEqual([])
 })
 
+test('imprimir: solo sale el reporte, sin menú lateral, navegación, botones ni filtros', async ({ page }) => {
+  await abrir(page, GERENTE)
+  await expect(page.getByRole('region', { name: 'Gasto real' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Principal', exact: true })).toBeVisible()
+  await page.emulateMedia({ media: 'print' })
+  await expect(page.getByRole('navigation', { name: 'Principal', exact: true })).toBeHidden()
+  await expect(page.locator('aside')).toBeHidden()
+  await expect(page.getByRole('navigation', { name: 'Principal móvil' })).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Imprimir o PDF' })).toBeHidden()
+  await expect(page.getByRole('tablist', { name: 'Sección del análisis' })).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Análisis', level: 1 })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Gasto real' })).toBeVisible()
+  await expect(page.getByRole('figure', { name: 'Gasto diario' })).toBeVisible()
+  // A4 vertical: el reporte entra en el ancho imprimible (~180 mm ≈ 680 px).
+  const ancho = await page.getByRole('figure', { name: 'Gasto diario' }).evaluate((e) => e.getBoundingClientRect().right)
+  expect(ancho).toBeLessThanOrEqual(page.viewportSize()!.width)
+  await page.setViewportSize({ width: 700, height: 1000 })
+  await expect(page.locator('header').first()).toBeHidden()
+  await expect(page.getByRole('navigation', { name: 'Principal móvil' })).toBeHidden()
+  await expect(page.getByRole('region', { name: 'Gasto real' })).toBeVisible()
+})
+
 test('gerencia importa la tabla DNRPA y el estimado usa la valuación del vehículo elegido', async ({ page }) => {
   await page.addInitScript((p) => { window.__valuacionesSimuladas = { 'valuaciones.pdf': p } }, paginasValuaciones)
   await abrir(page, GERENTE, '/analisis?vista=parametros')

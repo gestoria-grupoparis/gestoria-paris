@@ -75,8 +75,8 @@ export function Layout() {
   }, [cuenta])
 
   return (
-    <div className="min-h-dvh md:flex">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-noche text-white md:flex">
+    <div className="min-h-dvh md:flex print:block print:min-h-0">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-noche text-white md:flex print:hidden">
         <div className="flex items-center justify-between gap-2 pt-6 pr-3 pb-8 pl-5">
           <LogoGrupoParis tono="claro" className="h-8" />
           <Campana tono="oscuro" />
@@ -131,7 +131,7 @@ export function Layout() {
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-linea bg-superficie/90 px-4 backdrop-blur-md md:hidden">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-linea bg-superficie/90 px-4 backdrop-blur-md md:hidden print:hidden">
           <LogoGrupoParis className="h-8" />
           <div className="flex items-center gap-1">
           <Campana tono="claro" />
@@ -149,7 +149,7 @@ export function Layout() {
           </button>
           </div>
         </header>
-        <main className="min-w-0 pb-24 md:pb-0">
+        <main className="min-w-0 pb-24 md:pb-0 print:pb-0">
           <LimiteError compacto key={pathname}>
             <Outlet />
           </LimiteError>
@@ -157,7 +157,7 @@ export function Layout() {
       </div>
 
       {cuenta && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 md:hidden print:hidden">
           <button type="button" aria-label="Cerrar" tabIndex={-1} className="absolute inset-0 bg-noche/50" onClick={() => setCuenta(false)} />
           <div
             role="dialog"
@@ -192,7 +192,7 @@ export function Layout() {
 
       <nav
         aria-label="Principal móvil"
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-linea bg-superficie/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-linea bg-superficie/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden print:hidden"
       >
         {items.map((i) => (
           <NavLink
