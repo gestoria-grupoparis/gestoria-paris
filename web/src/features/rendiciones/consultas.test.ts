@@ -7,7 +7,7 @@ import { centavos, controles, mapearComprobante, mapearControles, mapearFila } f
 
 const CRUDO = {
   importes: {
-    filas: [{ fila_id: 'f1', nombre: 'GODOY', pago_cents: '116385524', comprobantes_cents: '116385624', diferencia_cents: '100', ok: false }],
+    filas: [{ fila_id: 'f1', nombre: 'PEREZ', pago_cents: '116385524', comprobantes_cents: '116385624', diferencia_cents: '100', ok: false }],
     total_planilla_cents: '116385524', debitado_habitualista_cents: '116385524', diferencia_cents: '0',
     movimientos_sin_rendir: [{ movimiento_id: 'm1', fecha: '2026-07-15', importe_cents: '1234500', tramite_id: 't', tramite_numero: 'T-2026-00003' }],
     ok: false,

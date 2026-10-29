@@ -9,7 +9,7 @@ const c = (id: string, cliente: string, dominio: string | null = null): Candidat
 })
 
 test('el dominio gana sobre el nombre', () => {
-  const r = vincularFila({ nombre: 'GODOY MARIO', dominio: 'AF869NV' }, [c('1', 'GODOY MARIO'), c('2', 'OTRO', 'AF869NV')])
+  const r = vincularFila({ nombre: 'PEREZ JUAN', dominio: 'AF869NV' }, [c('1', 'PEREZ JUAN'), c('2', 'OTRO', 'AF869NV')])
   expect(r).toEqual({ vinculo: 'auto', tramite_id: '2', candidatos: ['2'] })
 })
 
@@ -35,7 +35,7 @@ test('una retención con dominio AA111AA va a la fila de ese dominio', () => {
   const e = extraer(readFileSync(join(__dirname, '__fixtures__', 'retencion-sellos.txt'), 'utf8'))
   const filas = [
     { id: 'f1', nombre: 'OTRO CLIENTE', dominio: 'AA111AA' },
-    { id: 'f2', nombre: 'GODOY MARIO ESTEBAN', dominio: null },
+    { id: 'f2', nombre: 'PEREZ JUAN CARLOS', dominio: null },
   ]
   expect(asignarComprobante(e, filas)).toBe('f1')
   // sin dominio en las filas, por nombre

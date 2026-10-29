@@ -1,6 +1,6 @@
 // Normalización para comparar nombres, dominios y documentos leídos (a veces por OCR).
 
-const A_DIGITO: Record<string, string> = { O: '0', I: '1' }
+const A_DIGITO: Record<string, string> = { O: '0', Q: '0', D: '0', I: '1', L: '1' }
 const A_LETRA: Record<string, string> = { '0': 'O', '1': 'I' }
 
 // Patrones de dominio: L = letra, D = dígito.
@@ -36,7 +36,7 @@ function dominioDeToken(token: string): string | null {
 
 const tokens = (s: string) => (s ?? '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean)
 
-/** Último token con forma de dominio (AA111AA o AAA111), corrigiendo O/0 e I/1 del OCR. */
+/** Último token con forma de dominio (AA111AA o AAA111), corrigiendo O/Q/D->0 e I/L->1 y 0->O, 1->I del OCR. */
 export function extraerDominio(s: string): string | null {
   const ts = tokens(s)
   for (let i = ts.length - 1; i >= 0; i--) {

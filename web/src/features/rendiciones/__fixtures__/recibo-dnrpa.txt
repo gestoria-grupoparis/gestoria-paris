@@ -3,7 +3,7 @@ Propiedad del Automotor y de Créditos Prendarios
 RECIBO
 Registro Seccional 19008 SAN LUIS N° 3
 Fecha: 01/07/2026        Referencia: 4471
-N°Control Recibo: 171648     N°Trámites: 2     Control Web: 8F3A-22C1
+N°Control Recibo: 654321     N°Trámites: 2     Control Web: 8F3A-22C1
 Valor Declarado: $ 21576984,50     Valor C.Prenda: $ 0,00
 Dominio: AA111AA
 Concepto                              Valor Unit.     Cant.    Importe

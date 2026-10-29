@@ -2,8 +2,15 @@
 // - PDF con texto: PDF.js extrae el texto (sin OCR).
 // - PDF escaneado o foto: OCR con Tesseract.js en español, con los modelos servidos desde /ocr/.
 // PDF.js y Tesseract se cargan con import() dinámico: solo pesan cuando se usan.
+//
+// Antes del OCR la imagen pasa por prepararParaOcr() (imagen.ts): ampliación, blanco y negro
+// adaptativo y borrado de la grilla. Las fotos reales se leen más de una vez con distinto
+// preprocesado y los resultados se combinan (parsers.ts): un dato solo se acepta si las lecturas
+// coinciden o si una sola lo encontró sin contradicciones.
 
 import type { Worker as TesseractWorker } from 'tesseract.js'
+import { prepararParaOcr } from './imagen'
+import { combinarLecturas, extraer, necesitaOtraLectura, type LineaOcr } from './parsers'
 
 export interface PaginaLeida {
   pagina: number
@@ -11,7 +18,14 @@ export interface PaginaLeida {
   origen: 'texto_pdf' | 'ocr'
   confianza: number | null
   imagen: Blob
+  /** Comprobantes por OCR: texto de cada lectura (se combinan con combinarLecturas). */
+  lecturas?: string[]
+  /** Planilla por OCR: líneas con posiciones de cada lectura (se combinan con combinarPlanillas). */
+  lineasOcr?: LineaOcr[][]
 }
+
+/** comprobante: hoja suelta. planilla: tabla NOMBRE | PAGO | HONORARIOS. */
+export type ModoLectura = 'comprobante' | 'planilla'
 
 export interface Progreso {
   pagina: number
@@ -64,40 +78,63 @@ export async function terminarOcr(): Promise<void> {
   if (w) await (await w).terminate().catch(() => {})
 }
 
-async function reconocer(canvas: HTMLCanvasElement, onPct: (p: number) => void) {
+interface Lectura {
+  texto: string
+  confianza: number
+  lineas: LineaOcr[]
+}
+
+/** psm 3: página automática (comprobantes). psm 6: un solo bloque, renglón por renglón (tablas). */
+async function reconocer(canvas: HTMLCanvasElement, psm: '3' | '6', onPct: (p: number) => void): Promise<Lectura> {
   const w = await obtenerWorker()
   alProgresarOcr = onPct
   try {
-    const { data } = await w.recognize(canvas)
-    return { texto: data.text, confianza: data.confidence }
+    await w.setParameters({ tessedit_pageseg_mode: psm as never, preserve_interword_spaces: '1' })
+    const { data } = await w.recognize(canvas, {}, { text: true, blocks: psm === '6' })
+    const lineas: LineaOcr[] = []
+    for (const b of data.blocks ?? []) {
+      for (const p of b.paragraphs) {
+        for (const l of p.lines) {
+          lineas.push({
+            texto: l.text.trim(),
+            ...l.bbox,
+            palabras: l.words.map((x) => ({ texto: x.text, confianza: Math.round(x.confidence), ...x.bbox })),
+          })
+        }
+      }
+    }
+    return { texto: data.text, confianza: data.confidence, lineas }
   } finally {
     alProgresarOcr = null
   }
 }
 
 // ---------------------------------------------------------------------------------------
-// Imágenes: escala de grises con estiramiento de contraste y orientación.
+// Imágenes: preparación, orientación y lecturas adicionales.
 // ---------------------------------------------------------------------------------------
 
-function preprocesar(canvas: HTMLCanvasElement): void {
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const d = img.data
-  let min = 255
-  let max = 0
-  for (let i = 0; i < d.length; i += 4) {
-    const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2])
-    d[i] = g
-    if (g < min) min = g
-    if (g > max) max = g
-  }
-  const rango = Math.max(1, max - min)
-  for (let i = 0; i < d.length; i += 4) {
-    const v = Math.round(((d[i] - min) * 255) / rango)
-    d[i] = d[i + 1] = d[i + 2] = v
-  }
-  ctx.putImageData(img, 0, 0)
+interface Variante {
+  k?: number
+  binarizar?: boolean
+  psm: '3' | '6'
+}
+
+// Comprobantes: si la primera lectura deja datos sin leer, se repite con otro preprocesado.
+const VARIANTES_COMPROBANTE: Variante[] = [{ k: 0.3, psm: '3' }, { binarizar: false, psm: '3' }, { k: 0.2, psm: '6' }]
+// Planilla: cinco lecturas renglón por renglón con distinto umbral; un importe vale si dos coinciden.
+const VARIANTES_PLANILLA: Variante[] = [0.2, 0.15, 0.3, 0.25, 0.1].map((k) => ({ k, psm: '6' as const }))
+
+function preparado(origen: HTMLCanvasElement, v: Variante): HTMLCanvasElement {
+  const ctx = origen.getContext('2d', { willReadFrequently: true })!
+  const img = ctx.getImageData(0, 0, origen.width, origen.height)
+  const p = prepararParaOcr({ data: img.data, width: img.width, height: img.height }, { k: v.k, binarizar: v.binarizar })
+  const c = document.createElement('canvas')
+  c.width = p.width
+  c.height = p.height
+  const salida = c.getContext('2d')!.createImageData(p.width, p.height)
+  salida.data.set(p.data)
+  c.getContext('2d')!.putImageData(salida, 0, 0)
+  return c
 }
 
 function rotar(origen: HTMLCanvasElement, grados: number): HTMLCanvasElement {
@@ -117,18 +154,36 @@ const aBlob = (c: HTMLCanvasElement) =>
   new Promise<Blob>((ok, mal) => c.toBlob((b) => (b ? ok(b) : mal(new Error('No se pudo generar la imagen'))), 'image/png'))
 
 // Orientación: si la lectura derecha sale con poca confianza, se prueban 90, 180 y 270 grados
-// y se queda la de mayor confianza.
-async function ocrOrientado(canvas: HTMLCanvasElement, onPct: (p: number) => void) {
-  preprocesar(canvas)
-  let mejor = { ...(await reconocer(canvas, onPct)), canvas }
-  if (mejor.confianza >= 60) return mejor
-  for (const g of [90, 180, 270]) {
-    const c = rotar(canvas, g)
-    const r = await reconocer(c, onPct)
-    if (r.confianza > mejor.confianza) mejor = { ...r, canvas: c }
-    if (mejor.confianza >= 60) break
+// y se queda la de mayor confianza. Después vienen las lecturas adicionales del modo.
+async function ocrOrientado(original: HTMLCanvasElement, modo: ModoLectura, onPct: (p: number) => void) {
+  const variantes = modo === 'planilla' ? VARIANTES_PLANILLA : VARIANTES_COMPROBANTE
+  const pct = (i: number) => (p: number) => onPct(Math.round((i * 100 + p) / variantes.length))
+  let base = original
+  let primera = await reconocer(preparado(base, variantes[0]), variantes[0].psm, pct(0))
+  if (primera.confianza < 60) {
+    for (const g of [90, 180, 270]) {
+      const c = rotar(original, g)
+      const r = await reconocer(preparado(c, variantes[0]), variantes[0].psm, pct(0))
+      if (r.confianza > primera.confianza) {
+        primera = r
+        base = c
+      }
+      if (primera.confianza >= 60) break
+    }
   }
-  return mejor
+  const lecturas = [primera]
+  for (let i = 1; i < variantes.length; i++) {
+    if (modo === 'comprobante' && !necesitaOtraLectura(combinarLecturas(lecturas.map((l) => extraer(l.texto))))) break
+    lecturas.push(await reconocer(preparado(base, variantes[i]), variantes[i].psm, pct(i)))
+  }
+  onPct(100)
+  return {
+    texto: primera.texto,
+    confianza: primera.confianza,
+    canvas: base,
+    lecturas: lecturas.map((l) => l.texto),
+    lineasOcr: modo === 'planilla' ? lecturas.map((l) => l.lineas) : undefined,
+  }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -145,7 +200,7 @@ declare global {
 
 export const esPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name)
 
-async function leerPdf(f: File, onProgreso?: (p: Progreso) => void): Promise<PaginaLeida[]> {
+async function leerPdf(f: File, modo: ModoLectura, onProgreso?: (p: Progreso) => void): Promise<PaginaLeida[]> {
   const [pdfjs, { default: workerSrc }] = await Promise.all([
     import('pdfjs-dist'),
     import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
@@ -184,10 +239,13 @@ async function leerPdf(f: File, onProgreso?: (p: Progreso) => void): Promise<Pag
         continue
       }
       onProgreso?.({ pagina: n, total: doc.numPages, etapa: 'ocr', porcentaje: 0 })
-      const r = await ocrOrientado(canvas, (porcentaje) =>
+      const r = await ocrOrientado(canvas, modo, (porcentaje) =>
         onProgreso?.({ pagina: n, total: doc.numPages, etapa: 'ocr', porcentaje }),
       )
-      salida.push({ pagina: n, texto: r.texto, origen: 'ocr', confianza: r.confianza, imagen: await aBlob(r.canvas) })
+      salida.push({
+        pagina: n, texto: r.texto, origen: 'ocr', confianza: r.confianza, imagen: await aBlob(r.canvas),
+        lecturas: r.lecturas, lineasOcr: r.lineasOcr,
+      })
     }
   } finally {
     await tarea.destroy()
@@ -195,7 +253,7 @@ async function leerPdf(f: File, onProgreso?: (p: Progreso) => void): Promise<Pag
   return salida
 }
 
-async function leerImagen(f: File, onProgreso?: (p: Progreso) => void): Promise<PaginaLeida[]> {
+async function leerImagen(f: File, modo: ModoLectura, onProgreso?: (p: Progreso) => void): Promise<PaginaLeida[]> {
   let bitmap: ImageBitmap
   try {
     bitmap = await createImageBitmap(f)
@@ -208,12 +266,19 @@ async function leerImagen(f: File, onProgreso?: (p: Progreso) => void): Promise<
   canvas.getContext('2d')!.drawImage(bitmap, 0, 0)
   bitmap.close()
   onProgreso?.({ pagina: 1, total: 1, etapa: 'ocr', porcentaje: 0 })
-  const r = await ocrOrientado(canvas, (porcentaje) => onProgreso?.({ pagina: 1, total: 1, etapa: 'ocr', porcentaje }))
-  return [{ pagina: 1, texto: r.texto, origen: 'ocr', confianza: r.confianza, imagen: await aBlob(r.canvas) }]
+  const r = await ocrOrientado(canvas, modo, (porcentaje) => onProgreso?.({ pagina: 1, total: 1, etapa: 'ocr', porcentaje }))
+  return [{
+    pagina: 1, texto: r.texto, origen: 'ocr', confianza: r.confianza, imagen: await aBlob(r.canvas),
+    lecturas: r.lecturas, lineasOcr: r.lineasOcr,
+  }]
 }
 
 /** Lee un PDF o una imagen y devuelve el texto de cada página. */
-export async function leerArchivo(f: File, onProgreso?: (p: Progreso) => void): Promise<PaginaLeida[]> {
+export async function leerArchivo(
+  f: File,
+  onProgreso?: (p: Progreso) => void,
+  modo: ModoLectura = 'comprobante',
+): Promise<PaginaLeida[]> {
   const sim = (import.meta.env.DEV || import.meta.env.MODE === 'test') && typeof window !== 'undefined'
     ? window.__ocrSimulado?.[f.name]
     : undefined
@@ -224,5 +289,5 @@ export async function leerArchivo(f: File, onProgreso?: (p: Progreso) => void): 
       return { pagina: i + 1, texto, origen: 'ocr' as const, confianza: 90, imagen: f }
     })
   }
-  return esPdf(f) ? leerPdf(f, onProgreso) : leerImagen(f, onProgreso)
+  return esPdf(f) ? leerPdf(f, modo, onProgreso) : leerImagen(f, modo, onProgreso)
 }

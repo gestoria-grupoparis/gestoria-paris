@@ -7,7 +7,7 @@ import {
   candidatosDe, duplicados, guardarComprobante, subirComprobante, type ComprobanteGuardado, type RendicionDetalle,
 } from './consultas'
 import { hashArchivo, leerArchivo } from './lectura'
-import { extraer } from './parsers'
+import { combinarLecturas, extraer } from './parsers'
 import { RevisionComprobante, ETIQUETA_TIPO, VisorDocumento } from './RevisionComprobante'
 import { asignarComprobante, type FilaAsignable } from './vincular'
 
@@ -70,7 +70,7 @@ export function CargaComprobantes({ rendicion, editable, filaFoco }: { rendicion
         const hash = await hashArchivo(f)
         actualizar(item.id, { detalle: 'Subiendo el original…' })
         const path = await subirComprobante(r.id, f, hash)
-        let paginas: { pagina: number; texto: string; origen: string; confianza: number | null }[]
+        let paginas: { pagina: number; texto: string; origen: string; confianza: number | null; lecturas?: string[] }[]
         try {
           paginas = await leerArchivo(f, (p) => actualizar(item.id, {
             detalle: p.etapa === 'ocr' ? `Leyendo página ${p.pagina} de ${p.total} · OCR ${p.porcentaje ?? 0}%` : `Leyendo página ${p.pagina} de ${p.total}`,
@@ -81,7 +81,7 @@ export function CargaComprobantes({ rendicion, editable, filaFoco }: { rendicion
           paginas = [{ pagina: 1, texto: '', origen: 'ocr', confianza: null }]
         }
         for (const p of paginas) {
-          const e = extraer(p.texto)
+          const e = combinarLecturas((p.lecturas?.length ? p.lecturas : [p.texto]).map(extraer))
           await guardarComprobante(r.id, {
             fila_id: asignarComprobante(e, filas), tipo: e.tipo, archivo_path: path, archivo_sha256: hash, pagina: p.pagina,
             numero: e.numero, emisor: e.emisor, emisor_cuit: e.emisor_cuit, fecha: e.fecha,

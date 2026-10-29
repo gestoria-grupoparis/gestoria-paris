@@ -12,7 +12,7 @@ describe('recibo DNRPA', () => {
     expect(clasificar(t)).toBe('recibo_dnrpa')
     const e = extraer(t)
     expect(e.total_cents).toBe(43153969n)
-    expect(e.numero).toBe('171648')
+    expect(e.numero).toBe('654321')
     expect(e.fecha).toBe('2026-07-01')
     expect(e.emisor).toBe('Registro 19008 SAN LUIS N° 3')
     expect(e.dominio).toBe('AA111AA')
@@ -34,7 +34,7 @@ test('retención de sellos', () => {
   expect(e).toMatchObject({
     tipo: 'retencion_sellos', total_cents: 50861429n, dominio: 'AA111AA', numero: '0000115277',
     fecha: '2026-06-30', emisor: 'DPIP San Luis', emisor_cuit: '27111111114',
-    nombre: 'GODOY MARIO ESTEBAN', documento: '20111222',
+    nombre: 'PEREZ JUAN CARLOS', documento: '20111222',
   })
   expect(e.lineas).toEqual([{ concepto: 'Impuesto de Sellos', importe_cents: 50861429n }])
   expect(e.dudosos).toEqual([])
@@ -45,15 +45,16 @@ test('factura de honorarios', () => {
   expect(clasificar(t)).toBe('factura_honorarios')
   const e = extraer(t)
   expect(e).toMatchObject({
-    total_cents: 3250000n, numero: '0001-00010391', fecha: '2026-07-05', nombre: 'GODOY MARIO ESTEBAN',
+    total_cents: 3250000n, numero: '0001-00010391', fecha: '2026-07-05', nombre: 'PEREZ JUAN CARLOS',
   })
 })
 
 test('planilla', () => {
-  const filas = parsearPlanilla(fixture('planilla.txt'))
+  const { filas, cuadra } = parsearPlanilla(fixture('planilla.txt'))
   expect(filas).toHaveLength(3)
-  expect(filas[0]).toEqual({ nombre: 'GODOY MARIO ESTEBAN', dominio: null, pago_cents: 116385524n, honorarios_cents: 3250000n })
-  expect(filas[1]).toMatchObject({ nombre: 'JOFRE FABRICIO ALEJANDRO', dominio: 'AF869NV', pago_cents: 43153969n })
+  expect(cuadra).toBe(true)
+  expect(filas[0]).toEqual({ nombre: 'PEREZ JUAN CARLOS', dominio: null, pago_cents: 116385524n, honorarios_cents: 3250000n, dudoso: false })
+  expect(filas[1]).toMatchObject({ nombre: 'ACOSTA BRUNO DANIEL', dominio: 'AF869NV', pago_cents: 43153969n })
   expect(filas[2]).toMatchObject({ dominio: 'LZI780', pago_cents: 26932089n })
 })
 

@@ -1,6 +1,6 @@
-PARIS AUTOS S.A.  -  RENDICION JULIO 2026
+EMPRESA DEMO S.A.  -  RENDICION JULIO 2026
 NOMBRE                                      PAGO            HONORARIOS
-GODOY MARIO ESTEBAN                         1.163.855,24    32.500,00
-JOFRE FABRICIO ALEJANDRO AF869NV            431.539,69      32.500,00
-SUAREZ OSCAR RAUL LZI780                    269.320,89      32.500,00
+PEREZ JUAN CARLOS                         1.163.855,24    32.500,00
+ACOSTA BRUNO DANIEL AF869NV            431.539,69      32.500,00
+MORENO ELENA INES LZI780                    269.320,89      32.500,00
 TOTAL                                       1.864.715,82    97.500,00

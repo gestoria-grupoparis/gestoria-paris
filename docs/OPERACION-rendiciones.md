@@ -5,7 +5,7 @@ Módulo interno de gerencia y contable para controlar la rendición mensual de c
 ## Cómo se usa
 
 1. **Rendiciones → Nueva rendición.** Elegí la razón social, el mes, la gestora y el honorario por trámite (por defecto $ 32.500,00). No se puede repetir el mismo mes para la misma gestora y razón social.
-2. **Planilla.** Subí el Excel/CSV (columnas NOMBRE, PAGO, HONORARIOS, con o sin tildes) o una foto/PDF de la planilla impresa (se lee con OCR: revisá las filas). Cada fila se vincula sola con un trámite por dominio y, si no hay dominio, por nombre. Si dos trámites tienen el mismo nombre queda **Ambiguo** y hay que elegir; si no aparece, **Sin vincular** y se busca a mano. Guardá la planilla.
+2. **Planilla.** Subí el Excel/CSV (columnas NOMBRE, PAGO, HONORARIOS, con o sin tildes) o una foto/PDF de la planilla impresa (se lee con OCR: revisá las filas). En una foto, un importe solo se asigna a un nombre si está en el mismo renglón y dos lecturas lo leyeron igual; si no, la fila aparece con **Revisar importes** y el importe vacío para completarlo mirando la hoja. Nunca se corre un importe a otra fila. Si la hoja trae fila TOTAL, se avisa cuando la suma no coincide. Cada fila se vincula sola con un trámite por dominio y, si no hay dominio, por nombre. Si dos trámites tienen el mismo nombre queda **Ambiguo** y hay que elegir; si no aparece, **Sin vincular** y se busca a mano. Guardá la planilla.
 3. **Comprobantes.** Subí todos los PDF y fotos juntos (máx. 15 MB por archivo). Cada página se lee en el navegador, se clasifica, se extraen sus datos y se asigna a una fila por dominio, DNI o nombre. El original queda guardado en el bucket privado `comprobantes`.
 4. **Revisión.** Documento a la izquierda, datos a la derecha. Lo dudoso o vacío aparece con borde ámbar y "Revisar". **Confirmar** (o Enter) guarda y pasa al siguiente pendiente. Un archivo repetido o un comprobante con el mismo tipo, número y emisor muestra "Posible duplicado" (no bloquea).
 5. **Controles.** Tres tarjetas con semáforo:
@@ -28,6 +28,7 @@ Montos aceptados: `431539,69`, `1.163.855,24`, `508 614.29`, `$ -5290,00`, `32.5
 ## Limitaciones
 
 - El OCR (Tesseract.js, español, modelo `best_int`) corre en el navegador: la primera lectura descarga ~10 MB de `/ocr/` y en celulares viejos es lenta. Las facturas manuscritas suelen requerir completar a mano.
+- Las fotos se preparan antes del OCR (ampliación, blanco y negro adaptativo, se borra la grilla de las tablas). Un comprobante se relee hasta 3 veces con otro preprocesado si quedan datos sin leer, y se combinan: un dato que dos lecturas leen distinto queda vacío y dudoso. La planilla se lee 5 veces (tarda más, ~1 minuto en una PC común).
 - La orientación de las fotos se elige por confianza del OCR (0/90/180/270 grados), no con detección de orientación de Tesseract.
 - HEIC solo se lee si el navegador lo abre (Safari); en otros se pide convertir a JPG o PDF.
 - Un PDF con varios comprobantes se separa por página; dos comprobantes en la misma página se ven como uno.

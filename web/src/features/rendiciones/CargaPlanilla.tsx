@@ -7,7 +7,7 @@ import { Button, CampoPesos, Chip, DataTable, EmptyState, ErrorState, claseContr
 import { candidatosDe, guardarFilas, type FilaParaGuardar, type RendicionDetalle, type VinculoFila } from './consultas'
 import { importarPlanilla, esPlanillaArchivo } from './importarExcel'
 import { leerArchivo } from './lectura'
-import { parsearPlanilla, type FilaPlanilla } from './parsers'
+import { combinarPlanillas, parsearPlanilla, parsearPlanillaOcr, type FilaPlanilla, type ResultadoPlanilla } from './parsers'
 import { vincularFila, type Candidato } from './vincular'
 
 interface FilaEdit {
@@ -20,9 +20,11 @@ interface FilaEdit {
   tramite_id: string | null
   vinculo: VinculoFila
   candidatos: string[]
+  /** La lectura por OCR no pudo leer algún dato con seguridad: hay que revisarla. */
+  revisar?: boolean
 }
 
-const sinSigno = (cents: bigint | string) => formatearPesos(cents).replace(/^-?\$ /, (m) => (m.startsWith('-') ? '-' : ''))
+const sinSigno = (cents: bigint | string | null) => cents === null ? '' : formatearPesos(cents).replace(/^-?\$ /, (m) => (m.startsWith('-') ? '-' : ''))
 let n = 0
 const clave = () => `f${++n}`
 
@@ -48,6 +50,7 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
   const [sucio, setSucio] = useState(false)
   const [leyendo, setLeyendo] = useState<string | null>(null)
   const [errorLectura, setErrorLectura] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
   const [arrastrando, setArrastrando] = useState(false)
   const input = useRef<HTMLInputElement>(null)
 
@@ -64,14 +67,22 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
 
   const importar = async (f: File) => {
     setErrorLectura(null)
+    setAviso(null)
     if (f.size > 15 * 1024 * 1024) return setErrorLectura('El archivo supera los 15 MB. Dividilo o bajale la resolución.')
     setLeyendo(f.name)
     try {
       let leidas: FilaPlanilla[]
       if (esPlanillaArchivo(f.name)) leidas = await importarPlanilla(await f.arrayBuffer(), f.name)
       else {
-        const paginas = await leerArchivo(f, (p) => setLeyendo(`${f.name} · página ${p.pagina} de ${p.total}${p.etapa === 'ocr' ? ` · OCR ${p.porcentaje ?? 0}%` : ''}`))
-        leidas = parsearPlanilla(paginas.map((p) => p.texto).join('\n'))
+        const paginas = await leerArchivo(f, (p) => setLeyendo(`${f.name} · página ${p.pagina} de ${p.total}${p.etapa === 'ocr' ? ` · OCR ${p.porcentaje ?? 0}%` : ''}`), 'planilla')
+        const resultados: ResultadoPlanilla[] = paginas.map((p) =>
+          p.lineasOcr?.length ? combinarPlanillas(p.lineasOcr.map((l) => parsearPlanillaOcr(l))) : parsearPlanilla(p.texto))
+        leidas = resultados.flatMap((r) => r.filas)
+        const dudosas = leidas.filter((l) => l.dudoso).length
+        const avisos: string[] = []
+        if (dudosas) avisos.push(`${dudosas} ${dudosas === 1 ? 'fila quedó' : 'filas quedaron'} para revisar: los importes que no se leyeron con seguridad están vacíos. Completalos mirando la planilla.`)
+        if (resultados.some((r) => r.cuadra === false)) avisos.push('La suma de las filas no coincide con el total de la hoja. Revisá los importes.')
+        setAviso(avisos.join(' ') || null)
       }
       if (!leidas.length) {
         setErrorLectura('No se encontraron filas con nombre, pago y honorarios. Revisá el archivo o cargalas a mano.')
@@ -82,7 +93,7 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
         const v = vincularFila(l, cs)
         return {
           key: clave(), nombre: l.nombre, dominio: l.dominio ?? '', pago: sinSigno(l.pago_cents), honorarios: sinSigno(l.honorarios_cents),
-          tramite_id: v.tramite_id, vinculo: v.vinculo, candidatos: v.candidatos,
+          tramite_id: v.tramite_id, vinculo: v.vinculo, candidatos: v.candidatos, revisar: l.dudoso,
         }
       }))
       setSucio(true)
@@ -162,6 +173,7 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
           {leyendo && <p role="status" className="text-[13px] text-tenue">Leyendo {leyendo}…</p>}
         </div>
       )}
+      {aviso && <p role="status" className="rounded-md bg-comprometido-suave px-4 py-3 text-sm text-comprometido">{aviso}</p>}
       {errorLectura && <ErrorState titulo="No se pudo cargar la planilla." descripcion={errorLectura} />}
       {candidatos.isError && (
         <ErrorState titulo="No se pudieron traer los trámites para vincular." descripcion={mensajeError(candidatos.error)}
@@ -205,6 +217,7 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
                   {editable ? (
                     <input aria-label={`Nombre fila ${i + 1}`} value={f.nombre} onChange={(e) => cambiar(f.key, { nombre: e.target.value })} className={cx(claseControl, 'h-9 min-w-56')} />
                   ) : <span className="font-medium">{f.nombre}</span>}
+                  {f.revisar && <Chip tono="comprometido" className="mt-1">Revisar importes</Chip>}
                 </td>
                 <td>
                   {editable ? (

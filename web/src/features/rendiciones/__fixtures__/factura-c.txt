@@ -1,9 +1,9 @@
 FACTURA      C
 N° 0001-00010391
-Razón Social: SAEZ CARLA DEBORA
+Razón Social: FERNANDEZ LUCIA BEATRIZ
 CUIT: 27-22333444-5   Ingresos Brutos: Exento
 Fecha: 05/07/2026
-SEÑOR(es): GODOY MARIO ESTEBAN
+SEÑOR(es): PEREZ JUAN CARLOS
 Domicilio: Pringles 123 - San Luis
 Cant.  Descripción                                   Importe
 1      Honorarios gestión transferencia AA111AA

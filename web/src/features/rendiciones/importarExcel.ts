@@ -29,7 +29,7 @@ function desdeTabla(filas: unknown[][]): FilaPlanilla[] {
     const pago = aCentavos(f[cp])
     const hon = aCentavos(f[ch])
     if (pago === null || hon === null) continue
-    salida.push({ nombre, dominio: extraerDominio(crudo), pago_cents: pago, honorarios_cents: hon })
+    salida.push({ nombre, dominio: extraerDominio(crudo), pago_cents: pago, honorarios_cents: hon, dudoso: false })
   }
   return salida
 }
