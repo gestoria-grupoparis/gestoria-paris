@@ -98,3 +98,10 @@
 
 **Files:** `web/e2e/analisis.spec.ts`
 - gerencia ve menú, líneas (`.recharts-line`) y donas, ninguna `.recharts-bar`; "historia insuficiente"; calcula estimado en el panel; gestora no ve el menú y `/analisis` la devuelve a su inicio. Suites completas, `npm run build` y medición del chunk principal; `graphify update .`.
+
+## Notas de ejecución
+
+- Decisión: `guardar_parametro_estimador` quedó en su propia migración (`20261102000300_parametros_estimador.sql`) y el análisis en `20261102000400_analisis.sql`.
+- Decisión: la diferencia estimado/real la calcula la base (`comparar_estimado(p_tramite)`, migración `20261102000500_comparar_estimado.sql`) para que el front solo formatee.
+- Bundle principal: 37,10 kB -> 37,24 kB gzip (+0,14 kB). Recharts vive en el chunk `Analisis` (115,6 kB gzip).
+- Limitaciones: el concepto sale del desglose de los movimientos (no de los comprobantes de Rendiciones); la vista de impresión usa el estilo de pantalla (oculta filtros y botones, no el menú lateral).
