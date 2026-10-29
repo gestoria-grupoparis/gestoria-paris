@@ -32,7 +32,7 @@ test('retención de sellos', () => {
   expect(clasificar(t)).toBe('retencion_sellos')
   const e = extraer(t)
   expect(e).toMatchObject({
-    tipo: 'retencion_sellos', total_cents: 50861429n, dominio: 'AA111AA', numero: '0000115277',
+    tipo: 'retencion_sellos', total_cents: 50861429n, dominio: 'AA111AA', numero: '0000123457',
     fecha: '2026-06-30', emisor: 'DPIP San Luis', emisor_cuit: '27111111114',
     nombre: 'PEREZ JUAN CARLOS', documento: '20111222',
   })
