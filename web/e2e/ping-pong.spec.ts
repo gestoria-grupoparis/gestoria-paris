@@ -152,3 +152,21 @@ test('la gestora marca presentado y lo deshace al instante desde el aviso', asyn
   expect(String(cuerpo.p_motivo).trim()).not.toBe('')
   await expect(listos.getByRole('article', { name: /T-2026-00011/ })).toBeVisible()
 })
+
+test('aprobar presupuestos en lote: uno se aprueba y el sin fondos queda marcado con el motivo', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.clock.setFixedTime(catalogos.ahora)
+  const otro = { ...f.autorizado, id: '00000000-0000-4000-8000-0000000000b9', numero: 'T-2026-00019', dominio: 'AF900ZZ' }
+  await montarSupabase(page, [
+    { operacion: f.operacion, tramite: f.autorizado, presupuestos: ['70000000'] },
+    { operacion: f.operacion, tramite: otro, presupuestos: ['50000000'], situacion: 'sin_fondos' },
+  ], { usuario: CARLA })
+  await page.goto('/tramites?por_aprobar=1')
+  const tabla = page.getByRole('table')
+  await tabla.getByRole('checkbox', { name: 'Seleccionar T-2026-00011' }).check()
+  await tabla.getByRole('checkbox', { name: 'Seleccionar T-2026-00019' }).check()
+  await page.getByRole('button', { name: 'Aprobar presupuestos (2)' }).click()
+  const res = page.getByRole('region', { name: 'Resultado de la aprobación' })
+  await expect(res.getByRole('listitem').filter({ hasText: 'T-2026-00011' })).toContainText('Aprobado')
+  await expect(res.getByRole('listitem').filter({ hasText: 'T-2026-00019' })).toContainText('No hay fondos para este presupuesto')
+})

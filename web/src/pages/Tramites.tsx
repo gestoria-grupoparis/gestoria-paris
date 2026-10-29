@@ -6,11 +6,12 @@ import { cargarCatalogos, LIMITE, listarTramites } from '../features/tramites/co
 import { Button, Cargando, EmptyState, ErrorState, MenuExportar, PageHeader } from '../ui'
 import { IconoCerrar, IconoCheck, IconoMas, IconoUsuario } from '../ui/Iconos'
 import { FormAccion } from '../features/tramites/AccionesTramite'
-import { reasignarGestora } from '../features/tramites/consultas'
+import { aprobarPresupuesto, reasignarGestora } from '../features/tramites/consultas'
+import { codigoError, mensajeError } from '../lib/errores'
 import { alternar, alternarTodas } from '../features/tramites/flujo'
 import { columnasTramites } from '../features/tramites/exportar'
 import { exportarPlanilla } from '../lib/planilla'
-import { hoyEnBuenosAires } from '../features/tramites/filtros'
+import { esPorAprobar, hoyEnBuenosAires } from '../features/tramites/filtros'
 import { filtrosAURL, filtrosDesdeURL, type FiltrosTramites as Filtros } from '../features/tramites/filtros'
 import { FiltrosTramites } from '../features/tramites/FiltrosTramites'
 import { FormAlta } from '../features/tramites/FormAlta'
@@ -76,6 +77,33 @@ export function Tramites() {
   // Solo cuentan las marcadas que siguen visibles con los filtros actuales.
   const idsMarcados = (lista.data ?? []).filter((t) => marcadas.has(t.id)).map((t) => t.id)
   const gestoras = (catalogos.data?.perfiles ?? []).filter((p) => p.rol === 'gestora' && p.activo)
+  const porAprobarMarcados = (lista.data ?? []).filter((t) => marcadas.has(t.id) && esPorAprobar(t))
+  const [aprobando, setAprobando] = useState(false)
+  const [resultadosLote, setResultadosLote] = useState<{ numero: string; ok: boolean; texto: string }[] | null>(null)
+
+  // Aprueba uno por uno: un rechazo (sin fondos, versión cambiada) no frena al resto.
+  async function aprobarEnLote() {
+    if (aprobando) return
+    setAprobando(true)
+    const res: { numero: string; ok: boolean; texto: string }[] = []
+    for (const t of porAprobarMarcados) {
+      try {
+        await aprobarPresupuesto(t.id, t.finanzas!.presupuesto_version!)
+        res.push({ numero: t.numero, ok: true, texto: 'Aprobado' })
+      } catch (e) {
+        const c = codigoError(e)
+        res.push({
+          numero: t.numero,
+          ok: false,
+          texto: c === 'VERSION_CONFLICTO' ? 'La gestora cambió el presupuesto: revisalo' : mensajeError(e),
+        })
+      }
+    }
+    setResultadosLote(res)
+    setAprobando(false)
+    setMarcadas(new Set())
+    void qc.invalidateQueries({ queryKey: ['tramites'] })
+  }
   useEffect(() => {
     if (!aviso) return
     const h = window.setTimeout(() => setAviso(null), 6000)
@@ -120,6 +148,11 @@ export function Tramites() {
               {idsMarcados.length === 1 ? '1 trámite seleccionado' : `${idsMarcados.length} trámites seleccionados`}
             </span>
             <span className="flex-1" />
+            {porAprobarMarcados.length > 0 && (
+              <Button tamano="sm" className="bg-superficie text-tinta hover:bg-hundido" icono={<IconoCheck className="size-4" />} cargando={aprobando} onClick={() => void aprobarEnLote()}>
+                Aprobar presupuestos ({porAprobarMarcados.length})
+              </Button>
+            )}
             <Button tamano="sm" className="bg-superficie text-tinta hover:bg-hundido" icono={<IconoUsuario className="size-4" />} onClick={() => setReasignando(true)}>
               Reasignar gestora
             </Button>
@@ -130,6 +163,21 @@ export function Tramites() {
             >
               <IconoCerrar className="size-4" /> Quitar selección
             </button>
+          </section>
+        )}
+        {resultadosLote && (
+          <section aria-label="Resultado de la aprobación" className="mt-4 rounded-lg bg-superficie px-4 py-3 ring-1 ring-linea">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <strong className="text-[14px]">Resultado de la aprobación</strong>
+              <button type="button" className="text-sm font-semibold text-marca underline" onClick={() => setResultadosLote(null)}>Cerrar</button>
+            </div>
+            <ul className="space-y-1 text-[14px]">
+              {resultadosLote.map((r) => (
+                <li key={r.numero} className={r.ok ? 'text-disponible' : 'text-sinfondos'}>
+                  <span className="cifra font-semibold">{r.numero}</span>: {r.texto}
+                </li>
+              ))}
+            </ul>
           </section>
         )}
         {aviso && (

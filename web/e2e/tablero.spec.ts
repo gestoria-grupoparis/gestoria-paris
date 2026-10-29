@@ -18,4 +18,6 @@ test('el tablero muestra los presupuestos por aprobar y el clic lleva a la lista
   await expect(page.getByRole('list', { name: 'Requieren intervención' })).toContainText('Presupuesto por aprobar')
   await kpi.click()
   await expect(page).toHaveURL(/\/tramites\?por_aprobar=1/)
+  await expect(page.getByRole('row', { name: /T-2026-000(11|19)/ })).toHaveCount(2)
+  await expect(page.getByRole('row', { name: /T-2026-00012/ })).toHaveCount(0)
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  filtrosAURL, filtrosDesdeURL, formatearFechaHora, hoyEnBuenosAires, limpiarBusqueda, restarDiasHabiles, VISTAS,
+  esPorAprobar, filtrosAURL, filtrosDesdeURL, formatearFechaHora, hoyEnBuenosAires, limpiarBusqueda, restarDiasHabiles, VISTAS,
 } from './filtros'
 
 describe('filtros de trámites en la URL', () => {
@@ -32,5 +32,19 @@ describe('utilidades', () => {
   it('usa la zona de Buenos Aires', () => {
     expect(hoyEnBuenosAires(new Date('2026-10-29T02:00:00Z'))).toBe('2026-10-28')
     expect(formatearFechaHora('2026-10-28T13:45:00.000Z')).toBe('28/10/2026 10:45')
+  })
+})
+
+describe('por_aprobar', () => {
+  it('?por_aprobar=1 es la vista de presupuestos para aprobar y se limpia al cambiar filtros', () => {
+    expect(filtrosDesdeURL(new URLSearchParams('por_aprobar=1')).vista).toBe('para_aprobar')
+    expect(filtrosDesdeURL(new URLSearchParams('por_aprobar=1&vista=sin_fondos')).vista).toBe('sin_fondos')
+    expect(filtrosAURL({}, new URLSearchParams('por_aprobar=1&t=x')).toString()).toBe('t=x')
+  })
+  it('esPorAprobar', () => {
+    const fin = { presupuesto_version: 1, presupuesto_aprobado: false }
+    expect(esPorAprobar({ estado: 'autorizado', finanzas: fin })).toBe(true)
+    expect(esPorAprobar({ estado: 'presentado', finanzas: fin })).toBe(false)
+    expect(esPorAprobar({ estado: 'autorizado', finanzas: { ...fin, presupuesto_aprobado: true } })).toBe(false)
   })
 })

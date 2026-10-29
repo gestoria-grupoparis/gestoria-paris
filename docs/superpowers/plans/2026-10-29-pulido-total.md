@@ -87,6 +87,7 @@ Decisión: el test de DB importa `flujo.ts` directamente (no hace falta exportar
 **Archivos:** `web/src/features/tramites/filtros.ts`, `filtros.test.ts`, `FiltrosTramites.tsx`, `TablaTramites.tsx`, `web/src/pages/Tramites.tsx`.
 **Cambios:** filtro `por_aprobar` en la URL; columna/indicador "Presupuesto por aprobar" en la tabla; con selección, botón "Aprobar presupuestos (n)" que llama `aprobar_presupuesto` uno por uno y muestra el resultado por fila (aprobado / sin fondos / versión cambiada), sin abortar el resto.
 **Aceptación:** unit `filtros.test.ts` (parseo de `por_aprobar`). E2E `web/e2e/ping-pong.spec.ts`: aprobar 2 en lote, uno sin fondos queda marcado con el motivo.
+Decisión: ya existía la vista "Presupuestos para aprobar"; `?por_aprobar=1` es un alias de esa vista (no columna nueva en la tabla). El lote aparece en la barra de selección (escritorio).
 
 ## Tarea 11 — Sin fondos al aprobar: camino claro (P1)
 **Objetivo:** en vez de sólo un texto, ofrecer la salida.

@@ -68,12 +68,19 @@ export function filtrosDesdeURL(params: URLSearchParams): FiltrosTramites {
       if (VISTAS.some((x) => x.id === v)) f.vista = v as VistaId
     } else f[clave] = v
   }
+  // Alias del tablero: ?por_aprobar=1 es la vista "Presupuestos para aprobar".
+  if (!f.vista && params.get('por_aprobar') === '1') f.vista = 'para_aprobar'
   return f
 }
+
+/** El presupuesto vigente espera la aprobación de la empresa (antes de presentar). */
+export const esPorAprobar = (t: { estado: string; finanzas: { presupuesto_version: number | null; presupuesto_aprobado: boolean } | null }) =>
+  (t.estado === 'autorizado' || t.estado === 'en_gestoria') && t.finanzas?.presupuesto_version != null && !t.finanzas.presupuesto_aprobado
 
 /** Devuelve el querystring con los filtros aplicados, conservando parámetros ajenos (p. ej. t). */
 export function filtrosAURL(f: FiltrosTramites, actual: URLSearchParams): URLSearchParams {
   const p = new URLSearchParams(actual)
+  p.delete('por_aprobar')
   for (const clave of CLAVES_FILTRO) {
     const v = f[clave]?.trim()
     if (v) p.set(clave, v)
