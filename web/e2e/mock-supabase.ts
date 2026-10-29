@@ -82,6 +82,8 @@ export interface OpcionesMock {
   saldosFijos?: (st: Estado) => Fila[] | undefined
   /** Arranca sin sesión guardada (pantalla de ingreso, link de recuperación vencido). */
   sinSesion?: boolean
+  /** Filas de public.notificaciones (de cualquier perfil: el mock aplica la RLS perfil_id = yo). */
+  notificaciones?: { id: string; perfil_id: string; tipo: string; tramite_id: string | null; mensaje: string; created_at: string; leida_at: string | null }[]
   /** Contraseña vigente del usuario: la acepta POST /auth/v1/token y la rechaza PUT /auth/v1/user como same_password. */
   claveActual?: string
 }
@@ -224,6 +226,12 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     !alcances || alcances.some((a) => a.empresa_id === empresa && (a.sucursal_id == null || a.sucursal_id === sucursal))
   const veTramite = (t: Fila) => rol === 'gestora' || tieneAlcance(t.empresa_id, t.sucursal_id)
   const servidor = opciones.servidor ?? crearServidor(semillas)
+  const notificaciones: Fila[] = (opciones.notificaciones ?? []).map((n) => ({ ...n }))
+  /** Simula el trigger: inserta una notificación y la emite por Realtime. */
+  const agregarNotificacion = (n: Fila) => {
+    notificaciones.push({ leida_at: null, tramite_id: null, perfil_id: yo, created_at: ahora, ...n })
+    servidor.notificar('notificaciones')
+  }
   const { st, situacionForzada } = servidor
 
   function registrarEvento(e: Fila) {
@@ -636,7 +644,19 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     },
   }
 
+  rpcs.marcar_notificaciones_leidas = async (route, a) => {
+    const ids = a.p_ids as string[] | null
+    let n = 0
+    for (const x of notificaciones)
+      if (x.perfil_id === yo && !x.leida_at && (!ids || ids.includes(String(x.id)))) {
+        x.leida_at = ahora
+        n++
+      }
+    await route.fulfill({ json: n })
+  }
+
   const tablas: Record<string, () => Fila[]> = {
+    notificaciones: () => notificaciones.filter((n) => n.perfil_id === yo),
     perfiles: () => perfiles,
     alcances: () => tablaAlcances,
     empresas: () => catalogos.empresas,
@@ -766,5 +786,5 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     }
     return route.fulfill({ json: filas })
   })
-  return { rutasPedidas, urlsPedidas, invitaciones, perfiles, tablaAlcances, recuperaciones, cambiosClave }
+  return { notificaciones, agregarNotificacion, rutasPedidas, urlsPedidas, invitaciones, perfiles, tablaAlcances, recuperaciones, cambiosClave }
 }

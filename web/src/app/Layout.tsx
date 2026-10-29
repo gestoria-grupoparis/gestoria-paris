@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useSesion, type Rol } from '../lib/sesion'
 import { navegacionPorRol } from './navegacion'
 import { Button, LogoGrupoParis, cx } from '../ui'
+import { Campana } from '../features/notificaciones/Campana'
+import { useNotificacionesEnVivo } from '../features/notificaciones/consultas'
 
 const ROL_ETIQUETA: Record<Rol, string> = {
   gerencia: 'Gerencia',
@@ -55,6 +57,7 @@ function IconoLlave({ className = 'size-5' }: { className?: string }) {
 export function Layout() {
   const { perfil, rol } = useSesion()
   const items = navegacionPorRol(rol)
+  useNotificacionesEnVivo(perfil?.id)
   const [cuenta, setCuenta] = useState(false)
   const rolTexto = rol ? ROL_ETIQUETA[rol] : ''
   const salir = () => void supabase.auth.signOut()
@@ -71,8 +74,9 @@ export function Layout() {
   return (
     <div className="min-h-dvh md:flex">
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-noche text-white md:flex">
-        <div className="px-5 pt-6 pb-8">
+        <div className="flex items-center justify-between gap-2 pt-6 pr-3 pb-8 pl-5">
           <LogoGrupoParis tono="claro" className="h-8" />
+          <Campana tono="oscuro" />
         </div>
         <p className="rotulo-marca px-6 pb-3 text-[9px] text-white/35">Menú</p>
         <nav aria-label="Principal" className="flex flex-1 flex-col gap-1 px-3">
@@ -126,6 +130,8 @@ export function Layout() {
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-linea bg-superficie/90 px-4 backdrop-blur-md md:hidden">
           <LogoGrupoParis className="h-8" />
+          <div className="flex items-center gap-1">
+          <Campana tono="claro" />
           <button
             type="button"
             aria-label="Tu cuenta"
@@ -138,6 +144,7 @@ export function Layout() {
               {iniciales(perfil?.nombre)}
             </span>
           </button>
+          </div>
         </header>
         <main className="min-w-0 pb-24 md:pb-0">
           <Outlet />
