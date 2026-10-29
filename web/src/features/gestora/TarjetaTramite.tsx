@@ -14,7 +14,16 @@ import { etiquetaEstado } from "../tramites/filtros";
 import { legajoRetirado, type Grupo, type TramiteGestora } from "./consultas";
 
 export type AccionGestora =
-  "presupuesto" | "retirado" | "presentado" | "pago" | "finalizado" | "devuelto";
+  "presupuesto" | "retirado" | "presentado" | "pago" | "finalizado" | "devuelto" | "deshacer";
+
+/** Texto del botón para deshacer el último paso de la gestora en cada grupo (null: nada que deshacer). */
+export function etiquetaDeshacer(grupo: Grupo, retirado: boolean): string | null {
+  if (grupo === "listos") return retirado ? "Deshacer: no retiré el legajo" : null;
+  if (grupo === "presentados") return "Deshacer: no lo presenté";
+  if (grupo === "devolver") return "Deshacer: el registro no terminó";
+  if (grupo === "devueltos") return "Deshacer: no lo devolví";
+  return null;
+}
 
 const SITUACION: Record<string, { texto: string; clase: string }> = {
   pagado: { texto: "Pagado", clase: "text-disponible" },
@@ -30,6 +39,7 @@ const PASO_ACTUAL: Record<Grupo, number> = {
   listos: 2,
   presentados: 3,
   devolver: 4,
+  devueltos: 4,
 };
 
 function Pasos({ grupo }: { grupo: Grupo }) {
@@ -80,6 +90,7 @@ export function TarjetaTramite({
   const sinFondos = t.situacion === "sin_fondos";
   const pagado = t.situacion === "pagado";
   const retirado = legajoRetirado(t);
+  const deshacer = etiquetaDeshacer(grupo, retirado);
   const situacion = SITUACION[t.situacion];
   const tituloId = `tarjeta-${t.id}`;
   return (
@@ -249,6 +260,24 @@ export function TarjetaTramite({
             onClick={() => onAccion("devuelto")}
           >
             Marcar devuelto
+          </Button>
+        )}
+        {grupo === "devueltos" && (
+          <p className="flex items-center gap-2 rounded-md bg-hundido px-3 py-2.5 text-[13px] text-tinta">
+            <IconoCheck className="size-4 shrink-0 text-disponible" />
+            Devuelto. La empresa lo revisa y lo cierra.
+          </p>
+        )}
+        {deshacer && (
+          <Button
+            variante="fantasma"
+            ancho
+            icono={<IconoRetorno />}
+            className="text-tenue"
+            disabled={ocupado}
+            onClick={() => onAccion("deshacer")}
+          >
+            {deshacer}
           </Button>
         )}
       </div>

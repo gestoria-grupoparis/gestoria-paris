@@ -29,6 +29,15 @@ export const AVANCE: Record<string, { hacia: string; etiqueta: string }> = {
   devuelto: { hacia: 'cerrado', etiqueta: 'Cerrar trámite' },
 }
 
+/** Un paso atrás para corregir un clic equivocado (con motivo; ver es_retroceso en la base). */
+export const RETROCESO: Record<string, { hacia: string; etiqueta: string }> = {
+  en_gestoria: { hacia: 'autorizado', etiqueta: 'Volver a autorizado' },
+  presentado: { hacia: 'autorizado', etiqueta: 'Volver a sin presentar' },
+  finalizado_registro: { hacia: 'presentado', etiqueta: 'Volver a presentado' },
+  devuelto: { hacia: 'finalizado_registro', etiqueta: 'Volver a finalizado' },
+  cerrado: { hacia: 'devuelto', etiqueta: 'Reabrir trámite' },
+}
+
 export const puedeRechazar = (estado: string) => estado === 'borrador'
 export const puedeSuspender = (estado: string) => !ESTADOS_TERMINALES.includes(estado) && estado !== 'suspendido'
 export const puedeCancelar = (estado: string) => !ESTADOS_TERMINALES.includes(estado)

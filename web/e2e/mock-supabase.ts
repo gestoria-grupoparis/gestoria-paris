@@ -452,8 +452,13 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       const motivo = String(a.p_motivo ?? '').trim()
       if (!motivo && ['observado', 'rechazado', 'suspendido', 'cancelado'].includes(String(a.p_estado)))
         return errorNegocio(route, 'DATO_INVALIDO: el motivo es obligatorio')
+      const retrocesos = [['en_gestoria', 'autorizado'], ['presentado', 'autorizado'], ['presentado', 'en_gestoria'],
+        ['finalizado_registro', 'presentado'], ['devuelto', 'finalizado_registro'], ['cerrado', 'devuelto']]
+      if (!motivo && retrocesos.some(([d, h]) => d === t.estado && h === a.p_estado))
+        return errorNegocio(route, `DATO_INVALIDO: indicá el motivo para volver de ${t.estado} a ${a.p_estado}`)
       if (rol === 'gestora') {
-        const permitidas = [['autorizado', 'presentado'], ['en_gestoria', 'presentado'], ['presentado', 'finalizado_registro'], ['finalizado_registro', 'devuelto']]
+        const permitidas = [['autorizado', 'presentado'], ['en_gestoria', 'presentado'], ['presentado', 'finalizado_registro'], ['finalizado_registro', 'devuelto'],
+          ['presentado', 'autorizado'], ['finalizado_registro', 'presentado'], ['devuelto', 'finalizado_registro']]
         if (t.gestora_id !== yo || !permitidas.some(([d, h]) => d === t.estado && h === a.p_estado))
           return errorNegocio(route, `SIN_PERMISO: su rol no puede pasar el trámite de ${t.estado} a ${a.p_estado}`)
         if (a.p_estado === 'presentado') {
@@ -489,6 +494,30 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       st.presupuestos.push({ tramite_id: t.id, version, total: String(total), motivo: a.p_motivo ?? null, created_at: ahora })
       servidor.notificar('presupuestos')
       await route.fulfill({ json: version })
+    },
+    async desmarcar(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if (rol === 'gestora' && !(t.gestora_id === yo && a.p_marca === 'retirado' && ['autorizado', 'en_gestoria'].includes(String(t.estado))))
+        return errorNegocio(route, `SIN_PERMISO: no puede quitar la marca ${a.p_marca} de este trámite`)
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: indicá por qué se quita la marca')
+      const i = st.marcas.findIndex((m) => m.tramite_id === t.id && m.marca === a.p_marca)
+      if (i < 0) return errorNegocio(route, 'NO_ENCONTRADO: el trámite no tiene esa marca')
+      st.marcas.splice(i, 1)
+      registrarEvento({ entidad: 'tramite_marcas', entidad_id: t.id, accion: 'delete', marca: a.p_marca, motivo: a.p_motivo })
+      await route.fulfill({ status: 204, body: '' })
+    },
+    async revocar_aprobacion(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: no puede retirar la aprobación de este trámite')
+      if (!['autorizado', 'en_gestoria'].includes(String(t.estado)))
+        return errorNegocio(route, `TRANSICION_INVALIDA: el trámite ya se presentó (está ${t.estado}); primero volvelo atrás`)
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: indicá por qué se retira la aprobación')
+      const antes = st.aprobaciones.length
+      st.aprobaciones = st.aprobaciones.filter((x) => x.tramite_id !== t.id)
+      if (st.aprobaciones.length === antes) return errorNegocio(route, 'NO_ENCONTRADO: el presupuesto vigente no está aprobado')
+      await route.fulfill({ status: 204, body: '' })
     },
     async aprobar_presupuesto(route, a) {
       const t = tramite(a.p_tramite)

@@ -330,6 +330,14 @@ export const editarTramite = (id: string, version: number, d: EdicionTramite) =>
 export const aprobarPresupuesto = (id: string, version: number) =>
   sinRetorno(supabase.rpc('aprobar_presupuesto', { p_tramite: id, p_version: version }))
 
+/** Quita una marca documental puesta por error (con motivo, queda en el historial). */
+export const desmarcar = (id: string, marca: string, motivo: string) =>
+  sinRetorno(supabase.rpc('desmarcar', { p_tramite: id, p_marca: marca, p_motivo: motivo }))
+
+/** Retira una aprobación de presupuesto hecha por error, antes de presentar. */
+export const revocarAprobacion = (id: string, motivo: string) =>
+  sinRetorno(supabase.rpc('revocar_aprobacion', { p_tramite: id, p_motivo: motivo }))
+
 export const aprobarExcepcionFondos = (id: string, motivo: string) =>
   sinRetorno(supabase.rpc('aprobar_excepcion_fondos', { p_tramite: id, p_motivo: motivo }))
 

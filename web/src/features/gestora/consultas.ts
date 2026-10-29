@@ -21,10 +21,10 @@ export interface TramiteGestora {
   situacion: string
 }
 
-export const ESTADOS_GESTORA = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro']
+export const ESTADOS_GESTORA = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro', 'devuelto']
 
 /** Ping pong con la empresa: cada grupo es lo que la gestora tiene que hacer ahora (o esperar). */
-export type Grupo = 'presupuestar' | 'aprobacion' | 'listos' | 'presentados' | 'devolver'
+export type Grupo = 'presupuestar' | 'aprobacion' | 'listos' | 'presentados' | 'devolver' | 'devueltos'
 
 export const GRUPOS: { id: Grupo; titulo: string }[] = [
   { id: 'presupuestar', titulo: 'Presupuestar' },
@@ -32,11 +32,13 @@ export const GRUPOS: { id: Grupo; titulo: string }[] = [
   { id: 'listos', titulo: 'Retirar y presentar' },
   { id: 'presentados', titulo: 'Presentados' },
   { id: 'devolver', titulo: 'Para devolver' },
+  { id: 'devueltos', titulo: 'Esperando cierre' },
 ]
 
 const retirado = (t: Pick<TramiteGestora, 'marcas'>) => t.marcas.some((m) => m.marca === 'retirado')
 
 export function grupoDe(t: Pick<TramiteGestora, 'estado' | 'situacion' | 'marcas' | 'presupuesto_aprobado'>): Grupo | null {
+  if (t.estado === 'devuelto') return 'devueltos'
   if (t.estado === 'finalizado_registro') return 'devolver'
   if (t.estado === 'presentado') return t.situacion === 'sin_presupuesto' ? 'presupuestar' : 'presentados'
   if (t.estado === 'autorizado' || t.estado === 'en_gestoria') {

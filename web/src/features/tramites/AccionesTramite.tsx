@@ -2,15 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { mensajeError } from '../../lib/errores'
 import { Button, claseControl, Field } from '../../ui'
-import { IconoCheck, IconoFlecha, IconoLapiz, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
+import { IconoCheck, IconoFlecha, IconoLapiz, IconoRetorno, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
 import { formatearPesos } from '../../lib/dinero'
-import { aprobarPresupuesto, autorizarTramite, cambiarEstado, historial, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
+import { aprobarPresupuesto, autorizarTramite, cambiarEstado, revocarAprobacion, historial, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
 import { Dialogo } from './Dialogo'
 import { etiquetaEstado } from './filtros'
-import { AVANCE, estadoPrevioSuspension, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
+import { AVANCE, RETROCESO, estadoPrevioSuspension, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
 import { FormEdicion } from './FormEdicion'
 
-type Accion = 'editar' | 'aprobar' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
+type Accion = 'editar' | 'aprobar' | 'revocar' | 'retroceder' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
 
 const ESTADOS_ASIGNABLES = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro', 'devuelto', 'suspendido']
 const PELIGRO_SUAVE = 'text-sinfondos hover:bg-sinfondos-suave'
@@ -30,8 +30,11 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
   const previo = eventos.data ? estadoPrevioSuspension(eventos.data) : null
   const fin = tramite.finanzas
   // Ping pong: la gestora presupuestó y espera que la empresa apruebe (y guarde la plata).
-  const porAprobar =
-    (e === 'autorizado' || e === 'en_gestoria') && !!fin?.presupuesto && fin.presupuesto_version != null && !fin.presupuesto_aprobado
+  const antesDePresentar = e === 'autorizado' || e === 'en_gestoria'
+  const porAprobar = antesDePresentar && !!fin?.presupuesto && fin.presupuesto_version != null && !fin.presupuesto_aprobado
+  const sinFondos = fin?.situacion === 'sin_fondos'
+  const aprobado = antesDePresentar && !!fin?.presupuesto_aprobado
+  const retroceso = RETROCESO[e]
   const cambio = (hacia: string) => (_: string, motivo: string) => cambiarEstado(tramite.id, hacia, motivo, tramite.version)
 
   const secundarias: ReactNode[] = []
@@ -51,6 +54,18 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
     secundarias.push(
       <Button key="asig" variante="secundario" tamano="sm" icono={<IconoUsuario className="size-4" />} onClick={() => setAbierta('asignar')}>
         Asignar
+      </Button>,
+    )
+  if (aprobado)
+    secundarias.push(
+      <Button key="revocar" variante="secundario" tamano="sm" onClick={() => setAbierta('revocar')}>
+        Retirar aprobación
+      </Button>,
+    )
+  if (retroceso)
+    secundarias.push(
+      <Button key="retro" variante="secundario" tamano="sm" icono={<IconoRetorno className="size-4" />} onClick={() => setAbierta('retroceder')}>
+        {retroceso.etiqueta}
       </Button>,
     )
   if (puedeSuspender(e))
@@ -83,12 +98,16 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
       {porAprobar && (
         <div className="space-y-2 rounded-md bg-comprometido-suave px-3.5 py-3 ring-1 ring-comprometido/25">
           <p className="text-[13px] text-tinta">
-            La gestora presupuestó <strong className="cifra font-semibold">{formatearPesos(fin!.presupuesto!)}</strong>. Aprobalo para que
-            pueda retirar el legajo y presentar.
+            La gestora presupuestó <strong className="cifra font-semibold">{formatearPesos(fin!.presupuesto!)}</strong>.{' '}
+            {sinFondos
+              ? 'No hay fondos para aprobarlo: registrá una carga en Habitualista o pedile a gerencia la excepción de fondos.'
+              : 'Aprobalo para que pueda retirar el legajo y presentar.'}
           </p>
-          <Button ancho icono={<IconoCheck className="size-4" />} onClick={() => setAbierta('aprobar')}>
-            Aprobar presupuesto
-          </Button>
+          {!sinFondos && (
+            <Button ancho icono={<IconoCheck className="size-4" />} onClick={() => setAbierta('aprobar')}>
+              Aprobar presupuesto
+            </Button>
+          )}
         </div>
       )}
       {(e === 'borrador' || avance) && (
@@ -127,6 +146,28 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
           gestoras={gestoras}
           aviso={`Su presupuesto pasa a comprometer el saldo de ${tramite.operacion.empresa.nombre}. La gestora elegida lo recibe en su lista.`}
           ejecutar={(gestora) => autorizarTramite(tramite.id, gestora, tramite.version)}
+          onCerrar={cerrar}
+        />
+      )}
+      {abierta === 'revocar' && (
+        <FormAccion
+          titulo="Retirar aprobación"
+          rotulo={tramite.numero}
+          boton="Retirar aprobación"
+          aviso="El presupuesto vuelve a quedar pendiente y la gestora no puede retirar el legajo ni presentar hasta que lo apruebes otra vez."
+          pideMotivo="Indicá por qué se retira la aprobación."
+          ejecutar={(_, motivo) => revocarAprobacion(tramite.id, motivo)}
+          onCerrar={cerrar}
+        />
+      )}
+      {abierta === 'retroceder' && retroceso && (
+        <FormAccion
+          titulo={retroceso.etiqueta}
+          rotulo={tramite.numero}
+          boton="Confirmar"
+          aviso={`Para corregir un error: el trámite vuelve de ${etiquetaEstado(e)} a ${etiquetaEstado(retroceso.hacia)}. Queda registrado en el historial.`}
+          pideMotivo="Indicá qué pasó (queda en el historial)."
+          ejecutar={cambio(retroceso.hacia)}
           onCerrar={cerrar}
         />
       )}

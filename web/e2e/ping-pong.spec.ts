@@ -69,7 +69,7 @@ test('ping pong: presupuesto, aprobación, retiro, presentación, finalizado, de
   await lista.getByRole('button', { name: 'Marcar presentado' }).click()
   await tarjeta(gestora.page, 'Presentados').getByRole('button', { name: 'Marcar finalizado' }).click()
   await tarjeta(gestora.page, 'Para devolver').getByRole('button', { name: 'Marcar devuelto' }).click()
-  await expect(gestora.page.getByRole('heading', { name: 'Estás al día' })).toBeVisible()
+  await expect(tarjeta(gestora.page, 'Esperando cierre')).toContainText('La empresa lo revisa y lo cierra')
 
   // 5. La empresa ve el trámite devuelto y lo cierra.
   await empresa.page.goto(`/tramites?t=${ID}`)

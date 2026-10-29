@@ -8,7 +8,7 @@ import { mensajeError } from '../../lib/errores'
 import { Button, cx, ErrorState, Patente, Skeleton } from '../../ui'
 import { IconoAlerta, IconoCerrar, IconoCheck, IconoEscudo, IconoMas, IconoPesos, IconoRetorno } from '../../ui/Iconos'
 import { AccionesTramite, FormAccion } from './AccionesTramite'
-import { aprobarExcepcionFondos, marcar, obtenerTramite, type Catalogos, type TramiteDetalle } from './consultas'
+import { aprobarExcepcionFondos, desmarcar, marcar, obtenerTramite, type Catalogos, type TramiteDetalle } from './consultas'
 import { EstadoChip, SituacionChip } from './EstadoChip'
 import { etiquetaEstado, formatearFecha, formatearFechaHora } from './filtros'
 import { etiquetaMovimiento, indicePaso, pagoEsExcepcion, PASOS, puedeAprobarExcepcion, puedePresupuestar } from './flujo'
@@ -82,6 +82,7 @@ function MarcasDocumentales({ t, nombre }: { t: TramiteDetalle; nombre: (id: str
     mutationFn: (marca: string) => marcar(t.id, marca),
     onSettled: () => qc.invalidateQueries({ queryKey: ['tramites'] }),
   })
+  const [quitar, setQuitar] = useState<string | null>(null)
   return (
     <>
       <ul aria-label="Marcas documentales" className="divide-y divide-linea overflow-hidden rounded-md ring-1 ring-linea">
@@ -106,6 +107,17 @@ function MarcasDocumentales({ t, nombre }: { t: TramiteDetalle; nombre: (id: str
                   </div>
                 )}
               </div>
+              {hecha && (
+                <Button
+                  variante="fantasma"
+                  tamano="sm"
+                  aria-label={`Quitar ${MARCAS[clave].toLowerCase()}`}
+                  className="text-tenue"
+                  onClick={() => setQuitar(clave)}
+                >
+                  Quitar
+                </Button>
+              )}
               {!hecha && (
                 <Button
                   variante="fantasma"
@@ -125,6 +137,17 @@ function MarcasDocumentales({ t, nombre }: { t: TramiteDetalle; nombre: (id: str
         <p role="alert" className="mt-2 text-sm text-sinfondos">
           {mensajeError(m.error)}
         </p>
+      )}
+      {quitar && (
+        <FormAccion
+          titulo={`Quitar marca: ${MARCAS[quitar]}`}
+          rotulo={t.numero}
+          boton="Quitar marca"
+          aviso="Para corregir una marca puesta por error. Queda registrado en el historial quién la quitó y por qué."
+          pideMotivo="Indicá por qué se quita la marca."
+          ejecutar={(_, motivo) => desmarcar(t.id, quitar, motivo)}
+          onCerrar={() => setQuitar(null)}
+        />
       )}
     </>
   )

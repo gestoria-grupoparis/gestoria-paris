@@ -4,9 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSesion } from '../lib/sesion'
 import { mensajeError } from '../lib/errores'
 import { formatearPesos } from '../lib/dinero'
-import { cambiarEstado, marcar } from '../features/tramites/consultas'
-import { GRUPOS, grupoDe, listarMisTramites, listarSaldosGestora, type TramiteGestora } from '../features/gestora/consultas'
-import { TarjetaTramite, type AccionGestora } from '../features/gestora/TarjetaTramite'
+import { cambiarEstado, desmarcar, marcar } from '../features/tramites/consultas'
+import { FormAccion } from '../features/tramites/AccionesTramite'
+import { GRUPOS, grupoDe, legajoRetirado, listarMisTramites, listarSaldosGestora, type TramiteGestora } from '../features/gestora/consultas'
+import { TarjetaTramite, etiquetaDeshacer, type AccionGestora } from '../features/gestora/TarjetaTramite'
 import { FormPresupuesto } from '../features/gestora/FormPresupuesto'
 import { FormPago } from '../features/gestora/FormPago'
 import { Button, Cargando, EmptyState, ErrorState, PageHeader, cx } from '../ui'
@@ -19,6 +20,7 @@ const ICONO_GRUPO: Record<Grupo, (p: { className?: string }) => ReactElement> = 
   listos: IconoFlecha,
   presentados: IconoCheck,
   devolver: IconoRetorno,
+  devueltos: IconoCheck,
 }
 
 const AYUDA_GRUPO: Record<Grupo, string> = {
@@ -27,9 +29,17 @@ const AYUDA_GRUPO: Record<Grupo, string> = {
   listos: 'Presupuesto aprobado: retirá el legajo en la concesionaria y presentalo en el registro.',
   presentados: 'En el registro. Registrá el pago y marcá cuando el registro termine.',
   devolver: 'El registro terminó. Devolvé la documentación a la empresa y marcalo.',
+  devueltos: 'Ya los devolviste. Quedan acá hasta que la empresa los cierre.',
 }
 
-type Formulario = { tipo: 'presupuesto' | 'pago'; t: TramiteGestora } | null
+type Formulario = { tipo: 'presupuesto' | 'pago' | 'deshacer'; t: TramiteGestora } | null
+
+// Deshacer el último paso de la gestora (clic por error): con motivo, queda en el historial.
+function deshacer(t: TramiteGestora, motivo: string) {
+  if (t.estado === 'autorizado' || t.estado === 'en_gestoria') return desmarcar(t.id, 'retirado', motivo)
+  const atras: Record<string, string> = { presentado: 'autorizado', finalizado_registro: 'presentado', devuelto: 'finalizado_registro' }
+  return cambiarEstado(t.id, atras[t.estado], motivo, t.version)
+}
 
 function ejecutar(t: TramiteGestora, a: AccionGestora) {
   if (a === 'presentado') return cambiarEstado(t.id, 'presentado', '', t.version)
@@ -63,7 +73,7 @@ export function MisTramites() {
   })
 
   function alAccionar(t: TramiteGestora, a: AccionGestora) {
-    if (a === 'presupuesto' || a === 'pago') setForm({ tipo: a, t })
+    if (a === 'presupuesto' || a === 'pago' || a === 'deshacer') setForm({ tipo: a, t })
     else accion.mutate({ t, a })
   }
 
@@ -156,7 +166,7 @@ export function MisTramites() {
       {consulta.isSuccess && pendientes > 0 && (
         <nav
           aria-label="Resumen"
-          className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-5 md:gap-3 md:px-0"
+          className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:gap-3 md:px-0 xl:grid-cols-6"
         >
           {todosLosGrupos.map((g) => {
             const n = g.items.length
@@ -257,6 +267,18 @@ export function MisTramites() {
       </div>
       {form?.tipo === 'presupuesto' && <FormPresupuesto tramite={form.t} onCerrar={cerrar} onGuardado={guardado} />}
       {form?.tipo === 'pago' && <FormPago tramite={form.t} onCerrar={cerrar} onGuardado={guardado} />}
+      {form?.tipo === 'deshacer' && (
+        <FormAccion
+          titulo={etiquetaDeshacer(grupoDe(form.t)!, legajoRetirado(form.t)) ?? 'Deshacer'}
+          rotulo={form.t.numero}
+          boton="Deshacer"
+          aviso="Para corregir un toque por error. Queda registrado en el historial."
+          pideMotivo="Contá brevemente qué pasó."
+          ejecutar={(_, motivo) => deshacer(form.t, motivo)}
+          onCerrar={cerrar}
+          onHecho={() => void refrescar()}
+        />
+      )}
     </div>
   )
 }

@@ -22,8 +22,8 @@ describe('grupoDe (ping pong con la empresa)', () => {
     expect(grupoDe(t('presentado', 'pagado', true))).toBe('presentados')
     expect(grupoDe(t('finalizado_registro', 'pagado', true, ['retirado']))).toBe('devolver')
   })
-  it('devuelto o cerrado ya no es de la gestora', () => {
-    expect(grupoDe(t('devuelto', 'pagado', true))).toBeNull()
+  it('devuelto espera el cierre de la empresa; cerrado ya no es de la gestora', () => {
+    expect(grupoDe(t('devuelto', 'pagado', true))).toBe('devueltos')
     expect(grupoDe(t('cerrado', 'pagado', true))).toBeNull()
   })
 })
