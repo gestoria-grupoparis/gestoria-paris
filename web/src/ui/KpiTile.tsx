@@ -32,12 +32,13 @@ export function KpiTile({
 }) {
   const oscuro = tono === 'destacado'
   return (
-    <div className={cx('flex flex-col gap-3 rounded-lg p-5 ring-1', TONOS[tono], className)}>
+    <div className={cx('@container flex min-w-0 flex-col gap-3 rounded-lg p-5 ring-1', TONOS[tono], className)}>
       <div className="flex items-center justify-between">
         <span className={cx('text-[12px] font-medium', oscuro ? 'text-white/60' : 'text-tenue')}>{rotulo}</span>
         {icono && <span aria-hidden className="opacity-70">{icono}</span>}
       </div>
-      <span className={cx('cifra font-display font-medium leading-none tracking-[-0.03em] whitespace-nowrap', grande ? 'text-[32px] md:text-[44px]' : 'text-[22px] xl:text-[26px]')}>{valor}</span>
+      <span className={cx('cifra font-display font-medium leading-none tracking-[-0.03em] whitespace-nowrap', // la cifra se achica con el ancho de la tarjeta para no cortarse (montos de 8+ dígitos)
+        grande ? 'text-[clamp(26px,10cqi,44px)]' : 'text-[clamp(14px,9.5cqi,26px)]')}>{valor}</span>
       {detalle && <span className={cx('text-[13px]', oscuro ? 'text-white/60' : 'text-tenue')}>{detalle}</span>}
     </div>
   )
