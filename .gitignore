@@ -8,3 +8,4 @@ supabase/.temp/
 web/test-results/
 web/playwright-report/
 *.tsbuildinfo
+web/dist-presupuesto/

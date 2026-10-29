@@ -1,16 +1,16 @@
-import type { ComponentType } from 'react'
+import { lazy, Suspense, type ComponentType } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { useSesion } from '../lib/sesion'
 import { Login } from '../pages/Login'
 import { Layout } from './Layout'
 import { navegacionPorRol } from './navegacion'
 import { pantallaPara } from '../lib/perfil'
-import { Tramites } from '../pages/Tramites'
-import { MisTramites } from '../pages/MisTramites'
-import { Habitualista } from '../pages/Habitualista'
-import { Tablero } from '../pages/Tablero'
-import { Usuarios } from '../pages/Usuarios'
-import { Informes } from '../pages/Informes'
+const Tramites = lazy(() => import('../pages/Tramites').then((m) => ({ default: m.Tramites })))
+const MisTramites = lazy(() => import('../pages/MisTramites').then((m) => ({ default: m.MisTramites })))
+const Habitualista = lazy(() => import('../pages/Habitualista').then((m) => ({ default: m.Habitualista })))
+const Tablero = lazy(() => import('../pages/Tablero').then((m) => ({ default: m.Tablero })))
+const Usuarios = lazy(() => import('../pages/Usuarios').then((m) => ({ default: m.Usuarios })))
+const Informes = lazy(() => import('../pages/Informes').then((m) => ({ default: m.Informes })))
 import { Button, PaginaPendiente, PantallaCarga, PantallaMensaje } from '../ui'
 import { DefinirClave } from '../features/acceso/DefinirClave'
 import { errorEnUrl } from '../lib/clave'
@@ -61,7 +61,13 @@ function Pendiente({ titulo }: { titulo: string }) {
 
 function elementoDe(ruta: string, etiqueta: string) {
   const Pantalla = PANTALLAS[ruta]
-  return Pantalla ? <Pantalla /> : <Pendiente titulo={etiqueta} />
+  return Pantalla ? (
+    <Suspense fallback={<div role="status" className="p-8 text-sm text-tenue">Cargando…</div>}>
+      <Pantalla />
+    </Suspense>
+  ) : (
+    <Pendiente titulo={etiqueta} />
+  )
 }
 
 export function Rutas() {
