@@ -9,7 +9,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:db": "vitest run tests/db",
-    "test:web": "npm --prefix web test"
+    "test:web": "npm --prefix web test",
+    "test:functions": "vitest run -c vitest.functions.config.ts"
   },
   "keywords": [],
   "author": "",
