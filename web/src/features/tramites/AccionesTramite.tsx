@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { mensajeError } from '../../lib/errores'
+import { codigoError, mensajeError } from '../../lib/errores'
+import { ErrorAccion } from './ErrorAccion'
 import { useMutacionUnica } from '../../lib/consultas'
 import { Button, claseControl, Field, useAviso } from '../../ui'
 import { IconoCheck, IconoFlecha, IconoLapiz, IconoRetorno, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
@@ -314,6 +315,7 @@ export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, mot
   const [gestora, setGestora] = useState('')
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [conflicto, setConflicto] = useState(false)
 
   const m = useMutacionUnica({
     mutationFn: () => ejecutar(gestora, motivo.trim()),
@@ -322,7 +324,10 @@ export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, mot
       else avisar({ texto: `${hecho ?? HECHO[titulo] ?? `${titulo}: listo`}${rotulo ? ` · ${rotulo}` : ''}` })
       onCerrar()
     },
-    onError: (e) => setError(mensajeError(e)),
+    onError: (e) => {
+      setError(mensajeError(e))
+      setConflicto(codigoError(e) === 'VERSION_CONFLICTO')
+    },
     onSettled: () => qc.invalidateQueries({ queryKey: ['tramites'] }),
   })
 
@@ -364,11 +369,7 @@ export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, mot
             )}
           </Field>
         )}
-        {error && (
-          <p role="alert" className="rounded-md bg-sinfondos-suave px-4 py-3 text-sm font-medium text-sinfondos">
-            {error}
-          </p>
-        )}
+        <ErrorAccion error={error} conflicto={conflicto} onRecargado={() => { setError(null); setConflicto(false) }} />
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <Button variante="secundario" onClick={onCerrar}>
             Cancelar

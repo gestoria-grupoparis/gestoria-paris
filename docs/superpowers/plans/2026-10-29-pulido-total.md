@@ -101,6 +101,7 @@ Decisión: "Aprobar excepción de fondos" ya existía en el panel (bloque de fin
 **Archivos:** `web/src/features/tramites/AccionesTramite.tsx` (`FormAccion`), `FormEdicion.tsx`, `web/src/features/gestora/FormPresupuesto.tsx`.
 **Cambios:** si `codigoError(e) === 'VERSION_CONFLICTO'`, el mensaje del diálogo incluye un botón "Recargar y reintentar" que invalida `['tramites']`, re-lee la versión y vuelve a mostrar el formulario con lo escrito intacto.
 **Aceptación:** E2E `web/e2e/tramites-edicion.spec.ts`: el mock incrementa la versión entre abrir y confirmar → aparece el botón → reintento exitoso con el motivo conservado.
+Decisión: aplicado en `FormAccion` y `FormEdicion` (componente `ErrorAccion`); `FormPresupuesto` de la gestora no usa versión de trámite, queda igual.
 
 ## Tarea 13 — Montos grandes y nombres largos sin desbordes (P0)
 **Objetivo:** ningún texto se sale de su tarjeta de 320 a 1440 px.

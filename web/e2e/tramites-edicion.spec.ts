@@ -66,6 +66,14 @@ test('si otro usuario modificó el trámite, la edición avisa VERSION_CONFLICTO
   await form.getByRole('button', { name: 'Guardar cambios' }).click()
   await expect(form.getByRole('alert')).toContainText('Otro usuario modificó este trámite')
   expect(servidor.st.operaciones[0].cliente_nombre).toBe('Juan Pérez')
+
+  // Recargar en un toque: re-lee la versión y conserva lo escrito.
+  await form.getByRole('button', { name: 'Recargar y reintentar' }).click()
+  await expect(form.getByRole('alert')).toHaveCount(0)
+  await expect(form.getByLabel('Cliente')).toHaveValue('Otro nombre')
+  await form.getByRole('button', { name: 'Guardar cambios' }).click()
+  await expect(form).toBeHidden()
+  expect(servidor.st.operaciones[0].cliente_nombre).toBe('Otro nombre')
 })
 
 test('contable carga presupuesto y pago desde el panel; la segunda versión pide motivo', async ({ page }) => {

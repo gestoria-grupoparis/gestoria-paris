@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { mensajeError } from '../../lib/errores'
+import { codigoError, mensajeError } from '../../lib/errores'
+import { ErrorAccion } from './ErrorAccion'
 import { Button, claseControl, Field, Input } from '../../ui'
 import { cambiarEstado, editarTramite, type EdicionTramite, type TramiteDetalle } from './consultas'
 import { Dialogo } from './Dialogo'
@@ -23,6 +24,7 @@ export function FormEdicion({ tramite, onCerrar }: { tramite: TramiteDetalle; on
   })
   const [volver, setVolver] = useState(observado)
   const [error, setError] = useState<string | null>(null)
+  const [conflicto, setConflicto] = useState(false)
 
   const m = useMutation({
     mutationFn: async () => {
@@ -30,7 +32,10 @@ export function FormEdicion({ tramite, onCerrar }: { tramite: TramiteDetalle; on
       if (observado && volver) await cambiarEstado(tramite.id, 'borrador', d.motivo.trim(), tramite.version + 1)
     },
     onSuccess: onCerrar,
-    onError: (e) => setError(mensajeError(e)),
+    onError: (e) => {
+      setError(mensajeError(e))
+      setConflicto(codigoError(e) === 'VERSION_CONFLICTO')
+    },
     onSettled: () => qc.invalidateQueries({ queryKey: ['tramites'] }),
   })
 
@@ -95,11 +100,7 @@ export function FormEdicion({ tramite, onCerrar }: { tramite: TramiteDetalle; on
           )}
         </div>
 
-        {error && (
-          <p role="alert" className="rounded-md bg-sinfondos-suave px-4 py-3 text-sm font-medium text-sinfondos">
-            {error}
-          </p>
-        )}
+        <ErrorAccion error={error} conflicto={conflicto} onRecargado={() => { setError(null); setConflicto(false) }} />
         <div className="flex flex-col-reverse gap-2 border-t border-linea pt-4 sm:flex-row sm:justify-end">
           <Button variante="secundario" onClick={onCerrar}>
             Cancelar
