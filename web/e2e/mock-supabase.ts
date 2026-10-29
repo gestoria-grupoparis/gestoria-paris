@@ -1108,6 +1108,9 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   // --- Análisis y estimador (módulo interno: gerencia y contable con alcance) -----------------
   const interno = () => rol === 'gerencia' || rol === 'contable'
   const estimados: Fila[] = []
+  // Tablas de valuaciones DNRPA: versionadas, se importan en tandas y no se pisan.
+  const valuacionesTablas: Fila[] = []
+  const valuaciones: Fila[] = []
   const parametros: Fila[] = [
     { id: nuevoId(), clave: 'mrpa_pesos', vehiculo: null, provincia: null, valor: null, vigencia_desde: '2026-09-01', vigencia_hasta: null, fuente: 'A CONFIRMAR: valor en pesos no publicado', verificado: false },
     { id: nuevoId(), clave: 'inscripcion_pct', vehiculo: null, provincia: null, valor: '1', vigencia_desde: '2026-09-01', vigencia_hasta: null, fuente: 'DNRPA Anexo I/II 1A (Res. MJ 412/2026)', verificado: true },
@@ -1226,7 +1229,10 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     if (!t || !tieneAlcance(t.empresa_id, null)) return errorNegocio(route, 'NO_ENCONTRADO: tramite inexistente')
     const tipo = nombreDe(catalogos.tipos_tramite, t.tipo_id)!.codigo
     const provincia = String(a.p_provincia ?? nombreDe(catalogos.sucursales, t.sucursal_id)!.provincia)
-    const valor = a.p_valor == null || String(a.p_valor) === '0' ? null : big(a.p_valor)
+    const declarado = a.p_valor == null || String(a.p_valor) === '0' ? null : big(a.p_valor)
+    const val = a.p_mtm == null ? null : valuaciones.find((v) => v.tabla_id === a.p_tabla && v.mtm === a.p_mtm && v.anio === a.p_anio)
+    if (a.p_mtm != null && !val) return errorNegocio(route, 'DATO_INVALIDO: el vehiculo elegido no figura en la tabla de valuaciones')
+    const valor = val && big(val.valor_cents) > (declarado ?? 0n) ? big(val.valor_cents) : declarado
     const prenda = a.p_prenda == null ? 0n : big(a.p_prenda)
     const lineas: Fila[] = []
     let total = 0n
@@ -1250,10 +1256,17 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     }
     linea('sellos_acto', valor, 'sin regla verificada', null, sinDato, false)
     linea('honorarios', null, 'monto fijo por tramite', 3250000n, 'Planilla de rendiciones de la gestora', true)
+    if (val) {
+      const disp = valuacionesTablas.find((x) => x.id === val.tabla_id)!.disposicion
+      Object.assign(lineas[0], {
+        valuacion: `Valuación DNRPA ${disp} — ${val.mtm} (${val.anio === 0 ? '0 km' : val.anio})`,
+        base_origen: big(val.valor_cents) >= (declarado ?? 0n) ? 'valuacion' : 'declarado',
+      })
+    }
     const id = nuevoId()
     estimados.push({
       id, tramite_id: t.id, version: estimados.filter((e) => e.tramite_id === t.id).length + 1,
-      entrada: { valor_cents: valor == null ? null : String(valor), prenda_cents: String(prenda), vehiculo: a.p_vehiculo ?? 'auto', destino: a.p_destino ?? 'cliente', provincia },
+      entrada: { valor_cents: declarado == null ? null : String(declarado), prenda_cents: String(prenda), vehiculo: a.p_vehiculo ?? 'auto', destino: a.p_destino ?? 'cliente', provincia },
       lineas, total: String(total), confianza: valor == null ? 'sin_valor' : 'parcial', created_at: ahora,
     })
     await route.fulfill({ json: id })
@@ -1268,6 +1281,33 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     const id = nuevoId()
     parametros.push({ id, clave: a.p_clave, vehiculo: a.p_vehiculo ?? null, provincia: a.p_provincia ?? null, valor: a.p_valor == null ? null : String(a.p_valor), vigencia_desde: a.p_vigencia_desde, vigencia_hasta: null, fuente: String(a.p_fuente).trim(), verificado: !!a.p_verificado })
     await route.fulfill({ json: id })
+  }
+
+  rpcs.importar_valuaciones = async (route, a) => {
+    if (rol !== 'gerencia') return errorNegocio(route, 'SIN_PERMISO: solo gerencia importa la tabla de valuaciones')
+    if (!textoONull(a.p_disposicion) || !a.p_vigente_desde) return errorNegocio(route, 'DATO_INVALIDO: indica la disposicion y la fecha de vigencia')
+    const disp = String(a.p_disposicion).trim()
+    let t = valuacionesTablas.find((x) => x.disposicion === disp && x.vigente_desde === a.p_vigente_desde)
+    if (t?.completa) return errorNegocio(route, 'DUPLICADO: esa tabla ya se importo completa; las tablas anteriores no se modifican')
+    if (!t) valuacionesTablas.push(t = { id: nuevoId(), disposicion: disp, vigente_desde: a.p_vigente_desde, fuente_url: a.p_fuente_url ?? null, filas: 0, completa: false })
+    for (const f of a.p_filas as Fila[])
+      if (!valuaciones.some((v) => v.tabla_id === t!.id && v.mtm === f.mtm && v.anio === f.anio)) valuaciones.push({ ...f, tabla_id: t.id })
+    t.filas = valuaciones.filter((v) => v.tabla_id === t!.id).length
+    t.completa = !!a.p_final
+    await route.fulfill({ json: { tabla_id: t.id, filas: t.filas } })
+  }
+
+  rpcs.buscar_vehiculo = async (route, a) => {
+    if (!interno()) return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable consultan valuaciones')
+    const palabras = String(a.p_texto ?? '').toLowerCase().split(/\s+/).filter(Boolean)
+    const t = valuacionesTablas.filter((x) => x.completa && String(x.vigente_desde) <= String(a.p_fecha))
+      .sort((x, y) => String(y.vigente_desde).localeCompare(String(x.vigente_desde)))[0]
+    const filas = !t || !palabras.length ? [] : valuaciones
+      .filter((v) => v.tabla_id === t.id && (a.p_anio == null || v.anio === a.p_anio))
+      .filter((v) => palabras.every((w) => `${v.marca} ${v.modelo} ${v.version}`.toLowerCase().includes(w)))
+      .slice(0, 50)
+      .map((v) => ({ tabla_id: v.tabla_id, disposicion: t.disposicion, tipo_vehiculo: v.tipo_vehiculo, mtm: v.mtm, marca: v.marca, modelo: v.modelo, version: v.version, anio: v.anio, valor: String(v.valor_cents) }))
+    await route.fulfill({ json: filas })
   }
 
   rpcs.comparar_estimado = async (route, a) => {
@@ -1319,6 +1359,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     rendiciones: () => st.rendiciones.filter(veRendicion),
     estimados: () => (interno() ? estimados.filter((e) => { const t = tramite(e.tramite_id); return !!t && tieneAlcance(t.empresa_id, null) }) : []),
     parametros_estimador: () => (interno() ? parametros : []),
+    valuaciones_tablas: () => (interno() ? valuacionesTablas : []),
     rendicion_filas: () => st.rendicionFilas.filter((f) => veRendicion(rendicion(f.rendicion_id))),
     comprobantes: () => st.comprobantes.filter((c) => veRendicion(rendicion(c.rendicion_id))),
     comprobante_lineas: () => st.comprobanteLineas.filter((l) =>

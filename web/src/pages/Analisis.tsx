@@ -12,6 +12,7 @@ import { ETIQUETA_CONCEPTO, PERIODOS, aNumero, etiquetaSemana, etiquetaVariacion
 import { GraficoDona, GraficoLineas } from '../features/analisis/Graficos'
 import { Prevision } from '../features/analisis/Prevision'
 import { Parametros } from '../features/analisis/Parametros'
+import { TablasValuaciones } from '../features/analisis/ImportarValuaciones'
 import { Button, Cargando, EmptyState, ErrorState, KpiTile, MenuExportar, PageHeader, claseControl, cx } from '../ui'
 
 type Vista = 'gasto' | 'prevision' | 'parametros'
@@ -154,7 +155,10 @@ export function Analisis() {
       ) : vista === 'prevision' ? (
         <Prevision hoy={hoy} empresa={empresa} />
       ) : vista === 'parametros' ? (
-        <Parametros hoy={hoy} editable={rol === 'gerencia'} />
+        <>
+          <Parametros hoy={hoy} editable={rol === 'gerencia'} />
+          <TablasValuaciones editable={rol === 'gerencia'} />
+        </>
       ) : q.isError ? (
         <ErrorState titulo="No se pudo calcular el gasto." accion={<Button variante="secundario" tamano="sm" className="w-fit" onClick={() => void q.refetch()}>Reintentar</Button>} />
       ) : !q.data ? (

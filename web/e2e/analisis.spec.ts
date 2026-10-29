@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { crearServidor, montarSupabase, type Semilla } from './mock-supabase'
 import catalogos from './fixtures/catalogos.json' with { type: 'json' }
+import paginasValuaciones from '../src/features/analisis/__fixtures__/valuaciones-disp-160-2026.json' with { type: 'json' }
 
 const CONTABLE = '00000000-0000-4000-8000-0000000000c1'
 const GERENTE = '00000000-0000-4000-8000-0000000000a1'
@@ -94,4 +95,36 @@ test('la gestora no ve el menú Análisis y la ruta la devuelve a su inicio', as
   await expect(page).toHaveURL(/\/mis-tramites$/)
   await expect(page.getByRole('link', { name: 'Análisis' })).toHaveCount(0)
   expect(mock.rutasPedidas.filter((r) => /analisis|prevision|estimad|parametros/.test(r))).toEqual([])
+})
+
+test('gerencia importa la tabla DNRPA y el estimado usa la valuación del vehículo elegido', async ({ page }) => {
+  await page.addInitScript((p) => { window.__valuacionesSimuladas = { 'valuaciones.pdf': p } }, paginasValuaciones)
+  await abrir(page, GERENTE, '/analisis?vista=parametros')
+  await page.getByRole('button', { name: 'Importar tabla de valuaciones' }).click()
+  const d = page.getByRole('dialog')
+  await d.getByLabel('Archivo PDF').setInputFiles({ name: 'valuaciones.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7') })
+  await expect(d.getByTestId('vista-previa-valuaciones')).toContainText('modelos')
+  await expect(d.getByTestId('vista-previa-valuaciones')).toContainText('1 renglones no se pudieron leer')
+  await expect(d.getByLabel('Vigente desde')).toHaveValue('2026-10-01')
+  await d.getByLabel('Disposición').fill('Disp. 160/2026')
+  await d.getByRole('button', { name: /^Importar \d+ valores$/ }).click()
+  await expect(d.getByRole('status')).toContainText('Listo: se importaron')
+  await d.getByRole('button', { name: 'Listo' }).click()
+  await expect(page.getByRole('region', { name: 'Tabla de valuaciones DNRPA' })).toContainText('Disp. 160/2026')
+
+  await page.getByRole('link', { name: 'Trámites' }).first().click()
+  await page.getByRole('row', { name: /T-2026-00502/ }).click()
+  const detalle = page.getByRole('complementary', { name: 'Detalle del trámite' })
+  await detalle.getByRole('button', { name: 'Calcular estimado' }).click()
+  const form = detalle.getByRole('form', { name: 'Calcular estimado' })
+  await form.getByLabel('Valor de referencia').fill('10.000.000')
+  await form.getByLabel('Marca, modelo o versión').fill('kawasaki versys')
+  await form.getByRole('button', { name: 'Buscar' }).click()
+  const resultados = form.getByRole('list', { name: 'Resultados de la tabla DNRPA' })
+  await expect(resultados.getByRole('button')).toHaveCount(1)
+  await resultados.getByRole('button', { name: /VERSYS/ }).click()
+  await expect(form).toContainText('Valuación $ 31.174.000,00')
+  await form.getByRole('button', { name: 'Calcular' }).click()
+  await expect(detalle.getByTestId('linea-valuacion')).toContainText('Valuación DNRPA Disp. 160/2026 — 06919847 (0 km)')
+  await expect(detalle).toContainText('Base $ 31.174.000,00')
 })

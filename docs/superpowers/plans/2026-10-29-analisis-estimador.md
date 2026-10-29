@@ -105,3 +105,12 @@
 - Decisión: la diferencia estimado/real la calcula la base (`comparar_estimado(p_tramite)`, migración `20261102000500_comparar_estimado.sql`) para que el front solo formatee.
 - Bundle principal: 37,10 kB -> 37,24 kB gzip (+0,14 kB). Recharts vive en el chunk `Analisis` (115,6 kB gzip).
 - Limitaciones: el concepto sale del desglose de los movimientos (no de los comprobantes de Rendiciones); la vista de impresión usa el estilo de pantalla (oculta filtros y botones, no el menú lateral).
+
+## Tabla de valuaciones DNRPA e impresión (2026-10-29)
+
+- Decisión: el PDF se lee en el navegador con PDF.js y un parser puro (`web/src/features/analisis/valuacionesPdf.ts`) que ubica cada valor por el borde derecho bajo la columna del año; separa números que PDF.js junta ("270270000 243100000") o pega a la descripción, y hereda la descripción en blanco. Con la Disp. 160/2026 da 109.787 valores de 18.159 modelos; 3 renglones con valores en notación científica ("1,144E+09") se informan como error y no se importan.
+- Decisión: el 0 km se guarda como `anio = 0`. "Desc. Modelo" va a `modelo` y "Desc. Tipo" (carrocería) a `version`; `T` A/M se guarda como auto/moto.
+- Decisión: `importar_valuaciones(..., p_final)` crea la tabla en la primera tanda (clave disposición + vigencia), agrega en las siguientes (reintentos sin duplicar ni pisar) y la cierra con `p_final = true`; una tabla cerrada no admite cambios y solo las cerradas se usan para buscar. Tandas de 2000 filas.
+- Decisión: sin extensión pg_trgm (la base de tests embebida no la garantiza): la búsqueda es por palabras con `strpos` sobre una columna generada en minúsculas, acotada a la tabla vigente (~110 mil filas) y 50 resultados.
+- Decisión: `estimar_tramite` gana `p_tabla, p_mtm, p_anio` (opcionales); la base del arancel es max(declarado, valuación) para 0 km y transferencias, y la línea guarda `valuacion` ("Valuación DNRPA Disp. … — <mtm> (<año>)") y `base_origen`; la entrada guarda tabla, mtm, año y valuación. Elegir el vehículo es siempre manual; elegirlo ajusta auto/moto.
+- Decisión: impresión con variantes `print:` en el menú lateral, el encabezado y la barra móviles, y una hoja `@page A4` con márgenes de 12 mm; los gráficos se limitan al ancho imprimible.

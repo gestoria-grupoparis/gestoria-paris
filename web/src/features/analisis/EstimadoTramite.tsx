@@ -4,7 +4,8 @@ import { formatearPesos, parsearPesos } from '../../lib/dinero'
 import { useMutacionUnica } from '../../lib/consultas'
 import { mensajeError } from '../../lib/errores'
 import { Button, CampoPesos, Chip, Field, Skeleton, claseControl } from '../../ui'
-import { compararEstimado, estimarTramite, ultimoEstimado, type DatosEstimar, type Estimado } from './consultas'
+import { compararEstimado, estimarTramite, ultimoEstimado, type DatosEstimar, type Estimado, type Vehiculo } from './consultas'
+import { SelectorVehiculo } from './SelectorVehiculo'
 import { ETIQUETA_CONCEPTO, etiquetaConfianza } from './formato'
 
 const PROVINCIAS = ['San Luis', 'San Juan', 'Mendoza', 'Córdoba']
@@ -68,6 +69,11 @@ function Detalle({ e }: { e: Estimado }) {
                 <div className="text-[12px] text-tenue">
                   {l.base_cents && <>Base {formatearPesos(l.base_cents)} · </>}{l.regla}
                 </div>
+                {l.valuacion && (
+                  <div className="text-[12px] text-tenue" data-testid="linea-valuacion">
+                    {l.valuacion}{l.base_origen === 'valuacion' ? ' (mayor que el valor declarado)' : ' (el valor declarado es mayor)'}
+                  </div>
+                )}
                 <div className="text-[12px] text-tenue">Fuente: {l.fuente}</div>
               </td>
               <td className="cifra py-2 text-right font-semibold whitespace-nowrap">
@@ -90,6 +96,7 @@ function FormEstimado({ tramite, tipo, previo, onCerrar, onListo }: { tramite: s
   const [destino, setDestino] = useState<DatosEstimar['destino']>(
     (previo?.entrada.destino as DatosEstimar['destino']) ?? (tipo === 'transferencia_parte_pago' ? 'habitualista_08' : 'cliente'))
   const [provincia, setProvincia] = useState('')
+  const [elegido, setElegido] = useState<Vehiculo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const m = useMutacionUnica({
     mutationFn: () =>
@@ -97,15 +104,20 @@ function FormEstimado({ tramite, tipo, previo, onCerrar, onListo }: { tramite: s
         tramite, vehiculo, provincia: provincia || null, destino: esTransferencia ? destino : 'cliente',
         valor: valor.trim() ? parsearPesos(valor).toString() : null,
         prenda: prenda.trim() ? parsearPesos(prenda).toString() : null,
+        valuacion: elegido ? { tabla_id: elegido.tabla_id, mtm: elegido.mtm, anio: elegido.anio } : null,
       }),
     onSuccess: onListo,
     onError: (e) => setError(mensajeError(e)),
   })
   return (
     <form aria-label="Calcular estimado" className="space-y-3 rounded-md ring-1 ring-linea p-3" onSubmit={(e) => { e.preventDefault(); setError(null); m.mutate() }}>
-      <Field label="Valor de referencia" ayuda="Precio de factura del 0 km o valor declarado del usado.">
+      <Field label="Valor de referencia" ayuda="Precio de factura del 0 km o valor declarado del usado. Si elegís el vehículo de la tabla DNRPA, se usa el mayor de los dos.">
         {(c) => <CampoPesos {...c} value={valor} onValor={setValor} />}
       </Field>
+      <SelectorVehiculo
+        cero={!esTransferencia} elegido={elegido}
+        onElegir={(v) => { setElegido(v); if (v) setVehiculo(v.tipo_vehiculo) }}
+      />
       <Field label="Monto de la prenda" ayuda="Vacío si no lleva prenda.">
         {(c) => <CampoPesos {...c} value={prenda} onValor={setPrenda} />}
       </Field>

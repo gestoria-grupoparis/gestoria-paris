@@ -37,6 +37,9 @@ export interface LineaEstimado {
   importe_cents: string | null
   fuente: string
   verificado: boolean
+  /** Solo si se eligió un vehículo de la tabla DNRPA: "Valuación DNRPA Disp. … — <mtm> (<año>)". */
+  valuacion?: string
+  base_origen?: 'valuacion' | 'declarado'
 }
 
 export interface Estimado {
@@ -95,11 +98,14 @@ export interface DatosEstimar {
   vehiculo: 'auto' | 'moto'
   destino: 'cliente' | 'habitualista_08' | 'reventa_90'
   provincia: string | null
+  /** Vehículo elegido de la tabla de valuaciones (opcional). */
+  valuacion?: { tabla_id: string; mtm: string; anio: number } | null
 }
 
 export async function estimarTramite(d: DatosEstimar): Promise<string> {
   const { data, error } = await supabase.rpc('estimar_tramite', {
     p_tramite: d.tramite, p_valor: d.valor, p_prenda: d.prenda, p_vehiculo: d.vehiculo, p_destino: d.destino, p_provincia: d.provincia,
+    p_tabla: d.valuacion?.tabla_id ?? null, p_mtm: d.valuacion?.mtm ?? null, p_anio: d.valuacion?.anio ?? null,
   })
   if (error) throw error
   return data as string
@@ -142,4 +148,44 @@ export async function compararEstimado(tramite: string): Promise<Comparacion> {
   if (error) throw error
   const fila = (Array.isArray(data) ? data[0] : data) as unknown as Comparacion | undefined
   return fila ?? { estimado: null, real: null, diferencia: null, diferencia_pct: null }
+}
+
+export interface Vehiculo {
+  tabla_id: string
+  disposicion: string
+  tipo_vehiculo: 'auto' | 'moto'
+  mtm: string
+  marca: string
+  modelo: string
+  version: string
+  /** 0 = 0 km. */
+  anio: number
+  valor: string
+}
+
+export async function buscarVehiculo(texto: string, anio: number | null, fecha: string): Promise<Vehiculo[]> {
+  const { data, error } = await supabase
+    .rpc('buscar_vehiculo', { p_texto: texto, p_anio: anio, p_fecha: fecha })
+    .select('tabla_id,disposicion,tipo_vehiculo,mtm,marca,modelo,version,anio,valor:valor_cents::text')
+  if (error) throw error
+  return (data ?? []) as unknown as Vehiculo[]
+}
+
+export interface TablaValuaciones { id: string; disposicion: string; vigente_desde: string; filas: number; completa: boolean }
+
+export async function listarTablasValuaciones(): Promise<TablaValuaciones[]> {
+  const { data, error } = await supabase
+    .from('valuaciones_tablas')
+    .select('id,disposicion,vigente_desde,filas,completa')
+    .order('vigente_desde', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as TablaValuaciones[]
+}
+
+export async function importarValuaciones(d: { disposicion: string; vigente_desde: string; fuente_url: string | null; filas: unknown[]; final: boolean }) {
+  const { data, error } = await supabase.rpc('importar_valuaciones', {
+    p_disposicion: d.disposicion, p_vigente_desde: d.vigente_desde, p_fuente_url: d.fuente_url, p_filas: d.filas, p_final: d.final,
+  })
+  if (error) throw error
+  return data as { tabla_id: string; filas: number }
 }
