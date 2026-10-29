@@ -150,12 +150,14 @@ Decisión: hecho junto con la Tarea 16. Se preselecciona razón social/sucursal 
 **Cambios:** `ErrorState` siempre con botón "Reintentar" (hoy faltan en "Trámites por estado" y "Requieren intervención" del Tablero); vacío distinto de "sin resultados por filtro" (con botón "Limpiar filtros"); MisTramites vacío: "No tenés trámites asignados. Cuando la empresa te asigne uno, aparece acá."; saldos de gestora con error visible (hoy se ignora `saldos.isError`).
 **Aceptación:** E2E nuevo `web/e2e/estados.spec.ts`: para cada pantalla, el mock responde vacío, error 500 y lento (delay) → se ven el vacío, el error con "Reintentar" que funciona y el skeleton con `role="status"`.
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 20 — Sesión vencida y sin conexión (P1)
 **Objetivo:** el usuario entiende qué pasa y no pierde lo escrito.
 **Archivos:** `web/src/lib/sesion.tsx`, `web/src/app/Layout.tsx`, `web/src/ui/BarraConexion.tsx` (nuevo).
 **Cambios:** banda superior "Sin conexión. Los cambios se guardan cuando vuelva internet" (`navigator.onLine` + eventos) — los botones de envío se deshabilitan con ese texto; `onAuthStateChange('SIGNED_OUT')` inesperado → Login con aviso "Tu sesión venció".
 **Aceptación:** E2E `web/e2e/robustez.spec.ts`: `context.setOffline(true)` muestra la banda y deshabilita "Confirmar"; volver online la quita.
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 21 — División de código y peso inicial (P1)
 **Objetivo:** primera carga rápida en celulares de la gestoría.
 **Archivos:** `web/src/app/rutas.tsx`, `web/vite.config.ts`, `web/src/pages/Login.tsx`.
@@ -189,36 +191,42 @@ Decisión: hecho en f4cad91.
 **Cambios:** unificar "Razón social" (no "empresa" en la UI), "Gestora", "Legajo", voseo en todos los imperativos ("Elegí", "Indicá"), fechas `dd/mm/aaaa`, montos `$ 1.234,56`; eliminar textos técnicos visibles (códigos de estado crudos como `finalizado_registro`, ver Tarea 1). Revisar `title`/`aria-label` en inglés.
 **Aceptación:** unit `web/src/lib/textos.test.ts` que escanea `web/src/**/*.tsx` buscando palabras prohibidas (`Loading`, `Error:`, `Submit`, `Cancel`, `_registro`, `en_gestoria` en literales JSX, imperativos "Elige/Indica/Selecciona") → 0 coincidencias.
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 26 — Notificaciones: estado leído, enlaces y vacío (P2)
 **Objetivo:** la campana lleva al trámite y no acumula ruido.
 **Archivos:** `web/src/features/notificaciones/Campana.tsx`, `consultas.ts`, `formato.ts`.
 **Cambios:** cada notificación es un link al trámite (`/tramites?t=` o `/mis-tramites#t-…` para gestora, con scroll y resaltado de la tarjeta); "Marcar todas como leídas"; contador con `aria-label="3 avisos sin leer"`; popover que no se sale de la pantalla a 320 px (en móvil, hoja inferior con `Dialogo`).
 **Aceptación:** E2E `web/e2e/notificaciones.spec.ts` (clic lleva y resalta; marcar todas deja contador en 0; a 320 px el panel cabe).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 27 — MisTramites: búsqueda y orden útil (P2)
 **Objetivo:** la gestora encuentra un trámite por dominio o cliente.
 **Archivos:** `web/src/pages/MisTramites.tsx`, `web/src/features/gestora/consultas.ts`, `grupos.test.ts`.
 **Cambios:** buscador (dominio/cliente/número, sin tildes ni mayúsculas); dentro de cada grupo, orden por antigüedad (más viejo primero) y marca "hace N días"; los chips de grupo muestran conteo y son `aria-pressed`.
 **Aceptación:** unit `grupos.test.ts` (normalización y orden). E2E `web/e2e/gestora.spec.ts` (buscar "ab123" filtra a una tarjeta).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 28 — Informes y exportaciones verificadas (P2)
 **Objetivo:** los archivos descargados abren bien y coinciden con la pantalla.
 **Archivos:** `web/src/features/informes/exportar.ts`, `web/src/lib/planilla.ts`, `web/src/ui/MenuExportar.tsx`.
 **Cambios:** nombre de archivo con razón social y período (`informe-paris-autos-2026-10.xlsx`); montos como número con formato `$ #,##0.00` (no texto); botón con estado `cargando` mientras genera; error visible si falla.
 **Aceptación:** unit `web/src/lib/planilla.test.ts` (celda de monto es numérica con numFmt). E2E `web/e2e/informes.spec.ts` (descarga, nombre esperado, abrir con exceljs y comparar total con el de pantalla).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 29 — Historial legible y deshacer visible en el panel (P2)
 **Objetivo:** cada cambio y su motivo se entienden sin conocer la base.
 **Archivos:** `web/src/features/tramites/HistorialEventos.tsx`, `PanelDetalle.tsx`.
 **Cambios:** frases humanas ("Valentina pasó de Presentado a Sin presentar · motivo: …"), agrupar por día, iconos por tipo; acción de deshacer del último paso visible arriba del historial cuando existe `RETROCESO[estado]`; quitar marcas documentales (`desmarcar`) desde el panel con motivo.
 **Aceptación:** E2E `web/e2e/deshacer.spec.ts` (quitar marca "retirado" desde oficina con motivo, aparece en historial como frase).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 30 — Panel de detalle en móvil (P1)
 **Objetivo:** el detalle de un trámite se usa con el pulgar.
 **Archivos:** `web/src/features/tramites/PanelDetalle.tsx`, `web/src/pages/Tramites.tsx`.
 **Cambios:** en < md el panel es pantalla completa con encabezado sticky (número, estado, X) y botones de acción en barra inferior fija con safe-area; el foco va al título al abrir y vuelve a la fila al cerrar; botón atrás del navegador cierra el panel (estado en URL `?t=` ya existe: usar `navigate(-1)` al cerrar si se abrió desde la lista).
 **Aceptación:** E2E `web/e2e/responsive.spec.ts` (375 px: abrir trámite, acciones visibles sin scroll, "atrás" cierra el panel y la lista conserva el scroll).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 31 — Doble envío y botones con carga (P0)
 **Objetivo:** ningún botón dispara dos veces la misma RPC.
 **Archivos:** `web/src/ui/Button.tsx`, todos los formularios que usan `onClick` async sin `useMutation` (`FormUsuario.tsx` `DialogoEstadoUsuario` usa `enviando` manual; revisar `FormCarga`, `FormConciliacion`, `DefinirClave`, `Login`).
@@ -232,36 +240,42 @@ Decisión: `Button` ya tenía `cargando` → `disabled` + `aria-busy`. El doble 
 **Cambios:** parámetro opcional `p_clave_idempotencia uuid` en `alta_tramite`, `registrar_carga` y `registrar_pago` (versiones nuevas con default null, `unique` parcial en tabla nueva `idempotencia`); el front genera `crypto.randomUUID()` al abrir el formulario.
 **Aceptación:** DB `tests/db/concurrencia.test.ts` (dos llamadas con la misma clave → un solo registro, la segunda devuelve el mismo id).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 33 — Habitualista: sólo empresas con cuenta, avisos claros (P1)
 **Objetivo:** Doral y Paris Trac no aparecen como "sin fondos" ni ofrecen cargas.
 **Archivos:** `web/src/pages/Habitualista.tsx`, `web/src/features/habitualista/TarjetasSaldo.tsx`, `web/src/features/tramites/PanelDetalle.tsx`.
 **Cambios:** en el detalle de trámites de razones sin Habitualista, ocultar bloques de saldo/compromiso y mostrar "Esta razón social no usa Habitualista"; selector de empresa en Habitualista sólo con cuentas existentes; `?empresa=` inválido → aviso y vuelve a todas.
 **Aceptación:** E2E `web/e2e/habitualista.spec.ts` (Doral no figura; `/habitualista?empresa=<doral>` muestra aviso). DB `tests/db/fondos.test.ts` (trámite de Doral nunca queda `sin_fondos`).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 34 — Login y primer ingreso pulidos (P2)
 **Objetivo:** el primer contacto es impecable.
 **Archivos:** `web/src/pages/Login.tsx`, `web/src/features/acceso/DefinirClave.tsx`.
 **Cambios:** mostrar/ocultar contraseña con botón accesible; `autoComplete="username"/"current-password"/"new-password"`; Caps Lock activado avisado; error de credenciales genérico "Email o contraseña incorrectos"; tras definir la clave, aviso de éxito y entrada directa.
 **Aceptación:** E2E `web/e2e/contrasenas.spec.ts` y `acceso.spec.ts` ampliados (toggle visible, autocompletes correctos).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 35 — Metadatos, favicon, título por pantalla, 404 (P2)
 **Objetivo:** pestañas y accesos directos prolijos.
 **Archivos:** `web/index.html`, `web/public/manifest.webmanifest` (nuevo), `web/src/app/rutas.tsx`, `web/src/app/Layout.tsx`.
 **Cambios:** `document.title` = "Trámites · Gestoría Grupo Paris" por ruta; `lang="es-AR"`; `theme-color` negro; manifest para "agregar a inicio" del celular de la gestora; ruta desconocida muestra "Esta página no existe" con botón al inicio en vez de redirigir en silencio.
 **Aceptación:** E2E `web/e2e/acceso.spec.ts` (título por ruta; `/no-existe` muestra mensaje).
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 36 — Paridad del mock E2E con la base (P1)
 **Objetivo:** que los E2E no aprueben comportamientos que la base rechaza.
 **Archivos:** `web/e2e/mock-supabase.ts`, `tests/db/contrato-mock.test.ts` (nuevo).
 **Cambios:** extraer de `mock-supabase.ts` la tabla de reglas (transiciones, mensajes de error) a `web/e2e/reglas-mock.json`; el test de DB recorre esa tabla contra la base real (embedded postgres) y falla si difieren.
 **Aceptación:** DB `tests/db/contrato-mock.test.ts` verde; romper a propósito una regla del JSON lo hace fallar.
 
+Pendiente: pausado para priorizar rendiciones.
 ## Tarea 37 — CI de calidad local en un comando (P2)
 **Objetivo:** que cada tarea se valide igual.
 **Archivos:** `package.json` (raíz) script `verificar`, `web/package.json` scripts `typecheck`, `lint`.
 **Cambios:** `npm run verificar` = typecheck + unit web + DB + build + E2E (en ese orden, cortando al primer fallo). Sin servicios externos.
 **Aceptación:** correr `npm run verificar` desde la raíz termina en 0.
 
+Pendiente: pausado para priorizar rendiciones.
 ---
 
 ## Orden recomendado
