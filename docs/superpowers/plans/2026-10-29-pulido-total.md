@@ -170,12 +170,14 @@ Decisión: hecho junto con la Tarea 9 (RPC `tramites_intervencion` en la misma m
 **Archivos:** `web/src/features/usuarios/FormUsuario.tsx`, `web/src/features/usuarios/usuarios.ts`, `usuarios.test.ts`.
 **Cambios:** validación en vivo con las mismas reglas de `crear_usuario` (≥10, letras y números) mostrada como checklist; botón "Generar" (contraseña legible sin caracteres ambiguos) y "Copiar" (con aviso); después de crear, pantalla de resumen "Pasale a {nombre}: email + contraseña" con copiar todo, y aviso de que la cambiará al ingresar. Email normalizado a minúsculas y sin espacios.
 **Aceptación:** unit `usuarios.test.ts` (generador cumple la regla 1000 veces; validador igual a la regex de la base). DB `tests/db/usuarios.test.ts` (email con mayúsculas/espacios se guarda normalizado o se rechaza igual que el front). E2E `web/e2e/usuarios-gestion.spec.ts`.
+Decisión: hecho en f4cad91.
 
 ## Tarea 24 — Reset de contraseña por gerencia y desactivar sin perder trámites (P1)
 **Objetivo:** si alguien olvida la clave, gerencia lo resuelve sin pasos técnicos; desactivar una gestora no deja trámites huérfanos.
 **Archivos:** nueva migración `supabase/migrations/20261101000300_reset_clave.sql`, `web/src/features/usuarios/FormUsuario.tsx`, `web/src/pages/Usuarios.tsx`, `web/e2e/mock-supabase.ts`.
 **Cambios:** RPC `restablecer_clave(p_usuario, p_clave)` (sólo gerencia, misma validación que `crear_usuario`, marca `debe_cambiar_clave = true`, evento en historial). Al desactivar una gestora con trámites abiertos, el diálogo lo avisa con el conteo y ofrece elegir gestora destino (usa `reasignar_gestora`).
 **Aceptación:** DB `tests/db/usuarios.test.ts` (gerencia restablece → login con nueva clave → `debe_cambiar_clave`; contable → `SIN_PERMISO`). E2E `web/e2e/usuarios-gestion.spec.ts`.
+Decisión: hecho en f4cad91.
 
 ## Tarea 25 — Copy en castellano rioplatense consistente (P1)
 **Objetivo:** mismo tono y términos en todo.
