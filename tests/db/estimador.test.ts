@@ -113,3 +113,16 @@ test('cambiar un parámetro no altera estimados guardados; solo gerencia edita',
   const e = await calcular('patentamiento_0km', 'San Luis', 100n, null)
   expect(linea(e, 'arancel').importe_cents).toBe('52000000')
 })
+
+test('compara el último estimado con el presupuesto real; la gestora no puede', async () => {
+  const f = await preparar()
+  const comparar = (por: string) => rpc(por, 'comparar_estimado', { p_tramite: f.tramite }).then((r) => r.rows[0])
+  expect(await comparar(f.contable)).toMatchObject({ estimado_cents: null, real_cents: null })
+  await f.estimar(f.contable)
+  await rpc(f.gerencia, 'autorizar_tramite', { p_tramite: f.tramite, p_gestora: f.gestora, p_version: 1 })
+  await rpc(f.gerencia, 'registrar_presupuesto', {
+    p_tramite: f.tramite, p_arancel: 38814517n, p_prenda: 4238452n, p_sellado: 50861429n, p_otros: 1010n, p_motivo: null,
+  })
+  expect(await comparar(f.contable)).toMatchObject({ estimado_cents: 97164398n, real_cents: 93915408n, diferencia_cents: -3248990n })
+  await expect(comparar(f.gestora)).rejects.toThrow(/^SIN_PERMISO:/)
+})

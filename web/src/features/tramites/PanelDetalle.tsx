@@ -14,6 +14,7 @@ import { etiquetaEstado, formatearFecha, formatearFechaHora } from './filtros'
 import { etiquetaMovimiento, indicePaso, pagoEsExcepcion, PASOS, puedeAprobarExcepcion, puedePresupuestar } from './flujo'
 import { FormReintegro } from './FormReintegro'
 import { HistorialEventos, MARCAS } from './HistorialEventos'
+import { EstimadoTramite } from '../analisis/EstimadoTramite'
 
 interface Props {
   id: string
@@ -321,6 +322,12 @@ export function PanelDetalle({ id, catalogos, nombre, onCerrar }: Props) {
               </p>
             )}
           </Seccion>
+
+          {(rol === 'gerencia' || rol === 'contable') && (
+            <Seccion titulo="Costo estimado" extra={<span className="text-[12px] text-tenue">Uso interno</span>}>
+              <EstimadoTramite tramite={t.id} tipo={t.tipo.codigo} />
+            </Seccion>
+          )}
 
           <Seccion titulo="Pagos">
             {t.pagos.length ? (
