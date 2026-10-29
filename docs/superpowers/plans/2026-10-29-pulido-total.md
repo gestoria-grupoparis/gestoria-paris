@@ -94,6 +94,7 @@ Decisión: ya existía la vista "Presupuestos para aprobar"; `?por_aprobar=1` es
 **Archivos:** `web/src/features/tramites/AccionesTramite.tsx`, `PanelDetalle.tsx`.
 **Cambios:** cuando `porAprobar && sinFondos`: botón "Registrar carga" que abre `FormCarga` con la empresa preseleccionada (contable y gerencia) y, si rol gerencia, botón "Aprobar excepción de fondos" (usa `puedeAprobarExcepcion`). Tras la carga, refrescar finanzas y mostrar "Aprobar presupuesto".
 **Aceptación:** E2E `web/e2e/ping-pong.spec.ts`: sin fondos → cargar fondos desde el panel → aparece "Aprobar presupuesto" y aprueba.
+Decisión: "Aprobar excepción de fondos" ya existía en el panel (bloque de finanzas, sólo gerencia); se agregó sólo "Registrar carga" junto al aviso.
 
 ## Tarea 12 — Conflictos de versión con recarga en un toque (P1)
 **Objetivo:** `VERSION_CONFLICTO` no deja al usuario trabado.
