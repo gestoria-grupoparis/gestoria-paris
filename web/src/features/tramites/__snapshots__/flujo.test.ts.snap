@@ -36,7 +36,6 @@ exports[`matriz de acciones > oficina y gestora (snapshot) 1`] = `
   },
   "oficina": {
     "autorizado": [
-      "presentado",
       "suspendido",
       "cancelado",
     ],
@@ -53,19 +52,15 @@ exports[`matriz de acciones > oficina y gestora (snapshot) 1`] = `
     ],
     "devuelto": [
       "cerrado",
-      "finalizado_registro",
       "suspendido",
       "cancelado",
     ],
     "en_gestoria": [
-      "presentado",
       "autorizado",
       "suspendido",
       "cancelado",
     ],
     "finalizado_registro": [
-      "devuelto",
-      "presentado",
       "suspendido",
       "cancelado",
     ],
@@ -75,8 +70,6 @@ exports[`matriz de acciones > oficina y gestora (snapshot) 1`] = `
       "cancelado",
     ],
     "presentado": [
-      "finalizado_registro",
-      "autorizado",
       "suspendido",
       "cancelado",
     ],

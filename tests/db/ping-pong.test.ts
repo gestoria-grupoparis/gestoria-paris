@@ -148,3 +148,27 @@ test('Doral y Paris Trac existen sin Habitualista; San Luis tiene tres ciudades'
   const sl = await sqlAdmin(`select nombre from public.sucursales where provincia = 'San Luis' order by 1`)
   expect(sl.map((r) => r.nombre)).toEqual(['Merlo', 'San Luis Capital', 'Villa Mercedes'])
 })
+
+test('contable no puede marcar presentado/finalizado/devuelto ni deshacerlos', async () => {
+  const f = await preparar()
+  await f.carga(500000n)
+  const t = await f.tramite()
+  await f.presupuestar(t, 100000n)
+  await f.aprobar(f.contable, t, 1)
+  await rpc(f.gestora, 'marcar', { p_tramite: t, p_marca: 'retirado' })
+  await expect(f.estado(f.contable, t, 'presentado', 2)).rejects.toThrow(/^(SIN_PERMISO|TRANSICION_INVALIDA):/)
+  await f.estado(f.gestora, t, 'presentado', 2)
+  const deshacer = (por: string, hacia: string, v: number) =>
+    rpc(por, 'cambiar_estado', { p_tramite: t, p_estado: hacia, p_motivo: 'error de clic', p_version: v })
+  await expect(deshacer(f.contable, 'autorizado', 3)).rejects.toThrow(/^(SIN_PERMISO|TRANSICION_INVALIDA):/)
+  await expect(f.estado(f.gerencia, t, 'finalizado_registro', 3)).rejects.toThrow(/^(SIN_PERMISO|TRANSICION_INVALIDA):/)
+  await f.estado(f.gestora, t, 'finalizado_registro', 3)
+  await expect(deshacer(f.contable, 'presentado', 4)).rejects.toThrow(/^(SIN_PERMISO|TRANSICION_INVALIDA):/)
+  await expect(f.estado(f.contable, t, 'devuelto', 4)).rejects.toThrow(/^(SIN_PERMISO|TRANSICION_INVALIDA):/)
+  await f.estado(f.gestora, t, 'devuelto', 4)
+  await expect(deshacer(f.contable, 'finalizado_registro', 5)).rejects.toThrow(/^(SIN_PERMISO|TRANSICION_INVALIDA):/)
+  // El cierre y la reapertura siguen siendo de la empresa.
+  await f.estado(f.contable, t, 'cerrado', 5)
+  await deshacer(f.contable, 'devuelto', 6)
+  expect(await f.estadoDe(t)).toEqual({ estado: 'devuelto', version: 7 })
+})

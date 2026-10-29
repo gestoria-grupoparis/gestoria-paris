@@ -9,7 +9,7 @@ import { formatearPesos } from '../../lib/dinero'
 import { aprobarPresupuesto, autorizarTramite, cambiarEstado, revocarAprobacion, estadoPrevio, reanudarTramite, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
 import { Dialogo } from './Dialogo'
 import { etiquetaEstado } from './filtros'
-import { AVANCE, RETROCESO, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
+import { AVANCE, RETROCESO, TURNO_GESTORA, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
 import { FormEdicion } from './FormEdicion'
 import { FormCarga } from '../habitualista/FormCarga'
 
@@ -39,6 +39,7 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
   const sinFondos = fin?.situacion === 'sin_fondos'
   const aprobado = antesDePresentar && !!fin?.presupuesto_aprobado
   const retroceso = RETROCESO[e]
+  const turnoGestora = TURNO_GESTORA[e] && (e !== 'autorizado' || aprobado) ? TURNO_GESTORA[e] : null
   const cambio = (hacia: string) => (_: string, motivo: string) => cambiarEstado(tramite.id, hacia, motivo, tramite.version)
 
   const secundarias: ReactNode[] = []
@@ -120,6 +121,11 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
             </div>
           )}
         </div>
+      )}
+      {turnoGestora && (
+        <p role="note" className="rounded-md bg-hundido px-3.5 py-2.5 text-[13px] text-tenue ring-1 ring-linea">
+          Turno de la gestora: {turnoGestora}
+        </p>
       )}
       {(e === 'borrador' || avance) && (
         <div className="flex flex-wrap gap-2">

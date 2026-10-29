@@ -765,6 +765,11 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
         ['finalizado_registro', 'presentado'], ['devuelto', 'finalizado_registro'], ['cerrado', 'devuelto']]
       if (!motivo && retrocesos.some(([d, h]) => d === t.estado && h === a.p_estado))
         return errorNegocio(route, `DATO_INVALIDO: indicá el motivo para volver de ${t.estado} a ${a.p_estado}`)
+      const turnoGestora = [['autorizado', 'presentado'], ['en_gestoria', 'presentado'], ['presentado', 'finalizado_registro'],
+        ['finalizado_registro', 'devuelto'], ['presentado', 'autorizado'], ['presentado', 'en_gestoria'],
+        ['finalizado_registro', 'presentado'], ['devuelto', 'finalizado_registro']]
+      if (rol !== 'gestora' && turnoGestora.some(([d, h]) => d === t.estado && h === a.p_estado))
+        return errorNegocio(route, `SIN_PERMISO: su rol no puede pasar el trámite de ${t.estado} a ${a.p_estado}`)
       if (rol === 'gestora') {
         const permitidas = [['autorizado', 'presentado'], ['en_gestoria', 'presentado'], ['presentado', 'finalizado_registro'], ['finalizado_registro', 'devuelto'],
           ['presentado', 'autorizado'], ['finalizado_registro', 'presentado'], ['devuelto', 'finalizado_registro']]

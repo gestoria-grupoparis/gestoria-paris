@@ -19,23 +19,27 @@ export function indicePaso(estado: string): number {
 
 export const ESTADOS_TERMINALES = ['cerrado', 'cancelado', 'rechazado']
 
-/** Avance normal disponible para la oficina desde cada estado (sin autorizar, que tiene su propio flujo). */
+/**
+ * Avance normal disponible para la oficina desde cada estado (sin autorizar, que tiene su propio
+ * flujo). Ping pong: presentar, finalizar y devolver son turnos de la gestora, no de la oficina.
+ */
 export const AVANCE: Record<string, { hacia: string; etiqueta: string }> = {
   observado: { hacia: 'borrador', etiqueta: 'Volver a borrador' },
-  autorizado: { hacia: 'presentado', etiqueta: 'Marcar presentado' },
-  en_gestoria: { hacia: 'presentado', etiqueta: 'Marcar presentado' },
-  presentado: { hacia: 'finalizado_registro', etiqueta: 'Finalizado en registro' },
-  finalizado_registro: { hacia: 'devuelto', etiqueta: 'Marcar devuelto' },
   devuelto: { hacia: 'cerrado', etiqueta: 'Cerrar trámite' },
 }
 
-/** Un paso atrás para corregir un clic equivocado (con motivo; ver es_retroceso en la base). */
+/** Un paso atrás de la oficina para corregir un clic equivocado (con motivo). */
 export const RETROCESO: Record<string, { hacia: string; etiqueta: string }> = {
   en_gestoria: { hacia: 'autorizado', etiqueta: 'Volver a autorizado' },
-  presentado: { hacia: 'autorizado', etiqueta: 'Volver a sin presentar' },
-  finalizado_registro: { hacia: 'presentado', etiqueta: 'Volver a presentado' },
-  devuelto: { hacia: 'finalizado_registro', etiqueta: 'Volver a finalizado' },
   cerrado: { hacia: 'devuelto', etiqueta: 'Reabrir trámite' },
+}
+
+/** Próximo paso de la gestora mientras el trámite está en su turno (la oficina solo lo ve). */
+export const TURNO_GESTORA: Record<string, string> = {
+  autorizado: 'presentar en el registro',
+  en_gestoria: 'presentar en el registro',
+  presentado: 'marcar finalizado',
+  finalizado_registro: 'devolver la documentación',
 }
 
 export const puedeRechazar = (estado: string) => estado === 'borrador'

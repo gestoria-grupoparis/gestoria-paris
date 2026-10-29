@@ -40,11 +40,11 @@ test('la empresa quita una marca puesta por error y la vuelve a poner', async ({
   expect(mock.rutasPedidas.filter((r) => r.endsWith('/rpc/desmarcar'))).toHaveLength(1)
 })
 
-test('la empresa vuelve un paso atrás un trámite presentado por error', async ({ page }) => {
-  const { detalle } = await panel(page, { operacion: f.operacion, tramite: { ...f.autorizado, estado: 'presentado' }, presupuestos: ['70000000'], aprobado: true })
-  await detalle.getByRole('button', { name: 'Volver a sin presentar' }).click()
-  await confirmarConMotivo(page, 'Volver a sin presentar', 'Confirmar', 'todavía no fue al registro')
-  await expect(detalle.getByTestId('estado')).toHaveText('Autorizado')
+test('contable ve "Turno de la gestora" y no el botón Marcar devuelto', async ({ page }) => {
+  const { detalle } = await panel(page, { operacion: f.operacion, tramite: { ...f.autorizado, estado: 'finalizado_registro' }, presupuestos: ['70000000'], aprobado: true })
+  await expect(detalle.getByRole('note')).toHaveText('Turno de la gestora: devolver la documentación')
+  await expect(detalle.getByRole('button', { name: 'Marcar devuelto' })).toHaveCount(0)
+  await expect(detalle.getByRole('button', { name: 'Volver a presentado' })).toHaveCount(0)
 })
 
 test('la empresa reabre un trámite cerrado por error', async ({ page }) => {

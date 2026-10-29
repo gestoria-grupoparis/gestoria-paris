@@ -22,7 +22,6 @@ const permitida = async (desde: string, hacia: string, rol: string, asignada = f
 const SIN_BOTON_OFICINA: string[] = [
   // en_gestoria es un estado heredado: la UI ya no lo ofrece (autorizado y presentado alcanzan).
   'autorizado->en_gestoria',
-  'presentado->en_gestoria',
 ]
 
 test('toda acción ofrecida a la oficina pasa en la base', async () => {
