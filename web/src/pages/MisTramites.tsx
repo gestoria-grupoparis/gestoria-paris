@@ -204,7 +204,6 @@ export function MisTramites() {
                 key={g.id}
                 type="button"
                 aria-pressed={activo}
-                disabled={!n}
                 onClick={() => setFiltroGrupo(activo ? null : g.id)}
                 className={cx(
                   'flex min-w-[132px] shrink-0 flex-col gap-2 rounded-lg px-4 py-3 text-left ring-1 transition-colors md:min-w-0',
@@ -255,6 +254,13 @@ export function MisTramites() {
               ? 'No tenés trámites pendientes de esta razón social.'
               : 'No tenés trámites pendientes. Cuando te asignen uno, aparece acá.'
           }
+        />
+      )}
+      {consulta.isSuccess && pendientes > 0 && filtroGrupo && grupos.length === 0 && (
+        <EmptyState
+          titulo={`Nada pendiente en ${GRUPOS.find((g) => g.id === filtroGrupo)?.titulo ?? 'esta etapa'}`}
+          descripcion="Cuando tengas trámites en esta etapa van a aparecer acá."
+          accion={<Button variante="secundario" tamano="sm" onClick={() => setFiltroGrupo(null)}>Ver todas las etapas</Button>}
         />
       )}
       <div className="space-y-9 xl:grid xl:grid-cols-3 xl:items-start xl:gap-6 xl:space-y-0">

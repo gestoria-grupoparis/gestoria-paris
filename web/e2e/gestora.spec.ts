@@ -79,6 +79,22 @@ test('gestora ve el resumen cuenta por grupo', async ({ page }) => {
   await expect(page.getByText('Próximo paso:')).toContainText('Presupuesto')
 })
 
+test('tocar una etapa vacía muestra que no hay nada pendiente y se puede volver a ver todas', async ({ page }) => {
+  await montarSupabase(page, [{ operacion: f.operacion, tramite: f.autorizado }], { usuario: GABRIELA })
+  await page.goto('/mis-tramites')
+  const resumen = page.getByRole('navigation', { name: 'Resumen' })
+  const presentados = resumen.getByRole('button', { name: /Presentados/ })
+  await expect(presentados).toBeEnabled()
+  await presentados.click()
+  await expect(presentados).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('heading', { name: 'Nada pendiente en Presentados' })).toBeVisible()
+  await expect(page.getByText('Cuando tengas trámites en esta etapa van a aparecer acá.')).toBeVisible()
+  await expect(page.getByRole('article', { name: /T-2026-00011/ })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Ver todas las etapas' }).click()
+  await expect(presentados).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('article', { name: /T-2026-00011/ })).toBeVisible()
+})
+
 test('gestora sin trámites asignados ve el estado vacío', async ({ page }) => {
   await montarSupabase(page, [], { usuario: GABRIELA })
   await page.goto('/mis-tramites')
