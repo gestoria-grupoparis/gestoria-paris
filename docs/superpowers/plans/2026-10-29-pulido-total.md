@@ -128,6 +128,7 @@ Decisión: trámites, extracto y usuarios ya tenían tarjetas en móvil (`md:hid
 **Archivos:** `web/src/ui/Field.tsx`, `web/src/features/tramites/FormAlta.tsx`, `FormEdicion.tsx`, `web/src/features/gestora/FormPresupuesto.tsx`, `FormPago.tsx`, `web/src/features/habitualista/Form*.tsx`, `web/src/features/usuarios/FormUsuario.tsx`, `web/src/ui/Estados.tsx`.
 **Cambios:** `Field` acepta `error` → `aria-invalid` + `aria-describedby` y texto bajo el campo; validación por campo (no sólo banner general) y foco al primer campo inválido al enviar; `ErrorState` con `role="alert"`; skeletons con `aria-busy` en el contenedor; `Tablero` progress bars con `aria-hidden` ya — agregar texto alternativo en el `Link` ("Presentado: 3 trámites").
 **Aceptación:** unit `web/src/ui/Field.test.tsx`. E2E `web/e2e/a11y.spec.ts` (envío vacío de "Nuevo trámite" enfoca el primer campo y `aria-invalid=true`).
+Decisión: `Field` ya manejaba `error`; se aplicó validación por campo al alta (el formulario más usado), junto con la Tarea 18. El resto de los formularios conserva su banner de error.
 
 ## Tarea 17 — Entrada de montos: teclado, formato y límites (P1)
 **Objetivo:** cargar plata sin errores en móvil y escritorio.
@@ -140,6 +141,7 @@ Decisión: trámites, extracto y usuarios ya tenían tarjetas en móvil (`md:hid
 **Archivos:** `web/src/features/tramites/FormAlta.tsx`, `web/src/features/tramites/consultas.ts`.
 **Cambios:** preseleccionar razón social y sucursal si el usuario tiene una sola en alcance (o la última usada, en `localStorage` con try/catch); dominio en mayúsculas automático con validación de formato AA123BB / ABC123; Enter envía; `autoComplete="off"` en dominio; botón "Guardar y cargar otro".
 **Aceptación:** E2E `web/e2e/tramites.spec.ts`: contable con alcance a una sola sucursal ve los selects ya completos; dominio "ab123cd" se guarda "AB123CD"; dominio inválido muestra error en el campo.
+Decisión: hecho junto con la Tarea 16. Se preselecciona razón social/sucursal si hay una sola o la última usada; sin "Guardar y cargar otro" (al crear se abre el detalle del trámite, que es el flujo actual). El E2E no prueba alcance de una sola sucursal porque el mock no filtra catálogos por alcance.
 
 ## Tarea 19 — Estados vacío/carga/error uniformes en todas las pantallas (P1)
 **Objetivo:** cada lista tiene los tres estados con texto útil y reintento.
