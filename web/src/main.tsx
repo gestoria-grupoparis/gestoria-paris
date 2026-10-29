@@ -6,7 +6,7 @@ import { AVISO_SESION_VENCIDA, crearQueryClient } from './lib/consultas'
 import { supabase } from './lib/supabase'
 import { ProveedorSesion } from './lib/sesion'
 import { Rutas } from './app/rutas'
-import { LimiteError } from './ui'
+import { LimiteError, ProveedorAvisos } from './ui'
 import './index.css'
 
 const queryClient = crearQueryClient(() => {
@@ -23,9 +23,11 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ProveedorSesion>
-          <LimiteError>
-            <Rutas />
-          </LimiteError>
+          <ProveedorAvisos>
+            <LimiteError>
+              <Rutas />
+            </LimiteError>
+          </ProveedorAvisos>
         </ProveedorSesion>
       </BrowserRouter>
     </QueryClientProvider>

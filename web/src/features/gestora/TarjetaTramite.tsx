@@ -1,5 +1,5 @@
 import { formatearPesos } from "../../lib/dinero";
-import { Button, ChipEstado, Patente, cx } from "../../ui";
+import { Button, ChipEstado, ErrorState, Patente, cx } from "../../ui";
 import {
   IconoAlerta,
   IconoAuto,
@@ -81,11 +81,17 @@ export function TarjetaTramite({
   grupo,
   ocupado,
   onAccion,
+  enCurso = null,
+  error = null,
 }: {
   t: TramiteGestora;
   grupo: Grupo;
   ocupado: boolean;
   onAccion: (a: AccionGestora) => void;
+  /** Acción en curso en esta tarjeta (muestra la carga sólo en ese botón). */
+  enCurso?: AccionGestora | null;
+  /** Error de la última acción sobre esta tarjeta. */
+  error?: string | null;
 }) {
   const sinFondos = t.situacion === "sin_fondos";
   const pagado = t.situacion === "pagado";
@@ -213,6 +219,7 @@ export function TarjetaTramite({
             ancho
             icono={<IconoCheck />}
             disabled={ocupado}
+            cargando={enCurso === "retirado"}
             onClick={() => onAccion("retirado")}
           >
             Retiré el legajo
@@ -224,6 +231,7 @@ export function TarjetaTramite({
             ancho
             icono={sinFondos ? <IconoAlerta /> : <IconoFlecha />}
             disabled={ocupado || sinFondos}
+            cargando={enCurso === "presentado"}
             onClick={() => onAccion("presentado")}
           >
             Marcar presentado
@@ -246,6 +254,7 @@ export function TarjetaTramite({
             ancho
             variante="secundario"
             disabled={ocupado}
+            cargando={enCurso === "finalizado"}
             onClick={() => onAccion("finalizado")}
           >
             Marcar finalizado
@@ -257,6 +266,7 @@ export function TarjetaTramite({
             ancho
             icono={<IconoRetorno />}
             disabled={ocupado}
+            cargando={enCurso === "devuelto"}
             onClick={() => onAccion("devuelto")}
           >
             Marcar devuelto
@@ -268,6 +278,7 @@ export function TarjetaTramite({
             Devuelto. La empresa lo revisa y lo cierra.
           </p>
         )}
+        {error && <ErrorState titulo="No se pudo guardar" descripcion={error} />}
         {deshacer && (
           <Button
             variante="fantasma"

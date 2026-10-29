@@ -10,7 +10,7 @@ import { GRUPOS, grupoDe, legajoRetirado, listarMisTramites, listarSaldosGestora
 import { TarjetaTramite, etiquetaDeshacer, type AccionGestora } from '../features/gestora/TarjetaTramite'
 import { FormPresupuesto } from '../features/gestora/FormPresupuesto'
 import { FormPago } from '../features/gestora/FormPago'
-import { Button, Cargando, EmptyState, ErrorState, PageHeader, cx } from '../ui'
+import { Button, Cargando, EmptyState, ErrorState, PageHeader, cx, useAviso } from '../ui'
 import { IconoAlerta, IconoCheck, IconoDoc, IconoFlecha, IconoReloj, IconoRetorno } from '../ui/Iconos'
 import type { Grupo } from '../features/gestora/consultas'
 
@@ -48,6 +48,15 @@ function ejecutar(t: TramiteGestora, a: AccionGestora) {
   return marcar(t.id, 'retirado')
 }
 
+const MOTIVO_INSTANTANEO = 'Deshecho al instante por la gestora'
+const HACIA: Partial<Record<AccionGestora, string>> = { presentado: 'presentado', finalizado: 'finalizado_registro', devuelto: 'devuelto' }
+const TEXTO_HECHO: Partial<Record<AccionGestora, string>> = {
+  retirado: 'Legajo marcado como retirado',
+  presentado: 'Marcado como presentado',
+  finalizado: 'Marcado como finalizado',
+  devuelto: 'Marcado como devuelto',
+}
+
 const esNegativo = (cents: string) => cents.startsWith('-') && !/^-0+$/.test(cents)
 
 // Pantalla de la gestora: la mitad "gestoría" del ping pong con la empresa. Solo lo básico:
@@ -61,14 +70,31 @@ export function MisTramites() {
   const [form, setForm] = useState<Formulario>(null)
   const [empresa, setEmpresa] = useState<string | null>(null)
   const [filtroGrupo, setFiltroGrupo] = useState<Grupo | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ id: string; texto: string } | null>(null)
+  const avisar = useAviso()
   const refrescar = () =>
     Promise.all([qc.invalidateQueries({ queryKey: clave }), qc.invalidateQueries({ queryKey: ['saldos-gestora'] })])
+
+  const deshacerAlInstante = useMutation({
+    mutationFn: (t: TramiteGestora) => deshacer(t, MOTIVO_INSTANTANEO),
+    onError: (e, t) => setError({ id: t.id, texto: mensajeError(e) }),
+    onSettled: refrescar,
+  })
 
   const accion = useMutation({
     mutationFn: ({ t, a }: { t: TramiteGestora; a: AccionGestora }) => ejecutar(t, a),
     onMutate: () => setError(null),
-    onError: (e) => setError(mensajeError(e)),
+    onError: (e, { t }) => setError({ id: t.id, texto: mensajeError(e) }),
+    onSuccess: (_, { t, a }) => {
+      const despues: TramiteGestora =
+        a === 'retirado'
+          ? { ...t, marcas: [...t.marcas, { marca: 'retirado' }] }
+          : { ...t, estado: HACIA[a] ?? t.estado, version: t.version + 1 }
+      avisar({
+        texto: `${TEXTO_HECHO[a] ?? 'Listo'} · ${t.numero}`,
+        accion: { etiqueta: 'Deshacer', onClick: () => deshacerAlInstante.mutate(despues) },
+      })
+    },
     onSettled: refrescar,
   })
 
@@ -211,11 +237,6 @@ export function MisTramites() {
         </div>
       )}
 
-      {error && (
-        <div className="mb-4">
-          <ErrorState titulo="No se pudo guardar" descripcion={error} />
-        </div>
-      )}
       {consulta.isPending && <Cargando filas={4} etiqueta="Cargando tus trámites…" />}
       {consulta.isError && (
         <ErrorState
@@ -256,7 +277,9 @@ export function MisTramites() {
                     key={t.id}
                     t={t}
                     grupo={g.id}
-                    ocupado={accion.isPending}
+                    ocupado={(accion.isPending && accion.variables?.t.id === t.id) || (deshacerAlInstante.isPending && deshacerAlInstante.variables?.id === t.id)}
+                    enCurso={accion.isPending && accion.variables?.t.id === t.id ? accion.variables.a : null}
+                    error={error?.id === t.id ? error.texto : null}
                     onAccion={(a) => alAccionar(t, a)}
                   />
                 ))}
