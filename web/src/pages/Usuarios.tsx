@@ -1,9 +1,19 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useSesion } from '../lib/sesion'
-import { cargarUsuarios, etiquetaRol, filtrarUsuarios, ROLES, type Usuario } from '../features/usuarios/usuarios'
+import {
+  cambiarActivoUsuario,
+  cargarUsuariosYCatalogo,
+  etiquetaRol,
+  filtrarUsuarios,
+  puedeCambiarEstado,
+  puedeGestionar,
+  ROLES,
+  type Usuario,
+} from '../features/usuarios/usuarios'
+import { DialogoEstadoUsuario, FormUsuario } from '../features/usuarios/FormUsuario'
 import { Button, Card, Cargando, Chip, claseControl, cx, DataTable, EmptyState, ErrorState, PageHeader, type TonoChip } from '../ui'
-import { IconoBuscar, IconoEscudo } from '../ui/Iconos'
+import { IconoBuscar, IconoCheck, IconoEscudo, IconoMas } from '../ui/Iconos'
 
 const TONO_ROL: Record<string, TonoChip> = {
   gerencia: 'solido',
@@ -53,15 +63,41 @@ function Estado({ u }: { u: Usuario }) {
 }
 
 export function Usuarios() {
-  const { perfil } = useSesion()
+  const { perfil, rol: miRol } = useSesion()
+  const qc = useQueryClient()
   const [texto, setTexto] = useState('')
   const [rol, setRol] = useState('')
-  const consulta = useQuery({ queryKey: ['usuarios'], queryFn: cargarUsuarios, staleTime: 60_000 })
-  const visibles = useMemo(() => filtrarUsuarios(consulta.data ?? [], texto, rol), [consulta.data, texto, rol])
+  const [editando, setEditando] = useState<Usuario | 'nuevo' | null>(null)
+  const [estadoDe, setEstadoDe] = useState<Usuario | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const consulta = useQuery({ queryKey: ['usuarios', 'gestion'], queryFn: cargarUsuariosYCatalogo, staleTime: 60_000 })
+  const usuarios = consulta.data?.usuarios
+  const visibles = useMemo(() => filtrarUsuarios(usuarios ?? [], texto, rol), [usuarios, texto, rol])
+  const gestiona = miRol === 'admin' || miRol === 'gerencia'
+  const misAlcances = useMemo(() => usuarios?.find((u) => u.id === perfil?.id)?.alcancesCrudos ?? [], [usuarios, perfil?.id])
 
-  const total = consulta.data?.length ?? 0
-  const activos = consulta.data?.filter((u) => u.activo).length ?? 0
-  const porRol = (r: string) => consulta.data?.filter((u) => u.rol === r && u.activo).length ?? 0
+  const total = usuarios?.length ?? 0
+  const activos = usuarios?.filter((u) => u.activo).length ?? 0
+  const porRol = (r: string) => usuarios?.filter((u) => u.rol === r && u.activo).length ?? 0
+  const listo = (mensaje: string) => {
+    setEditando(null)
+    setEstadoDe(null)
+    setAviso(mensaje)
+    void qc.invalidateQueries({ queryKey: ['usuarios'] })
+  }
+  const acciones = (u: Usuario, compacto = false) =>
+    !gestiona || !puedeGestionar(miRol, perfil?.id, u) ? null : (
+      <div className={cx('flex gap-1.5', compacto ? 'flex-wrap' : 'justify-end')}>
+        <Button variante="secundario" tamano={compacto ? "md" : "sm"} aria-label={`Editar a ${u.nombre}`} onClick={() => setEditando(u)}>
+          Editar
+        </Button>
+        {puedeCambiarEstado(miRol, perfil?.id, u) && (
+          <Button variante="fantasma" tamano={compacto ? "md" : "sm"} aria-label={`${u.activo ? 'Desactivar' : 'Reactivar'} a ${u.nombre}`} onClick={() => setEstadoDe(u)}>
+            {u.activo ? 'Desactivar' : 'Reactivar'}
+          </Button>
+        )}
+      </div>
+    )
   const limpiar = () => {
     setTexto('')
     setRol('')
@@ -73,7 +109,25 @@ export function Usuarios() {
         rotulo="Administración"
         titulo="Usuarios y permisos"
         descripcion="Quién entra a la app, con qué rol y sobre qué razones sociales y sucursales trabaja."
+        acciones={
+          gestiona && consulta.data ? (
+            <Button onClick={() => setEditando('nuevo')}>
+              <IconoMas className="size-[18px]" />
+              Invitar usuario
+            </Button>
+          ) : undefined
+        }
       />
+
+      {aviso && (
+        <div role="status" className="mb-5 flex items-center gap-3 rounded-lg bg-disponible-suave px-4 py-3 text-[14px] font-medium text-tinta ring-1 ring-disponible/30">
+          <IconoCheck className="size-5 shrink-0 text-disponible" />
+          <span className="flex-1">{aviso}</span>
+          <button type="button" className="min-h-[44px] px-2 text-[13px] text-tenue hover:text-tinta" onClick={() => setAviso(null)}>
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {consulta.isError ? (
         <ErrorState
@@ -85,7 +139,7 @@ export function Usuarios() {
             </Button>
           }
         />
-      ) : !consulta.data ? (
+      ) : !usuarios ? (
         <Cargando filas={5} etiqueta="Cargando usuarios…" />
       ) : (
         <>
@@ -158,6 +212,11 @@ export function Usuarios() {
                       <th scope="col">Rol</th>
                       <th scope="col">Alcance</th>
                       <th scope="col">Estado</th>
+                      {gestiona && (
+                        <th scope="col">
+                          <span className="sr-only">Acciones</span>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -183,6 +242,7 @@ export function Usuarios() {
                         <td>
                           <Estado u={u} />
                         </td>
+                        {gestiona && <td className="!py-3">{acciones(u)}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -208,6 +268,7 @@ export function Usuarios() {
                         <div className="rotulo mb-1">Alcance</div>
                         <Alcances u={u} />
                       </div>
+                      {gestiona && puedeGestionar(miRol, perfil?.id, u) && <div className="mt-3 border-t border-linea pt-3">{acciones(u, true)}</div>}
                     </Card>
                   </li>
                 ))}
@@ -218,11 +279,41 @@ export function Usuarios() {
           <Card plana className="mt-6 flex items-start gap-3 p-4 md:p-5">
             <IconoEscudo className="mt-0.5 size-6 text-marca" />
             <p className="text-[14px] leading-relaxed text-tenue">
-              <span className="font-semibold text-tinta">Pantalla de consulta.</span> Por ahora las altas, los cambios de rol o de
-              alcance y las bajas se piden a soporte técnico, y quedan registrados en el historial de auditoría.
+              {gestiona ? (
+                <>
+                  <span className="font-semibold text-tinta">Todo queda auditado.</span> Las invitaciones, los cambios de rol o de alcance y
+                  las bajas quedan en el historial con quién los hizo y el motivo. Nadie puede desactivarse ni cambiarse el rol a sí mismo.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-tinta">Pantalla de consulta.</span> Las altas, los cambios de rol o de alcance y las
+                  bajas las hace administración o gerencia, y quedan registrados en el historial de auditoría.
+                </>
+              )}
             </p>
           </Card>
         </>
+      )}
+
+      {editando && consulta.data && (
+        <FormUsuario
+          usuario={editando === 'nuevo' ? null : editando}
+          miRol={miRol}
+          misAlcances={misAlcances}
+          catalogo={consulta.data}
+          onCerrar={() => setEditando(null)}
+          onGuardado={listo}
+        />
+      )}
+      {estadoDe && (
+        <DialogoEstadoUsuario
+          usuario={estadoDe}
+          onCerrar={() => setEstadoDe(null)}
+          onConfirmar={async (motivo) => {
+            await cambiarActivoUsuario(estadoDe.id, !estadoDe.activo, motivo)
+            listo(`${estadoDe.nombre} quedó ${estadoDe.activo ? 'inactivo' : 'activo'}.`)
+          }}
+        />
       )}
     </div>
   )

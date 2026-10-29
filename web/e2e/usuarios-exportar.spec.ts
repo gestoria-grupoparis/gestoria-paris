@@ -27,9 +27,9 @@ test('gerencia consulta usuarios con rol y alcance, y filtra por rol y por texto
   await expect(tabla.getByRole('row', { name: /Gabriela Gestora/ })).toContainText('Solo los trámites que tiene asignados')
   await expect(tabla.getByRole('row', { name: /Gisela Gerente/ })).toContainText('Sin alcance')
 
-  await page.getByRole('button', { name: /Gestora/ }).click()
+  await page.getByRole('button', { name: /^Gestora/ }).click()
   await expect(tabla.getByRole('row')).toHaveCount(3)
-  await page.getByRole('button', { name: /Gestora/ }).click()
+  await page.getByRole('button', { name: /^Gestora/ }).click()
   await page.getByLabel('Buscar usuario').fill('cars')
   await expect(tabla.getByRole('row')).toHaveCount(2)
   await page.getByLabel('Buscar usuario').fill('nadie')

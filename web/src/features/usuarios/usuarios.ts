@@ -24,6 +24,8 @@ export interface AlcanceLegible {
 
 export interface Usuario extends PerfilUsuario {
   alcances: AlcanceLegible[]
+  /** Alcances tal como están en la base (para editarlos). */
+  alcancesCrudos: Alcance[]
   /** true si el rol ve todo sin depender de alcances (gestora ve lo asignado; admin no opera). */
   sinAlcances: boolean
 }
@@ -63,6 +65,7 @@ export function armarUsuarios(perfiles: PerfilUsuario[], alcances: Alcance[], em
     .map((p) => ({
       ...p,
       alcances: alcancesLegibles(alcances.filter((a) => a.perfil_id === p.id), empresas, sucursales),
+      alcancesCrudos: alcances.filter((a) => a.perfil_id === p.id),
       sinAlcances: p.rol === 'gestora' || p.rol === 'admin',
     }))
     .sort((a, b) => Number(b.activo) - Number(a.activo) || (ORDEN_ROL[a.rol] ?? 9) - (ORDEN_ROL[b.rol] ?? 9) || a.nombre.localeCompare(b.nombre, 'es'))
@@ -75,7 +78,16 @@ export function filtrarUsuarios(lista: Usuario[], texto: string, rol: string): U
   )
 }
 
+export interface CatalogoAlcance {
+  empresas: Nombrado[]
+  sucursales: Nombrado[]
+}
+
 export async function cargarUsuarios(): Promise<Usuario[]> {
+  return (await cargarUsuariosYCatalogo()).usuarios
+}
+
+export async function cargarUsuariosYCatalogo(): Promise<{ usuarios: Usuario[] } & CatalogoAlcance> {
   const [p, a, e, s] = await Promise.all([
     supabase.from('perfiles').select('id,nombre,rol,activo').order('nombre'),
     supabase.from('alcances').select('perfil_id,empresa_id,sucursal_id'),
@@ -83,5 +95,98 @@ export async function cargarUsuarios(): Promise<Usuario[]> {
     supabase.from('sucursales').select('id,nombre').order('nombre'),
   ])
   for (const r of [p, a, e, s]) if (r.error) throw r.error
-  return armarUsuarios((p.data ?? []) as PerfilUsuario[], (a.data ?? []) as Alcance[], e.data ?? [], s.data ?? [])
+  const empresas = e.data ?? []
+  const sucursales = s.data ?? []
+  return { usuarios: armarUsuarios((p.data ?? []) as PerfilUsuario[], (a.data ?? []) as Alcance[], empresas, sucursales), empresas, sucursales }
+}
+
+// --- Gestión (admin y gerencia) ---------------------------------------------------------------
+
+/** Alcance elegido por razón social: toda la empresa o una lista de sucursales. */
+export type Seleccion = Record<string, { todas: boolean; sucursales: string[] }>
+
+export function seleccionDesdeAlcances(alcances: Alcance[]): Seleccion {
+  const sel: Seleccion = {}
+  for (const a of alcances) {
+    const g = (sel[a.empresa_id] ??= { todas: false, sucursales: [] })
+    if (a.sucursal_id == null) g.todas = true
+    else g.sucursales.push(a.sucursal_id)
+  }
+  for (const g of Object.values(sel)) if (g.todas) g.sucursales = []
+  return sel
+}
+
+export function alcancesDesdeSeleccion(sel: Seleccion): { empresa_id: string; sucursal_id: string | null }[] {
+  return Object.entries(sel).flatMap(([empresa_id, g]) =>
+    g.todas ? [{ empresa_id, sucursal_id: null as string | null }] : g.sucursales.map((sucursal_id): { empresa_id: string; sucursal_id: string | null } => ({ empresa_id, sucursal_id })),
+  )
+}
+
+/** Roles cuyo acceso depende de las razones sociales asignadas. */
+export const ROLES_CON_ALCANCE: Rol[] = ['gerencia', 'contable', 'comercial']
+
+export interface DatosUsuario {
+  email?: string
+  nombre: string
+  rol: Rol
+  seleccion: Seleccion
+}
+
+export function validarUsuario(d: DatosUsuario, modo: 'alta' | 'edicion'): string | null {
+  if (modo === 'alta' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((d.email ?? '').trim())) return 'Ingresá un email válido.'
+  if (!d.nombre.trim()) return 'Ingresá el nombre y apellido.'
+  if (ROLES_CON_ALCANCE.includes(d.rol) && alcancesDesdeSeleccion(d.seleccion).length === 0)
+    return 'Elegí al menos una razón social (o sucursal) para este rol.'
+  return null
+}
+
+export function rolesAsignables(miRol: Rol | null) {
+  return miRol === 'admin' ? ROLES : miRol === 'gerencia' ? ROLES.filter((r) => r.id !== 'admin') : []
+}
+
+export function puedeGestionar(miRol: Rol | null, _miId: string | undefined, u: Pick<Usuario, 'id' | 'rol'>): boolean {
+  if (miRol === 'admin') return true
+  return miRol === 'gerencia' && u.rol !== 'admin'
+}
+
+export function puedeCambiarEstado(miRol: Rol | null, miId: string | undefined, u: Pick<Usuario, 'id' | 'rol'>): boolean {
+  return u.id !== miId && puedeGestionar(miRol, miId, u)
+}
+
+/** supabase.functions.invoke deja el cuerpo de error en error.context (Response). */
+export async function errorDeFuncion(e: unknown): Promise<Error> {
+  const ctx = e && typeof e === 'object' && 'context' in e ? (e as { context: unknown }).context : null
+  if (ctx instanceof Response) {
+    try {
+      const cuerpo = (await ctx.json()) as { error?: unknown }
+      if (typeof cuerpo.error === 'string') return new Error(cuerpo.error)
+    } catch {
+      /* cuerpo no JSON */
+    }
+  }
+  return e instanceof Error ? e : new Error(String(e))
+}
+
+export async function invitarUsuario(d: DatosUsuario): Promise<string> {
+  const { data, error } = await supabase.functions.invoke<{ id: string }>('invitar-usuario', {
+    body: { email: d.email!.trim().toLowerCase(), nombre: d.nombre.trim(), rol: d.rol, alcances: alcancesDesdeSeleccion(d.seleccion) },
+  })
+  if (error) throw await errorDeFuncion(error)
+  return data!.id
+}
+
+export async function editarUsuario(id: string, d: DatosUsuario, motivo: string): Promise<void> {
+  const { error } = await supabase.rpc('editar_usuario', {
+    p_perfil: id,
+    p_nombre: d.nombre.trim(),
+    p_rol: d.rol,
+    p_alcances: alcancesDesdeSeleccion(d.seleccion),
+    p_motivo: motivo.trim(),
+  })
+  if (error) throw error
+}
+
+export async function cambiarActivoUsuario(id: string, activo: boolean, motivo: string): Promise<void> {
+  const { error } = await supabase.rpc('cambiar_activo_usuario', { p_perfil: id, p_activo: activo, p_motivo: motivo.trim() })
+  if (error) throw error
 }

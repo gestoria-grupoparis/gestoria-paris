@@ -72,6 +72,8 @@ export interface OpcionesMock {
   alcances?: { empresa_id: string; sucursal_id: string | null }[]
   /** Filas de public.alcances de todos los perfiles (pantalla de Usuarios). */
   tablaAlcances?: { perfil_id: string; empresa_id: string; sucursal_id: string | null }[]
+  /** Perfiles adicionales a los de fixtures/catalogos.json (p. ej. un admin). */
+  perfilesExtra?: { id: string; nombre: string; rol: string; activo: boolean }[]
   /**
    * Fuente fija de v_saldos (salida real de la base, p. ej. fixtures/escenario-saldos.json). Recibe el
    * estado y devuelve las filas, o undefined si el estado no tiene salida registrada: en ese caso la
@@ -199,7 +201,12 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   const ahora = catalogos.ahora
   const hoy = ahora.slice(0, 10)
   const yo = opciones.usuario ?? sesion.user.id
-  const rol = nombreDe(catalogos.perfiles, yo)?.rol
+  // Perfiles y alcances mutables: la pantalla de Usuarios los edita por RPC / Edge Function.
+  const perfiles: Fila[] = [...catalogos.perfiles, ...(opciones.perfilesExtra ?? [])].map((p) => ({ ...p }))
+  const tablaAlcances: Fila[] = (opciones.tablaAlcances ?? []).map((a) => ({ ...a }))
+  /** Cuerpos recibidos por la Edge Function invitar-usuario. */
+  const invitaciones: Fila[] = []
+  const rol = perfiles.find((p) => p.id === yo)?.rol as string | undefined
   const sesionActiva = { ...sesion, user: { ...sesion.user, id: yo } }
   const rutasPedidas: string[] = []
   /** URL completa (con select y filtros) de cada pedido, para verificar qué columnas se piden. */
@@ -328,7 +335,34 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   const importe = (x: unknown) => (/^-?\d+$/.test(String(x ?? '')) ? big(x) : null)
   const conMotivo = (a: Fila) => String(a.p_motivo ?? '').trim() !== ''
 
+  const gestionaUsuarios = () => rol === 'admin' || rol === 'gerencia'
+  const reemplazarAlcances = (perfil: string, lista: unknown) => {
+    for (let i = tablaAlcances.length - 1; i >= 0; i--) if (tablaAlcances[i].perfil_id === perfil) tablaAlcances.splice(i, 1)
+    for (const a of (lista ?? []) as Fila[]) tablaAlcances.push({ perfil_id: perfil, empresa_id: a.empresa_id, sucursal_id: a.sucursal_id ?? null })
+  }
   const rpcs: Record<string, (route: Route, a: Fila) => Promise<void>> = {
+    async editar_usuario(route, a) {
+      if (!gestionaUsuarios()) return errorNegocio(route, 'SIN_PERMISO: solo administración o gerencia gestionan usuarios')
+      const p = perfiles.find((x) => x.id === a.p_perfil)
+      if (!p) return errorNegocio(route, 'NO_ENCONTRADO: usuario inexistente')
+      if (rol === 'gerencia' && (p.rol === 'admin' || a.p_rol === 'admin')) return errorNegocio(route, 'SIN_PERMISO: gerencia no gestiona administradores')
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: el motivo del cambio es obligatorio')
+      if (p.id === yo && a.p_rol !== p.rol) return errorNegocio(route, 'DATO_INVALIDO: no podés cambiarte el rol a vos mismo')
+      Object.assign(p, { nombre: String(a.p_nombre).trim(), rol: a.p_rol })
+      reemplazarAlcances(String(p.id), a.p_alcances)
+      registrarEvento({ entidad: 'perfiles', entidad_id: p.id, accion: 'update', motivo: a.p_motivo })
+      await route.fulfill({ status: 204, body: '' })
+    },
+    async cambiar_activo_usuario(route, a) {
+      if (!gestionaUsuarios()) return errorNegocio(route, 'SIN_PERMISO: solo administración o gerencia gestionan usuarios')
+      const p = perfiles.find((x) => x.id === a.p_perfil)
+      if (!p) return errorNegocio(route, 'NO_ENCONTRADO: usuario inexistente')
+      if (p.id === yo) return errorNegocio(route, 'DATO_INVALIDO: no podés desactivarte a vos mismo')
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: el motivo es obligatorio')
+      p.activo = !!a.p_activo
+      registrarEvento({ entidad: 'perfiles', entidad_id: p.id, accion: 'update', motivo: a.p_motivo })
+      await route.fulfill({ status: 204, body: '' })
+    },
     async crear_tramite(route, a) {
       if (!tieneAlcance(a.p_empresa, a.p_sucursal))
         return errorNegocio(route, 'SIN_PERMISO: sin alcance sobre esa razón social y sucursal')
@@ -495,8 +529,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   }
 
   const tablas: Record<string, () => Fila[]> = {
-    perfiles: () => catalogos.perfiles,
-    alcances: () => opciones.tablaAlcances ?? [],
+    perfiles: () => perfiles,
+    alcances: () => tablaAlcances,
     empresas: () => catalogos.empresas,
     sucursales: () => catalogos.sucursales,
     tipos_tramite: () => catalogos.tipos_tramite,
@@ -544,6 +578,20 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     urlsPedidas.push(decodeURIComponent(url.pathname + url.search))
     if (url.pathname.startsWith('/auth/v1/user')) return route.fulfill({ json: sesionActiva.user })
     if (url.pathname.startsWith('/auth/v1/logout')) return route.fulfill({ status: 204, body: '' })
+    if (url.pathname === '/functions/v1/invitar-usuario') {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 200, headers: cors, body: 'ok' })
+      const b = (req.postDataJSON() ?? {}) as Fila
+      invitaciones.push(b)
+      const responder = (status: number, json: Fila) => route.fulfill({ status, headers: cors, json })
+      if (!gestionaUsuarios()) return responder(403, { error: 'SIN_PERMISO: solo administración o gerencia invitan usuarios' })
+      const email = String(b.email ?? '')
+      if (email === 'repetido@grupoparis.com.ar') return responder(409, { error: 'DUPLICADO: ya existe un usuario con ese email' })
+      const id = `00000000-0000-4000-8000-${String(700 + perfiles.length).padStart(12, '0')}`
+      perfiles.push({ id, nombre: String(b.nombre), rol: String(b.rol), activo: true })
+      reemplazarAlcances(id, b.alcances)
+      return responder(200, { id })
+    }
     const rpc = /^\/rest\/v1\/rpc\/(\w+)$/.exec(url.pathname)
     if (rpc) {
       const fn = rpcs[rpc[1]]
@@ -591,5 +639,5 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     }
     return route.fulfill({ json: filas })
   })
-  return { rutasPedidas, urlsPedidas }
+  return { rutasPedidas, urlsPedidas, invitaciones, perfiles, tablaAlcances }
 }
