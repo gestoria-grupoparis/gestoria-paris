@@ -11,3 +11,16 @@ test('si una pantalla falla al dibujar, se ve el aviso y el menú sigue navegand
   await expect(page).toHaveURL(/\/tramites/)
   await expect(page.getByText('Algo salió mal en esta pantalla')).toHaveCount(0)
 })
+
+test('un error de permisos no se reintenta', async ({ page }) => {
+  await montarSupabase(page)
+  let llamadas = 0
+  await page.route('**/rest/v1/v_saldos*', (route) => {
+    llamadas++
+    return route.fulfill({ status: 400, json: { code: 'P0001', message: 'SIN_PERMISO: sin alcance', details: null, hint: null } })
+  })
+  await page.goto('/tablero')
+  await expect.poll(() => llamadas).toBeGreaterThan(0)
+  await page.waitForTimeout(3500)
+  expect(llamadas).toBe(1)
+})
