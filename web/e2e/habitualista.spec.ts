@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from '@playwright/test'
+import ExcelJS from 'exceljs'
 import { crearServidor, montarSupabase, type Servidor } from './mock-supabase'
 import catalogos from './fixtures/catalogos.json' with { type: 'json' }
 import h from './fixtures/habitualista.json' with { type: 'json' }
@@ -144,4 +146,42 @@ test('el extracto se pagina de a 25 y la reversión se liga aunque el original q
   await page.getByRole('button', { name: 'Anteriores' }).click()
   await expect(filaDe(page, '01/10/2026').getByTestId('vinculo')).toHaveText('Revertido el 27/10/2026')
   await expect(page.getByRole('button', { name: 'Anteriores' })).toBeDisabled()
+})
+
+test('exporta el extracto completo (todas las páginas) a XLSX y CSV con la fecha en el nombre', async ({ page }) => {
+  const cuenta = h.movimientos[0].cuenta_id
+  const extra = Array.from({ length: 30 }, (_, i) => ({
+    id: `00000000-0000-4000-8000-000000000${String(100 + i)}`,
+    cuenta_id: cuenta, tipo: 'carga', importe: '100050', fecha_operacion: '2026-10-26',
+    tramite_id: null, revierte_id: null, es_pago_final: false, creado_por: CONTABLE,
+    created_at: `2026-10-26T10:${String(i).padStart(2, '0')}:00.000Z`,
+  }))
+  const servidor = crearServidor(
+    [{ operacion: h.operacion, tramite: h.tramite21, presupuestos: ['70000000'] }],
+    { movimientos: [...h.movimientos, ...extra], conciliaciones: h.conciliaciones },
+  )
+  await abrir(page, servidor, CONTABLE)
+  await expect(page.getByRole('table', { name: 'Movimientos' }).getByRole('row')).toHaveCount(26)
+  const total = h.movimientos.length + extra.length
+
+  await page.getByRole('button', { name: 'Exportar' }).click()
+  const [xlsx] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Excel/ }).click()])
+  expect(xlsx.suggestedFilename()).toBe('extracto-paris-autos-2026-10-28.xlsx')
+  const libro = new ExcelJS.Workbook()
+  await libro.xlsx.readFile((await xlsx.path())!)
+  const hoja = libro.getWorksheet('Extracto')!
+  expect(hoja.rowCount).toBe(total + 1)
+  expect(hoja.getRow(1).values).toEqual([undefined, 'Fecha', 'Movimiento', 'Trámite', 'Cliente', 'Responsable', 'Ingreso', 'Egreso', 'Saldo', 'Conciliado'])
+  // Más reciente primero: la última carga del 26/10 encabeza, con su importe como número.
+  expect(hoja.getCell('A2').value).toBe('26/10/2026')
+  expect(hoja.getCell('F2').value).toBe(1000.5)
+  expect(hoja.getCell('F2').numFmt).toContain('#,##0.00')
+  expect(typeof hoja.getCell('H2').value).toBe('number')
+
+  await page.getByRole('button', { name: 'Exportar' }).click()
+  const [csv] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /CSV/ }).click()])
+  expect(csv.suggestedFilename()).toBe('extracto-paris-autos-2026-10-28.csv')
+  const lineas = (await readFile((await csv.path())!, 'utf8')).replace(/^﻿/, '').trim().split('\r\n')
+  expect(lineas).toHaveLength(total + 1)
+  expect(lineas[1]).toMatch(/^26\/10\/2026;Carga;;;[^;]+;1000,50;;[\d,]+;No$/)
 })

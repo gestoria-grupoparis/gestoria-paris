@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TramiteFila } from './consultas'
-import { centavosADecimal, COLUMNAS_CSV, nombreArchivo, tramitesACsv } from './exportar'
+import { centavosADecimal, COLUMNAS_CSV, columnasTramites, nombreArchivo, tramitesACsv } from './exportar'
 
 const fila = (extra: Partial<TramiteFila> = {}): TramiteFila => ({
   id: 't1', numero: 'T-2026-00001', created_at: '2026-10-20T13:00:00Z', estado: 'autorizado',
@@ -47,5 +47,12 @@ describe('tramitesACsv', () => {
 
   it('nombra el archivo con la fecha', () => {
     expect(nombreArchivo('2026-10-28')).toBe('tramites-2026-10-28.csv')
+    expect(nombreArchivo('2026-10-28', 'xlsx')).toBe('tramites-2026-10-28.xlsx')
+  })
+
+  it('marca presupuesto y pagado como columnas de moneda para el XLSX', () => {
+    const cols = columnasTramites(() => 'G')
+    expect(cols.map((c) => c.titulo)).toEqual(COLUMNAS_CSV)
+    expect(cols.filter((c) => c.moneda).map((c) => c.titulo)).toEqual(['Presupuesto', 'Pagado'])
   })
 })

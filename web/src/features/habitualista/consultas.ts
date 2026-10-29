@@ -124,6 +124,27 @@ export async function listarExtracto(cuenta: string, pagina = 0): Promise<Pagina
   return { filas: ids.map((id) => porId.get(id)).filter((m): m is Movimiento => !!m), hayMas: todos.length > POR_PAGINA }
 }
 
+/** Extracto completo de la cuenta (todas las páginas), más reciente primero, para exportar. */
+export async function listarExtractoCompleto(cuenta: string): Promise<Movimiento[]> {
+  const filas: FilaExtracto[] = []
+  const LOTE = 1000
+  for (let desde = 0; ; desde += LOTE) {
+    const { data, error } = await supabase
+      .from('v_movimientos_extracto')
+      .select(COLUMNAS_EXTRACTO)
+      .eq('cuenta_id', cuenta)
+      .order('fecha_operacion', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('movimiento_id', { ascending: false })
+      .range(desde, desde + LOTE - 1)
+    if (error) throw error
+    const lote = (data ?? []) as unknown as FilaExtracto[]
+    filas.push(...lote)
+    if (lote.length < LOTE) break
+  }
+  return filas.map((f) => ({ ...f, revierte: null, revertidoPor: null }))
+}
+
 /** Movimientos sin conciliar de la cuenta (todas las páginas), para el formulario de conciliación. */
 export async function listarPendientes(cuenta: string): Promise<Movimiento[]> {
   const { data, error } = await supabase

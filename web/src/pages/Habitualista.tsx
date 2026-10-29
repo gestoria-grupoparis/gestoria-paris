@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useSesion } from '../lib/sesion'
 import {
-  listarCompromisos, listarExtracto, listarPendientes, listarSaldos, POR_PAGINA, type Movimiento,
+  listarCompromisos, listarExtracto, listarExtractoCompleto, listarPendientes, listarSaldos, POR_PAGINA, type Movimiento,
 } from '../features/habitualista/consultas'
 import { useFinanzasEnVivo } from '../features/habitualista/enVivo'
 import { FormAjuste } from '../features/habitualista/FormAjuste'
@@ -13,8 +13,11 @@ import { FormReversion } from '../features/habitualista/FormReversion'
 import { TablaCompromisos } from '../features/habitualista/TablaCompromisos'
 import { TablaExtracto } from '../features/habitualista/TablaExtracto'
 import { TarjetasSaldo } from '../features/habitualista/TarjetasSaldo'
+import { COLUMNAS_EXTRACTO_PLANILLA } from '../features/habitualista/exportar'
+import { hoyEnBuenosAires } from '../features/tramites/filtros'
+import { exportarPlanilla } from '../lib/planilla'
 import {
-  Button, Cargando, EmptyState, ErrorState, IconoCheck, IconoChevron, IconoDoc, IconoMas, PageHeader, Skeleton,
+  Button, Cargando, EmptyState, ErrorState, IconoCheck, MenuExportar, IconoChevron, IconoDoc, IconoMas, PageHeader, Skeleton,
   claseControl, cx,
 } from '../ui'
 
@@ -138,6 +141,7 @@ export function Habitualista() {
           <TarjetasSaldo saldo={saldo} />
 
           <section aria-label="Detalle de la cuenta" className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <div role="tablist" aria-label="Vista" className="flex w-fit gap-1 rounded-lg bg-hundido p-1">
               {(['movimientos', 'compromisos'] as const).map((p) => (
                 <button
@@ -154,6 +158,23 @@ export function Habitualista() {
                   {p === 'movimientos' ? 'Movimientos' : 'Compromisos'}
                 </button>
               ))}
+            </div>
+            {pestana === 'movimientos' && (
+              <MenuExportar
+                disabled={!extracto.data?.filas.length}
+                title="Descarga el extracto completo de la cuenta, todas las páginas"
+                onExportar={async (formato) => {
+                  const filas = await qc.fetchQuery({
+                    queryKey: ['habitualista', 'extracto-completo', saldo.cuenta_id],
+                    queryFn: () => listarExtractoCompleto(saldo.cuenta_id),
+                    staleTime: 0,
+                  })
+                  await exportarPlanilla(formato, COLUMNAS_EXTRACTO_PLANILLA, filas, {
+                    prefijo: `extracto-${saldo.empresa}`, hoy: hoyEnBuenosAires(), hoja: 'Extracto',
+                  })
+                }}
+              />
+            )}
             </div>
             {pestana === 'movimientos' ? (
               extracto.isError ? (

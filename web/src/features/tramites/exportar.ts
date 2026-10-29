@@ -1,63 +1,43 @@
 import type { TramiteFila } from './consultas'
 import { etiquetaEstado, SITUACIONES } from './filtros'
+import { planillaACsv, type Columna } from '../../lib/planilla'
 
-/**
- * Centavos (texto) a decimal con coma, para que Excel en es-AR lo lea como número.
- * Es manipulación de texto: nunca se hace aritmética sobre el importe.
- */
-export function centavosADecimal(cents: string | null | undefined): string {
-  if (cents == null || cents === '') return ''
-  const texto = String(cents).trim()
-  if (!/^-?\d+$/.test(texto)) throw new Error(`Importe en centavos inválido: ${texto}`)
-  const negativo = texto.startsWith('-')
-  const digitos = (negativo ? texto.slice(1) : texto).replace(/^0+(?=\d)/, '').padStart(3, '0')
-  const cero = /^0+$/.test(digitos)
-  return `${negativo && !cero ? '-' : ''}${digitos.slice(0, -2)},${digitos.slice(-2)}`
-}
-
-function celda(valor: string): string {
-  // Evita inyección de fórmulas al abrir en Excel y escapa separadores y comillas.
-  const seguro = /^[=+\-@\t\r]/.test(valor) && !/^-?\d+(,\d+)?$/.test(valor) ? `'${valor}` : valor
-  return /[";\n\r]/.test(seguro) ? `"${seguro.replace(/"/g, '""')}"` : seguro
-}
+export { centavosADecimal } from '../../lib/planilla'
 
 const fecha = (iso: string | null) => (iso ? iso.slice(0, 10) : '')
 
-export const COLUMNAS_CSV = [
-  'Número', 'Fecha de alta', 'Estado', 'Tipo', 'Cliente', 'Cuenta personal', 'Oferta', 'Vehículo', 'Dominio',
-  'Razón social', 'Sucursal', 'Provincia', 'Gestora', 'Autorizado', 'Presupuesto', 'Pagado', 'Situación de fondos',
-]
+export function columnasTramites(nombreGestora: (id: string | null) => string): Columna<TramiteFila>[] {
+  return [
+    { titulo: 'Número', valor: (t) => t.numero, ancho: 16 },
+    { titulo: 'Fecha de alta', valor: (t) => fecha(t.created_at), ancho: 14 },
+    { titulo: 'Estado', valor: (t) => etiquetaEstado(t.estado), ancho: 18 },
+    { titulo: 'Tipo', valor: (t) => t.tipo.nombre, ancho: 24 },
+    { titulo: 'Cliente', valor: (t) => t.operacion.cliente_nombre, ancho: 28 },
+    { titulo: 'Cuenta personal', valor: (t) => t.operacion.cuenta_personal },
+    { titulo: 'Oferta', valor: (t) => t.operacion.oferta_ref },
+    { titulo: 'Vehículo', valor: (t) => t.vehiculo_desc, ancho: 28 },
+    { titulo: 'Dominio', valor: (t) => t.dominio ?? '' },
+    { titulo: 'Razón social', valor: (t) => t.operacion.empresa.nombre, ancho: 20 },
+    { titulo: 'Sucursal', valor: (t) => t.operacion.sucursal.nombre, ancho: 18 },
+    { titulo: 'Provincia', valor: (t) => t.operacion.sucursal.provincia },
+    { titulo: 'Gestora', valor: (t) => (t.gestora_id ? nombreGestora(t.gestora_id) : ''), ancho: 20 },
+    { titulo: 'Autorizado', valor: (t) => fecha(t.autorizado_at), ancho: 14 },
+    { titulo: 'Presupuesto', valor: (t) => t.finanzas?.presupuesto, moneda: true, ancho: 16 },
+    { titulo: 'Pagado', valor: (t) => t.finanzas?.pagado, moneda: true, ancho: 16 },
+    {
+      titulo: 'Situación de fondos', ancho: 20,
+      valor: (t) => { const sit = t.finanzas?.situacion; return sit && sit !== 'no_aplica' ? (SITUACIONES[sit] ?? sit) : '' },
+    },
+  ]
+}
+
+export const COLUMNAS_CSV = columnasTramites(() => '').map((c) => c.titulo)
 
 /** CSV con `;` (lo que Excel espera en configuración regional argentina), BOM UTF-8 y fin de línea CRLF. */
 export function tramitesACsv(filas: TramiteFila[], nombreGestora: (id: string | null) => string): string {
-  const lineas = [COLUMNAS_CSV.map(celda).join(';')]
-  for (const t of filas) {
-    const sit = t.finanzas?.situacion
-    lineas.push(
-      [
-        t.numero, fecha(t.created_at), etiquetaEstado(t.estado), t.tipo.nombre, t.operacion.cliente_nombre,
-        t.operacion.cuenta_personal, t.operacion.oferta_ref, t.vehiculo_desc, t.dominio ?? '',
-        t.operacion.empresa.nombre, t.operacion.sucursal.nombre, t.operacion.sucursal.provincia,
-        t.gestora_id ? nombreGestora(t.gestora_id) : '', fecha(t.autorizado_at),
-        centavosADecimal(t.finanzas?.presupuesto), centavosADecimal(t.finanzas?.pagado),
-        sit && sit !== 'no_aplica' ? (SITUACIONES[sit] ?? sit) : '',
-      ].map(celda).join(';'),
-    )
-  }
-  return '\uFEFF' + lineas.join('\r\n') + '\r\n'
+  return planillaACsv(columnasTramites(nombreGestora), filas)
 }
 
-export function nombreArchivo(hoy: string): string {
-  return `tramites-${hoy}.csv`
-}
-
-export function descargarTexto(nombre: string, contenido: string, tipo = 'text/csv;charset=utf-8') {
-  const url = URL.createObjectURL(new Blob([contenido], { type: tipo }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nombre
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+export function nombreArchivo(hoy: string, extension: 'csv' | 'xlsx' = 'csv'): string {
+  return `tramites-${hoy}.${extension}`
 }

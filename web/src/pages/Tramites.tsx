@@ -3,12 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { cargarCatalogos, LIMITE, listarTramites } from '../features/tramites/consultas'
-import { Button, Cargando, EmptyState, ErrorState, PageHeader } from '../ui'
-import { IconoCerrar, IconoCheck, IconoDescarga, IconoMas, IconoUsuario } from '../ui/Iconos'
+import { Button, Cargando, EmptyState, ErrorState, MenuExportar, PageHeader } from '../ui'
+import { IconoCerrar, IconoCheck, IconoMas, IconoUsuario } from '../ui/Iconos'
 import { FormAccion } from '../features/tramites/AccionesTramite'
 import { reasignarGestora } from '../features/tramites/consultas'
 import { alternar, alternarTodas } from '../features/tramites/flujo'
-import { descargarTexto, nombreArchivo, tramitesACsv } from '../features/tramites/exportar'
+import { columnasTramites } from '../features/tramites/exportar'
+import { exportarPlanilla } from '../lib/planilla'
 import { hoyEnBuenosAires } from '../features/tramites/filtros'
 import { filtrosAURL, filtrosDesdeURL, type FiltrosTramites as Filtros } from '../features/tramites/filtros'
 import { FiltrosTramites } from '../features/tramites/FiltrosTramites'
@@ -96,15 +97,13 @@ export function Tramites() {
           }
           acciones={
             <>
-              <Button
-                variante="secundario"
-                icono={<IconoDescarga className="size-[18px]" />}
+              <MenuExportar
                 disabled={!lista.data?.length}
-                title="Descarga los trámites visibles, con los filtros aplicados, para abrir en Excel"
-                onClick={() => lista.data && descargarTexto(nombreArchivo(hoyEnBuenosAires()), tramitesACsv(lista.data, nombre))}
-              >
-                Exportar a Excel
-              </Button>
+                title="Descarga los trámites visibles, con los filtros aplicados"
+                onExportar={(formato) =>
+                  lista.data && exportarPlanilla(formato, columnasTramites(nombre), lista.data, { prefijo: 'tramites', hoy: hoyEnBuenosAires(), hoja: 'Trámites' })
+                }
+              />
               <Button icono={<IconoMas className="size-[18px]" />} disabled={!catalogos.data} onClick={() => setAltaAbierta(true)}>
                 Nuevo trámite
               </Button>

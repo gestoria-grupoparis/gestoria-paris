@@ -317,6 +317,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
         responsable: nombreDe(catalogos.perfiles, m.creado_por)!.nombre,
         ingreso: String(imp > 0n ? imp : 0n), egreso: String(imp < 0n ? -imp : 0n), saldo: String(saldo),
         conciliado: st.conciliaciones.some((k) => (k.movimientos as string[]).includes(String(m.id))),
+        created_at: m.created_at,
       }
     })
   }

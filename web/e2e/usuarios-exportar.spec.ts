@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import ExcelJS from 'exceljs'
 import { expect, test } from '@playwright/test'
 import { montarSupabase } from './mock-supabase'
 import borrador from './fixtures/tramite-borrador.json' with { type: 'json' }
@@ -47,11 +48,41 @@ test('exporta los trámites visibles a un CSV para Excel', async ({ page }) => {
   await montarSupabase(page, [borrador])
   await page.goto('/tramites')
   await expect(page.getByRole('table')).toBeVisible()
-  const [descarga] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar a Excel' }).click()])
+  await page.getByRole('button', { name: 'Exportar' }).click()
+  const [descarga] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /CSV/ }).click()])
   expect(descarga.suggestedFilename()).toMatch(/^tramites-\d{4}-\d{2}-\d{2}\.csv$/)
   const texto = await readFile((await descarga.path())!, 'utf8')
   const lineas = texto.replace(/^\uFEFF/, '').trim().split('\r\n')
   expect(lineas[0]).toMatch(/^Número;Fecha de alta;Estado/)
   expect(lineas).toHaveLength(2)
   expect(lineas[1]).toContain(borrador.tramite.numero)
+})
+
+test('exporta los trámites filtrados a XLSX con montos numéricos', async ({ page }) => {
+  await montarSupabase(page, [borrador])
+  await page.goto('/tramites')
+  await expect(page.getByRole('table')).toBeVisible()
+  const menu = page.getByRole('button', { name: 'Exportar' })
+  await menu.click()
+  await expect(page.getByRole('menu', { name: 'Formato de exportación' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await expect(menu).toBeFocused()
+
+  await menu.click()
+  const [descarga] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Excel/ }).click()])
+  expect(descarga.suggestedFilename()).toMatch(/^tramites-\d{4}-\d{2}-\d{2}\.xlsx$/)
+  const libro = new ExcelJS.Workbook()
+  await libro.xlsx.readFile((await descarga.path())!)
+  const hoja = libro.getWorksheet('Trámites')!
+  expect(hoja.getCell('A1').value).toBe('Número')
+  expect(hoja.rowCount).toBe(2)
+  expect(hoja.getCell('A2').value).toBe(borrador.tramite.numero)
+})
+
+test('con filtros que no dejan trámites, Exportar queda deshabilitado', async ({ page }) => {
+  await montarSupabase(page, [borrador])
+  await page.goto('/tramites?q=no-existe-nada')
+  await expect(page.getByText(/Ningún trámite|Probá con otra búsqueda/).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Exportar' })).toBeDisabled()
 })
