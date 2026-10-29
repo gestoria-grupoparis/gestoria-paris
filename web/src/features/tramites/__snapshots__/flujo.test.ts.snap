@@ -1,0 +1,90 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`matriz de acciones > oficina y gestora (snapshot) 1`] = `
+{
+  "gestora": {
+    "aprobacion": [],
+    "aprobacion+retirado": [],
+    "devolver": [
+      "devuelto",
+      "presentado",
+    ],
+    "devolver+retirado": [
+      "devuelto",
+      "presentado",
+    ],
+    "devueltos": [
+      "finalizado_registro",
+    ],
+    "devueltos+retirado": [
+      "finalizado_registro",
+    ],
+    "listos": [],
+    "listos+retirado": [
+      "presentado",
+    ],
+    "presentados": [
+      "finalizado_registro",
+      "autorizado",
+    ],
+    "presentados+retirado": [
+      "finalizado_registro",
+      "autorizado",
+    ],
+    "presupuestar": [],
+    "presupuestar+retirado": [],
+  },
+  "oficina": {
+    "autorizado": [
+      "presentado",
+      "suspendido",
+      "cancelado",
+    ],
+    "borrador": [
+      "autorizado",
+      "observado",
+      "rechazado",
+      "suspendido",
+      "cancelado",
+    ],
+    "cancelado": [],
+    "cerrado": [
+      "devuelto",
+    ],
+    "devuelto": [
+      "cerrado",
+      "finalizado_registro",
+      "suspendido",
+      "cancelado",
+    ],
+    "en_gestoria": [
+      "presentado",
+      "autorizado",
+      "suspendido",
+      "cancelado",
+    ],
+    "finalizado_registro": [
+      "devuelto",
+      "presentado",
+      "suspendido",
+      "cancelado",
+    ],
+    "observado": [
+      "borrador",
+      "suspendido",
+      "cancelado",
+    ],
+    "presentado": [
+      "finalizado_registro",
+      "autorizado",
+      "suspendido",
+      "cancelado",
+    ],
+    "rechazado": [],
+    "suspendido": [
+      "previo",
+      "cancelado",
+    ],
+  },
+}
+`;

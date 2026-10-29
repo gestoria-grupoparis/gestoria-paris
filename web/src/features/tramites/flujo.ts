@@ -42,6 +42,47 @@ export const puedeRechazar = (estado: string) => estado === 'borrador'
 export const puedeSuspender = (estado: string) => !ESTADOS_TERMINALES.includes(estado) && estado !== 'suspendido'
 export const puedeCancelar = (estado: string) => !ESTADOS_TERMINALES.includes(estado)
 
+/** Todos los estados del trámite (mismo check de la tabla tramites). */
+export const TODOS_LOS_ESTADOS = [
+  'borrador', 'observado', 'autorizado', 'en_gestoria', 'presentado', 'finalizado_registro',
+  'devuelto', 'cerrado', 'suspendido', 'cancelado', 'rechazado',
+] as const
+
+/**
+ * Destinos que la oficina (gerencia/contable) tiene como botón desde cada estado.
+ * 'autorizado' desde borrador va por autorizar_tramite; 'previo' es reanudar_tramite.
+ */
+export function accionesOficina(estado: string): string[] {
+  const r: string[] = []
+  if (estado === 'borrador') r.push('autorizado', 'observado')
+  if (AVANCE[estado]) r.push(AVANCE[estado].hacia)
+  if (RETROCESO[estado]) r.push(RETROCESO[estado].hacia)
+  if (puedeRechazar(estado)) r.push('rechazado')
+  if (puedeSuspender(estado)) r.push('suspendido')
+  if (estado === 'suspendido') r.push('previo')
+  if (puedeCancelar(estado)) r.push('cancelado')
+  return [...new Set(r)]
+}
+
+/** Estados que caen en cada grupo de la gestora (ver grupoDe en features/gestora/consultas). */
+export const ESTADOS_POR_GRUPO: Record<string, string[]> = {
+  presupuestar: ['autorizado', 'en_gestoria', 'presentado'],
+  aprobacion: ['autorizado', 'en_gestoria'],
+  listos: ['autorizado', 'en_gestoria'],
+  presentados: ['presentado'],
+  devolver: ['finalizado_registro'],
+  devueltos: ['devuelto'],
+}
+
+/** Cambios de estado que la tarjeta de la gestora ofrece (avance y deshacer) en cada grupo. */
+export function accionesGestora(grupo: string, retirado: boolean): string[] {
+  if (grupo === 'listos') return retirado ? ['presentado'] : []
+  if (grupo === 'presentados') return ['finalizado_registro', 'autorizado']
+  if (grupo === 'devolver') return ['devuelto', 'presentado']
+  if (grupo === 'devueltos') return ['finalizado_registro']
+  return []
+}
+
 /** Estado al que vuelve un trámite suspendido: el "antes" de la última suspensión (eventos más nuevos primero). */
 export function estadoPrevioSuspension(eventos: Evento[]): string | null {
   const e = eventos.find((x) => x.entidad === 'tramites' && x.estado_despues === 'suspendido' && x.estado_antes !== 'suspendido')

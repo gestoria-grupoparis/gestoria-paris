@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Evento } from './consultas'
-import { AVANCE, estadoPrevioSuspension, indicePaso, puedeCancelar, puedeRechazar, puedeSuspender } from './flujo'
+import { AVANCE, ESTADOS_POR_GRUPO, TODOS_LOS_ESTADOS, accionesGestora, accionesOficina, estadoPrevioSuspension, indicePaso, puedeCancelar, puedeRechazar, puedeSuspender } from './flujo'
 
 const ev = (id: number, antes: string, despues: string): Evento => ({
   id, at: '2026-10-28T13:00:00Z', actor_id: null, entidad: 'tramites', accion: 'update',
@@ -78,5 +78,15 @@ describe('selección de filas para reasignar en lote', () => {
     expect([...s].sort()).toEqual(['a', 'b', 'c'])
     s = alternarTodas(s, ['a', 'b', 'c'])
     expect(s.size).toBe(0)
+  })
+})
+
+describe('matriz de acciones', () => {
+  it('oficina y gestora (snapshot)', () => {
+    const oficina = Object.fromEntries(TODOS_LOS_ESTADOS.map((e) => [e, accionesOficina(e)]))
+    const gestora = Object.fromEntries(
+      Object.keys(ESTADOS_POR_GRUPO).flatMap((g) => [[`${g}`, accionesGestora(g, false)], [`${g}+retirado`, accionesGestora(g, true)]]),
+    )
+    expect({ oficina, gestora }).toMatchSnapshot()
   })
 })
