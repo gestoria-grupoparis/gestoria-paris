@@ -134,7 +134,7 @@ test('escenario integral: tres usuarios y los cuatro tríos de saldos de Paris A
   // 0. Alcances: la gerencia de San Juan no puede dar de alta en San Luis, y ni ella ni la contable
   // de San Luis ven el saldo de la cuenta compartida (v_saldos exige alcance sobre toda la empresa).
   const ajeno = await completarAlta(gerencia.page, 'Casa central (San Luis)', 'OF-X', 'ZZ999ZZ')
-  await expect(ajeno.getByRole('alert')).toHaveText('No tenés permiso para realizar esta acción.')
+  await expect(ajeno.getByRole('alert')).toHaveText('Sin alcance sobre esa razón social y sucursal.')
   expect(servidor.st.tramites).toEqual([])
   for (const u of [contable, gerencia]) {
     await u.page.goto('/habitualista')
