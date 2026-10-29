@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useNavigate } from 'react-router'
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSesion, type Rol } from '../lib/sesion'
@@ -43,12 +43,22 @@ function IconoSalir({ className = 'size-5' }: { className?: string }) {
   )
 }
 
+function IconoLlave({ className = 'size-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="15" r="4" /><path d="m11 12 8-8M16 7l2.5 2.5M14 9l2 2" />
+    </svg>
+  )
+}
+
 export function Layout() {
   const { perfil, rol } = useSesion()
   const items = navegacionPorRol(rol)
   const [cuenta, setCuenta] = useState(false)
   const rolTexto = rol ? ROL_ETIQUETA[rol] : ''
   const salir = () => void supabase.auth.signOut()
+  const navegar = useNavigate()
+  const cambiarClave = () => { setCuenta(false); navegar('/cambiar-clave') }
 
   useEffect(() => {
     if (!cuenta) return
@@ -95,7 +105,15 @@ export function Layout() {
           </div>
           <button
             type="button"
-            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 ring-1 ring-white/[0.12] hover:bg-white/[0.05] hover:text-white"
+            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 hover:bg-white/[0.05] hover:text-white"
+            onClick={cambiarClave}
+          >
+            <IconoLlave className="size-4" />
+            Cambiar contraseña
+          </button>
+          <button
+            type="button"
+            className="mt-1.5 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium text-white/70 ring-1 ring-white/[0.12] hover:bg-white/[0.05] hover:text-white"
             onClick={salir}
           >
             <IconoSalir className="size-4" />
@@ -145,6 +163,9 @@ export function Layout() {
               </div>
             </div>
             <div className="mt-6 flex flex-col gap-2.5">
+              <Button variante="secundario" tamano="lg" ancho icono={<IconoLlave />} onClick={cambiarClave}>
+                Cambiar contraseña
+              </Button>
               <Button variante="secundario" tamano="lg" ancho icono={<IconoSalir />} onClick={salir}>
                 Cerrar sesión
               </Button>

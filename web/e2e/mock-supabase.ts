@@ -80,6 +80,10 @@ export interface OpcionesMock {
    * consulta responde 500 y el test falla en lugar de mostrar un saldo calculado por el mock.
    */
   saldosFijos?: (st: Estado) => Fila[] | undefined
+  /** Arranca sin sesión guardada (pantalla de ingreso, link de recuperación vencido). */
+  sinSesion?: boolean
+  /** Contraseña vigente del usuario: la acepta POST /auth/v1/token y la rechaza PUT /auth/v1/user como same_password. */
+  claveActual?: string
 }
 
 class SaldoSinFixture extends Error {}
@@ -206,6 +210,10 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   const tablaAlcances: Fila[] = (opciones.tablaAlcances ?? []).map((a) => ({ ...a }))
   /** Cuerpos recibidos por la Edge Function invitar-usuario. */
   const invitaciones: Fila[] = []
+  /** Pedidos a /auth/v1/recover (email + redirect_to) y cuerpos de PUT /auth/v1/user. */
+  const recuperaciones: Fila[] = []
+  const cambiosClave: Fila[] = []
+  let claveActual = opciones.claveActual ?? 'ClaveVigente-2026'
   const rol = perfiles.find((p) => p.id === yo)?.rol as string | undefined
   const sesionActiva = { ...sesion, user: { ...sesion.user, id: yo } }
   const rutasPedidas: string[] = []
@@ -548,7 +556,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     eventos: () => st.eventos,
   }
 
-  await page.addInitScript(
+  if (!opciones.sinSesion) await page.addInitScript(
     ([clave, valor]) => window.localStorage.setItem(clave, valor),
     [CLAVE_SESION, JSON.stringify(sesionActiva)] as const,
   )
@@ -576,6 +584,24 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     const url = new URL(req.url())
     rutasPedidas.push(url.pathname)
     urlsPedidas.push(decodeURIComponent(url.pathname + url.search))
+    if (url.pathname === '/auth/v1/recover') {
+      recuperaciones.push({ ...((req.postDataJSON() ?? {}) as Fila), redirect_to: url.searchParams.get('redirect_to') })
+      return route.fulfill({ json: {} })
+    }
+    if (url.pathname === '/auth/v1/token' && url.searchParams.get('grant_type') === 'password') {
+      const b = (req.postDataJSON() ?? {}) as Fila
+      if (b.password !== claveActual)
+        return route.fulfill({ status: 400, json: { code: 'invalid_credentials', error_code: 'invalid_credentials', msg: 'Invalid login credentials' } })
+      return route.fulfill({ json: sesionActiva })
+    }
+    if (url.pathname.startsWith('/auth/v1/user') && req.method() === 'PUT') {
+      const b = (req.postDataJSON() ?? {}) as Fila
+      if (b.password === claveActual)
+        return route.fulfill({ status: 422, json: { code: 'same_password', error_code: 'same_password', msg: 'New password should be different from the old password.' } })
+      cambiosClave.push(b)
+      if (typeof b.password === 'string') claveActual = b.password
+      return route.fulfill({ json: sesionActiva.user })
+    }
     if (url.pathname.startsWith('/auth/v1/user')) return route.fulfill({ json: sesionActiva.user })
     if (url.pathname.startsWith('/auth/v1/logout')) return route.fulfill({ status: 204, body: '' })
     if (url.pathname === '/functions/v1/invitar-usuario') {
@@ -639,5 +665,5 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     }
     return route.fulfill({ json: filas })
   })
-  return { rutasPedidas, urlsPedidas, invitaciones, perfiles, tablaAlcances }
+  return { rutasPedidas, urlsPedidas, invitaciones, perfiles, tablaAlcances, recuperaciones, cambiosClave }
 }

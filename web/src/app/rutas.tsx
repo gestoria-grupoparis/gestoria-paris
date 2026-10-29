@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { useSesion } from '../lib/sesion'
 import { Login } from '../pages/Login'
 import { Layout } from './Layout'
@@ -11,6 +11,39 @@ import { Habitualista } from '../pages/Habitualista'
 import { Tablero } from '../pages/Tablero'
 import { Usuarios } from '../pages/Usuarios'
 import { Button, PaginaPendiente, PantallaCarga, PantallaMensaje } from '../ui'
+import { DefinirClave } from '../features/acceso/DefinirClave'
+import { errorEnUrl } from '../lib/clave'
+
+/**
+ * Error que Supabase Auth dejó en la URL del link de invitación/recuperación. Se lee al cargar el
+ * módulo, antes de que supabase-js procese y limpie la URL.
+ */
+const ERROR_LINK = typeof window === 'undefined' ? null : errorEnUrl(window.location.hash || window.location.search)
+
+const icoLink = (
+  <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1M4 4l16 16" />
+  </svg>
+)
+
+/** /definir-clave sin sesión: el link venció, ya se usó o se abrió en otro navegador. */
+function LinkInvalido() {
+  const navegar = useNavigate()
+  return (
+    <PantallaMensaje
+      tono="error"
+      icono={icoLink}
+      titulo={ERROR_LINK === 'vencido' ? 'El link venció' : 'El link no es válido'}
+      descripcion="Los links para definir la contraseña duran una hora y sirven una sola vez. Pedí uno nuevo con tu email y abrilo desde este mismo navegador."
+      acciones={
+        <>
+          <Button ancho onClick={() => navegar('/', { replace: true, state: { recuperar: true } })}>Pedir un link nuevo</Button>
+          <Button ancho variante="secundario" onClick={() => navegar('/', { replace: true })}>Ir al ingreso</Button>
+        </>
+      }
+    />
+  )
+}
 
 const PANTALLAS: Record<string, ComponentType> = {
   '/tramites': Tramites,
@@ -33,8 +66,15 @@ export function Rutas() {
   const sesion = useSesion()
   const { rol } = sesion
   const pantalla = pantallaPara(sesion)
+  const { pathname, state } = useLocation()
+  const navegar = useNavigate()
   if (pantalla === 'cargando') return <PantallaCarga />
-  if (pantalla === 'login') return <Login />
+  if (pathname === '/definir-clave') {
+    if (!sesion.conSesion) return <LinkInvalido />
+    if (pantalla === 'app' || pantalla === 'error_perfil')
+      return <DefinirClave modo="definir" alTerminar={() => navegar('/', { replace: true })} />
+  }
+  if (pantalla === 'login') return <Login modoInicial={(state as { recuperar?: boolean } | null)?.recuperar ? 'recuperar' : 'ingresar'} />
   if (pantalla === 'login_inactivo')
     return <Login aviso="Usuario inactivo. Pedile a gerencia que lo reactive." />
   if (pantalla === 'error_perfil')
@@ -56,6 +96,7 @@ export function Rutas() {
   const inicio = items[0]?.ruta
   return (
     <Routes>
+      <Route path="/cambiar-clave" element={<DefinirClave modo="cambiar" alTerminar={() => navegar(-1)} />} />
       <Route element={<Layout />}>
         {items.map((i) => (
           <Route key={i.ruta} path={i.ruta} element={elementoDe(i.ruta, i.etiqueta)} />

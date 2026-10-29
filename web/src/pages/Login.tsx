@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { supabase } from '../lib/supabase'
 import { mensajeErrorLogin, type MensajeLogin } from '../lib/erroresAuth'
+import { mensajeErrorClave } from '../lib/clave'
 import { Button, Field, Input, LogoGrupoParis, MarqueeMarcas, Monograma } from '../ui'
 
 /**
@@ -35,7 +36,9 @@ function useParallax(capas: { ref: RefObject<HTMLElement | null>; factor: number
   }, [])
 }
 
-export function Login({ aviso }: { aviso?: string } = {}) {
+export function Login({ aviso, modoInicial = 'ingresar' }: { aviso?: string; modoInicial?: 'ingresar' | 'recuperar' } = {}) {
+  const [modo, setModo] = useState(modoInicial)
+  const [enviado, setEnviado] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [ver, setVer] = useState(false)
@@ -59,7 +62,52 @@ export function Login({ aviso }: { aviso?: string } = {}) {
     }
   }
 
-  const alerta = error ?? (aviso ? { titulo: aviso, detalle: '' } : null)
+  async function recuperar(e: FormEvent) {
+    e.preventDefault()
+    setEnviando(true)
+    setError(null)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/definir-clave`,
+      })
+      // No revelamos si el email existe: solo frenamos ante límite de envíos o falta de conexión.
+      const m = error ? mensajeErrorClave(error) : null
+      if (m && /Demasiados|conectarnos/.test(m.titulo)) setError(m)
+      else setEnviado(true)
+    } catch (err) {
+      setError(mensajeErrorClave({ message: err instanceof Error ? err.message : 'network' }))
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  function irA(m: 'ingresar' | 'recuperar') {
+    setModo(m)
+    setError(null)
+    setEnviado(false)
+    setPassword('')
+  }
+
+  const alerta = error ?? (aviso && modo === 'ingresar' ? { titulo: aviso, detalle: '' } : null)
+  const cajaAlerta = alerta && (
+    <div role="alert" className="mt-5 flex gap-3 rounded-md bg-sinfondos-suave px-4 py-3 text-sinfondos ring-1 ring-sinfondos/25">
+      <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 size-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5h.01" />
+      </svg>
+      <div className="text-sm leading-snug">
+        <p className="font-semibold">{alerta.titulo}</p>
+        {alerta.detalle && <p className="mt-0.5 text-tinta/75">{alerta.detalle}</p>}
+      </div>
+    </div>
+  )
+  const campoEmail = (
+    <Field label="Email" id="email" ayuda="El de tu trabajo, por ejemplo nombre@grupoparis.com.ar">
+      {(a) => (
+        <Input {...a} type="email" autoComplete="username" inputMode="email" required value={email}
+          onChange={(e) => setEmail(e.target.value)} />
+      )}
+    </Field>
+  )
 
   return (
     <div className="tema-oscuro relative isolate flex min-h-dvh flex-col overflow-hidden bg-noche text-tinta">
@@ -74,57 +122,85 @@ export function Login({ aviso }: { aviso?: string } = {}) {
       </header>
 
       <main className="flex flex-1 items-center justify-center px-4 py-12">
+        {modo === 'recuperar' ? (
+          <form onSubmit={recuperar} className="w-full max-w-[380px]">
+            <p className="rotulo-marca mb-4 text-white/60">Acceso</p>
+            <h1 className="font-marca text-[22px] leading-[1.25] font-normal tracking-[0.02em] text-white md:text-[26px]">Recuperá tu contraseña</h1>
+            {enviado ? (
+              <>
+                <div role="status" className="mt-6 flex gap-3 rounded-md bg-disponible/10 px-4 py-3.5 ring-1 ring-disponible/25">
+                  <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 size-5 shrink-0 text-disponible" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3.5 6.5h17v11h-17zM4 7l8 6 8-6" />
+                  </svg>
+                  <div className="text-sm leading-snug">
+                    <p className="font-semibold text-tinta">Revisá tu correo.</p>
+                    <p className="mt-0.5 text-tinta/75">Si el email está registrado, en unos minutos te llega un link para definir una contraseña nueva. Mirá también en spam. El link vence en una hora.</p>
+                  </div>
+                </div>
+                <Button type="button" variante="secundario" tamano="lg" ancho className="mt-7" onClick={() => irA('ingresar')}>
+                  Volver al ingreso
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 mb-9 text-[14px] leading-relaxed text-tenue">Escribí tu email y te mandamos un link para elegir una contraseña nueva.</p>
+                {campoEmail}
+                {cajaAlerta}
+                <Button type="submit" tamano="lg" ancho cargando={enviando} className="mt-7">
+                  {enviando ? 'Enviando…' : 'Enviar link'}
+                </Button>
+                <Button type="button" variante="fantasma" tamano="lg" ancho className="mt-2.5" onClick={() => irA('ingresar')}>
+                  Volver al ingreso
+                </Button>
+              </>
+            )}
+          </form>
+        ) : (
         <form onSubmit={ingresar} className="w-full max-w-[380px]">
           <p className="rotulo-marca mb-4 text-white/60">Acceso</p>
           <h1 className="font-marca text-[22px] leading-[1.25] font-normal tracking-[0.02em] text-white md:text-[26px]">Ingresá a tu cuenta</h1>
-          <p className="mt-3 mb-9 text-[14px] leading-relaxed text-tenue">Usá el email y la contraseña que te dio gerencia.</p>
+          <p className="mt-3 mb-9 text-[14px] leading-relaxed text-tenue">Usá el email y la contraseña que definiste con el link de invitación.</p>
 
           <div className="flex flex-col gap-5">
-            <Field label="Email" id="email" ayuda="El de tu trabajo, por ejemplo nombre@grupoparis.com.ar">
-              {(a) => (
-                <Input {...a} type="email" autoComplete="username" inputMode="email" required value={email}
-                  onChange={(e) => setEmail(e.target.value)} />
-              )}
-            </Field>
-            <Field
-              label="Contraseña"
-              id="password"
-              extra={
-                <button type="button" onClick={() => setVer((v) => !v)} aria-pressed={ver}
-                  aria-label={ver ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  className="-my-3 min-h-11 min-w-11 rounded px-2 py-3 text-[13px] font-medium text-tenue hover:text-tinta">
-                  {ver ? 'Ocultar' : 'Mostrar'}
+            {campoEmail}
+            <div>
+              <Field
+                label="Contraseña"
+                id="password"
+                extra={
+                  <button type="button" onClick={() => setVer((v) => !v)} aria-pressed={ver}
+                    aria-label={ver ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    className="-my-3 min-h-11 min-w-11 rounded px-2 py-3 text-[13px] font-medium text-tenue hover:text-tinta">
+                    {ver ? 'Ocultar' : 'Mostrar'}
+                  </button>
+                }
+              >
+                {(a) => (
+                  <Input {...a} type={ver ? 'text' : 'password'} autoComplete="current-password" required
+                    value={password} onChange={(e) => setPassword(e.target.value)} />
+                )}
+              </Field>
+              <div className="mt-1 flex justify-end">
+                <button type="button" onClick={() => irA('recuperar')}
+                  className="-mr-2 min-h-11 rounded px-2 text-[13px] font-medium text-tenue underline-offset-4 hover:text-tinta hover:underline">
+                  ¿Olvidaste tu contraseña?
                 </button>
-              }
-            >
-              {(a) => (
-                <Input {...a} type={ver ? 'text' : 'password'} autoComplete="current-password" required
-                  value={password} onChange={(e) => setPassword(e.target.value)} />
-              )}
-            </Field>
-          </div>
-
-          {alerta && (
-            <div role="alert" className="mt-5 flex gap-3 rounded-md bg-sinfondos-suave px-4 py-3 text-sinfondos ring-1 ring-sinfondos/25">
-              <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 size-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5h.01" />
-              </svg>
-              <div className="text-sm leading-snug">
-                <p className="font-semibold">{alerta.titulo}</p>
-                {alerta.detalle && <p className="mt-0.5 text-tinta/75">{alerta.detalle}</p>}
               </div>
             </div>
-          )}
+          </div>
 
-          <Button type="submit" tamano="lg" ancho cargando={enviando} className="mt-7">
+          {cajaAlerta}
+
+          <Button type="submit" tamano="lg" ancho cargando={enviando} className="mt-5">
             {enviando ? 'Ingresando…' : 'Ingresar'}
           </Button>
 
           <div className="mt-8 border-t border-linea pt-6 text-[13px] leading-relaxed text-tenue">
-            <p className="font-medium text-tinta">¿Olvidaste la contraseña o no tenés usuario?</p>
-            <p>Pedíselo a gerencia: las cuentas se crean y se restablecen desde la administración de usuarios. No hay registro abierto.</p>
+            <p className="font-medium text-tinta">¿No tenés usuario?</p>
+            <p>Pedíselo a gerencia: las cuentas se crean desde la administración de usuarios. No hay registro abierto.</p>
           </div>
         </form>
+        )}
       </main>
 
       <footer className="pb-8 md:pb-10">
