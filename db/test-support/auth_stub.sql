@@ -66,3 +66,22 @@ $$;
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
+
+-- Esquema storage minimo (Supabase Storage), solo para poder crear el bucket y sus politicas en pruebas.
+create schema if not exists storage;
+create table if not exists storage.buckets (
+  id text primary key,
+  name text not null,
+  public boolean not null default false
+);
+create table if not exists storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets (id),
+  name text,
+  owner uuid
+);
+create or replace function storage.foldername(name text) returns text[]
+language sql immutable
+as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon, authenticated, service_role;
