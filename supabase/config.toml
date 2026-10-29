@@ -415,8 +415,9 @@ enabled = true
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
-# Alta de usuarios por invitación (admin/gerencia). El JWT se verifica en el gateway y de nuevo
-# adentro (rol vía perfiles con mi_rol()).
+# Alta de usuarios por invitación (admin/gerencia). El control del gateway no acepta los JWT
+# ES256 de las llaves de firma nuevas, así que el JWT se verifica adentro: auth.getUser() contra
+# Auth y rol vía perfiles con mi_rol() (autorizado por el usuario el 2026-10-29).
 [functions.invitar-usuario]
 enabled = true
-verify_jwt = true
+verify_jwt = false
