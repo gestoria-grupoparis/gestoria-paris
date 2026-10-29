@@ -1105,6 +1105,184 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     },
   }
 
+  // --- Análisis y estimador (módulo interno: gerencia y contable con alcance) -----------------
+  const interno = () => rol === 'gerencia' || rol === 'contable'
+  const estimados: Fila[] = []
+  const parametros: Fila[] = [
+    { id: nuevoId(), clave: 'mrpa_pesos', vehiculo: null, provincia: null, valor: null, vigencia_desde: '2026-09-01', vigencia_hasta: null, fuente: 'A CONFIRMAR: valor en pesos no publicado', verificado: false },
+    { id: nuevoId(), clave: 'inscripcion_pct', vehiculo: null, provincia: null, valor: '1', vigencia_desde: '2026-09-01', vigencia_hasta: null, fuente: 'DNRPA Anexo I/II 1A (Res. MJ 412/2026)', verificado: true },
+    { id: nuevoId(), clave: 'sellos_prenda_pct', vehiculo: null, provincia: 'San Luis', valor: '1.2', vigencia_desde: '2026-01-01', vigencia_hasta: null, fuente: 'Ley VIII-254/2025', verificado: true },
+    { id: nuevoId(), clave: 'honorarios', vehiculo: null, provincia: null, valor: '3250000', vigencia_desde: '2026-09-01', vigencia_hasta: null, fuente: 'Planilla de rendiciones de la gestora', verificado: true },
+  ]
+  const redondeo = (num: bigint, den: bigint) => (num * 2n + den) / (2n * den)
+  const semanaDe = (f: string) => {
+    const d = new Date(`${f.slice(0, 10)}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+    return d.toISOString().slice(0, 10)
+  }
+  const sumarDias = (f: string, n: number) => new Date(Date.parse(`${f}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+  const pagosVisibles = () => st.movimientos.filter((m) => {
+    const t = m.tramite_id ? tramite(m.tramite_id) : undefined
+    return !!t && tieneAlcance(t.empresa_id, null)
+  })
+
+  rpcs.analisis_gastos = async (route, a) => {
+    if (!interno()) return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable ven el analisis')
+    const desde = String(a.p_desde), hasta = String(a.p_hasta)
+    if (hasta < desde) return errorNegocio(route, 'DATO_INVALIDO: el periodo no es valido')
+    const tipoDe = (t: Fila) => nombreDe(catalogos.tipos_tramite, t.tipo_id)!
+    const movs = pagosVisibles().filter((m) => {
+      const t = tramite(m.tramite_id)!
+      return (!a.p_empresa || t.empresa_id === a.p_empresa) && (!a.p_sucursal || t.sucursal_id === a.p_sucursal) &&
+        (!a.p_tipo || tipoDe(t).codigo === a.p_tipo)
+    })
+    const dias = (Date.parse(hasta) - Date.parse(desde)) / 86_400_000 + 1
+    const antDesde = sumarDias(desde, -dias)
+    const gasto = (m: Fila) => -big(m.importe)
+    const act = movs.filter((m) => String(m.fecha_operacion) >= desde && String(m.fecha_operacion) <= hasta)
+    const total = act.reduce((s, m) => s + gasto(m), 0n)
+    const anterior = movs.filter((m) => String(m.fecha_operacion) >= antDesde && String(m.fecha_operacion) < desde).reduce((s, m) => s + gasto(m), 0n)
+    const semanal = dias > 31
+    const serie: Fila[] = []
+    for (let f = semanal ? semanaDe(desde) : desde; f <= hasta; f = sumarDias(f, semanal ? 7 : 1)) {
+      const fin = sumarDias(f, semanal ? 7 : 1)
+      serie.push({ fecha: f, gasto_cents: String(act.filter((m) => String(m.fecha_operacion) >= f && String(m.fecha_operacion) < fin).reduce((s, m) => s + gasto(m), 0n)) })
+    }
+    const fechaAlta = (t: Fila) => String(t.created_at ?? ahora).slice(0, 10)
+    const creados = st.tramites.filter((t) => tieneAlcance(t.empresa_id, null) && fechaAlta(t) >= desde && fechaAlta(t) <= hasta)
+    const semanas: Fila[] = []
+    for (let f = semanaDe(desde); f <= hasta; f = sumarDias(f, 7))
+      semanas.push({ semana: f, tramites: creados.filter((t) => semanaDe(fechaAlta(t)) === f).length })
+    const agrupar = (clave: (m: Fila) => string) => {
+      const mapa = new Map<string, bigint>()
+      for (const m of act) mapa.set(clave(m), (mapa.get(clave(m)) ?? 0n) + gasto(m))
+      return [...mapa].filter(([, c]) => c !== 0n).map(([etiqueta, c]) => ({ etiqueta, cents: String(c) }))
+    }
+    const concepto = (k: string) => act.reduce((s, m) => s + (m[k] == null ? 0n : big(m[k])), 0n)
+    const otros = act.filter((m) => m.arancel == null).reduce((s, m) => s + gasto(m), 0n) + concepto('otros')
+    const pendiente = st.tramites.filter((t) => tieneAlcance(t.empresa_id, null) && !st.presupuestos.some((p) => p.tramite_id === t.id))
+      .reduce((s, t) => {
+        const e = estimados.filter((x) => x.tramite_id === t.id).at(-1)
+        return s + (e ? big(e.total) : 0n)
+      }, 0n)
+    const cuenta = (codigo: string) => creados.filter((t) => tipoDe(t).codigo === codigo).length
+    await route.fulfill({ json: {
+      granularidad: semanal ? 'semana' : 'dia',
+      kpis: {
+        gasto_cents: String(total), gasto_anterior_cents: String(anterior),
+        variacion_pct: anterior > 0n ? Number((total - anterior) * 1000n / anterior) / 10 : null,
+        estimado_pendiente_cents: String(pendiente), honorarios_cents: '0',
+        tramites: { patentamiento_0km: cuenta('patentamiento_0km'), transferencia_usado: cuenta('transferencia_usado'), transferencia_parte_pago: cuenta('transferencia_parte_pago') },
+      },
+      serie, semanas,
+      por_tipo: agrupar((m) => String(tipoDe(tramite(m.tramite_id)!).nombre)),
+      por_empresa: agrupar((m) => String(nombreDe(catalogos.empresas, tramite(m.tramite_id)!.empresa_id)!.nombre)),
+      por_concepto: [
+        { etiqueta: 'arancel', cents: String(concepto('arancel')) },
+        { etiqueta: 'sellos', cents: String(concepto('sellado')) },
+        { etiqueta: 'prenda', cents: String(concepto('prenda')) },
+        { etiqueta: 'otros', cents: String(otros) },
+      ].filter((c) => c.cents !== '0'),
+    } })
+  }
+
+  rpcs.prevision_fondos = async (route, a) => {
+    if (!interno()) return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable ven la prevision')
+    const sem0 = semanaDe(String(a.p_hoy))
+    const movs = pagosVisibles().filter((m) => String(m.fecha_operacion) < sem0 && (!a.p_empresa || tramite(m.tramite_id)!.empresa_id === a.p_empresa))
+    const primera = movs.map((m) => semanaDe(String(m.fecha_operacion))).sort()[0]
+    const historia = primera ? Math.min(13, (Date.parse(sem0) - Date.parse(primera)) / (7 * 86_400_000)) : 0
+    const suficiente = historia >= 4
+    const gastoSemana = (f: string) => movs.filter((m) => semanaDe(String(m.fecha_operacion)) === f).reduce((s, m) => s - big(m.importe), 0n)
+    const ultimas = [1, 2, 3, 4].map((i) => gastoSemana(sumarDias(sem0, -7 * i)))
+    const base = suficiente ? redondeo(ultimas.reduce((s, x) => s + x, 0n), 4n) : null
+    const alto = suficiente ? ultimas.reduce((m, x) => (x > m ? x : m), 0n) : null
+    const enCurso = st.tramites.filter((t) => tieneAlcance(t.empresa_id, null) && (!a.p_empresa || t.empresa_id === a.p_empresa) &&
+      ESTADOS_EN_CURSO.includes(String(t.estado)) && finanzas(t).situacion !== 'pagado')
+    const pipe = enCurso.map((t) => {
+      const f = finanzas(t)
+      const e = estimados.filter((x) => x.tramite_id === t.id).at(-1)
+      const monto = f.presupuesto != null ? big(f.presupuesto) - big(f.pagado) : e ? big(e.total) - big(f.pagado) : null
+      return { semana: f.presupuesto != null ? sem0 : sumarDias(sem0, 7), monto: monto == null ? null : monto > 0n ? monto : 0n }
+    })
+    const semanas = [0, 1, 2, 3].map((i) => {
+      const s = sumarDias(sem0, 7 * i)
+      const pipeline = pipe.filter((p) => p.semana === s && p.monto != null).reduce((x, p) => x + p.monto!, 0n)
+      const previsto = base != null && base > pipeline ? base : pipeline
+      return { semana: s, pipeline_cents: String(pipeline), base_cents: base == null ? null : String(base), misma_semana_cents: null, alto_cents: alto == null ? null : String(alto), previsto_cents: String(previsto) }
+    })
+    const acumulado = (n: number) => semanas.slice(0, n).reduce((x, s) => x + big(s.previsto_cents), 0n)
+    const saldosFilas = saldos().filter((s) => tieneAlcance(s.empresa_id, null) && (!a.p_empresa || s.empresa_id === a.p_empresa)).map((s) => ({
+      empresa_id: s.empresa_id, empresa: s.empresa, registrado_cents: String(s.registrado), disponible_cents: String(s.disponible),
+      previsto_1_cents: String(acumulado(1)), previsto_2_cents: String(acumulado(2)), previsto_4_cents: String(acumulado(4)),
+      alerta: big(s.registrado) < acumulado(4),
+    }))
+    await route.fulfill({ json: { semanas_historia: historia, suficiente, sin_monto: pipe.filter((p) => p.monto == null).length, semanas, saldos: saldosFilas } })
+  }
+
+  rpcs.estimar_tramite = async (route, a) => {
+    if (!interno()) return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable estiman costos')
+    const t = tramite(a.p_tramite)
+    if (!t || !tieneAlcance(t.empresa_id, null)) return errorNegocio(route, 'NO_ENCONTRADO: tramite inexistente')
+    const tipo = nombreDe(catalogos.tipos_tramite, t.tipo_id)!.codigo
+    const provincia = String(a.p_provincia ?? nombreDe(catalogos.sucursales, t.sucursal_id)!.provincia)
+    const valor = a.p_valor == null || String(a.p_valor) === '0' ? null : big(a.p_valor)
+    const prenda = a.p_prenda == null ? 0n : big(a.p_prenda)
+    const lineas: Fila[] = []
+    let total = 0n
+    const linea = (concepto: string, base: bigint | null, regla: string, imp: bigint | null, fuente: string, verificado: boolean) => {
+      lineas.push({ concepto, base_cents: base == null ? null : String(base), regla, importe_cents: imp == null ? null : String(imp), fuente, verificado })
+      if (imp != null) total += imp
+    }
+    const sinDato = 'sin dato: se completa con lo que informe la gestora'
+    if (valor == null) linea('arancel', null, 'falta el valor de referencia', null, 'sin dato', false)
+    else if (tipo !== 'patentamiento_0km' && a.p_destino === 'habitualista_08') linea('arancel', valor, 'a favor del habitualista (Solicitud Tipo 08): arancel 0', 0n, 'DNRPA Anexo I cat. 7', true)
+    else {
+      const imp = tipo !== 'patentamiento_0km' && a.p_destino === 'reventa_90' ? redondeo(valor * 90n, 10000n) : redondeo(valor, 100n)
+      linea('arancel', valor, '1 % del valor (minimo sin dato: MRPA a confirmar)', imp, 'DNRPA Anexo I/II (Res. MJ 412/2026)', false)
+    }
+    if (prenda > 0n) {
+      linea('prenda', prenda, '1 por mil del monto (minimo sin dato: MRPA a confirmar)', redondeo(prenda, 1000n), 'DNRPA Anexo I/II 3A', false)
+      if (provincia === 'San Luis') {
+        const s = redondeo(prenda * 12n, 1000n)
+        linea('sellos_prenda', prenda, '1,2 % del monto, minimo $780', s > 78000n ? s : 78000n, 'Ley VIII-254/2025', true)
+      } else linea('sellos_prenda', prenda, 'sin regla verificada para ' + provincia, null, sinDato, false)
+    }
+    linea('sellos_acto', valor, 'sin regla verificada', null, sinDato, false)
+    linea('honorarios', null, 'monto fijo por tramite', 3250000n, 'Planilla de rendiciones de la gestora', true)
+    const id = nuevoId()
+    estimados.push({
+      id, tramite_id: t.id, version: estimados.filter((e) => e.tramite_id === t.id).length + 1,
+      entrada: { valor_cents: valor == null ? null : String(valor), prenda_cents: String(prenda), vehiculo: a.p_vehiculo ?? 'auto', destino: a.p_destino ?? 'cliente', provincia },
+      lineas, total: String(total), confianza: valor == null ? 'sin_valor' : 'parcial', created_at: ahora,
+    })
+    await route.fulfill({ json: id })
+  }
+
+  rpcs.guardar_parametro_estimador = async (route, a) => {
+    if (rol !== 'gerencia') return errorNegocio(route, 'SIN_PERMISO: solo gerencia actualiza los parametros del estimador')
+    if (!textoONull(a.p_fuente)) return errorNegocio(route, 'DATO_INVALIDO: indica la fuente del parametro')
+    for (const p of parametros)
+      if (p.clave === a.p_clave && p.vehiculo === (a.p_vehiculo ?? null) && p.provincia === (a.p_provincia ?? null) && !p.vigencia_hasta)
+        p.vigencia_hasta = sumarDias(String(a.p_vigencia_desde), -1)
+    const id = nuevoId()
+    parametros.push({ id, clave: a.p_clave, vehiculo: a.p_vehiculo ?? null, provincia: a.p_provincia ?? null, valor: a.p_valor == null ? null : String(a.p_valor), vigencia_desde: a.p_vigencia_desde, vigencia_hasta: null, fuente: String(a.p_fuente).trim(), verificado: !!a.p_verificado })
+    await route.fulfill({ json: id })
+  }
+
+  rpcs.comparar_estimado = async (route, a) => {
+    if (!interno()) return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable comparan estimados')
+    const t = tramite(a.p_tramite)
+    if (!t || !tieneAlcance(t.empresa_id, null)) return errorNegocio(route, 'NO_ENCONTRADO: tramite inexistente')
+    const e = estimados.filter((x) => x.tramite_id === t.id).at(-1)
+    const p = st.presupuestos.filter((x) => x.tramite_id === t.id).at(-1)
+    const dif = e && p ? big(p.total) - big(e.total) : null
+    await route.fulfill({ json: [{
+      estimado: e ? String(e.total) : null, real: p ? String(p.total) : null, diferencia: dif == null ? null : String(dif),
+      diferencia_pct: dif == null || big(e!.total) === 0n ? null : String(Number(dif * 1000n / big(e!.total)) / 10),
+    }] })
+  }
+
   Object.assign(rpcs, rpcsRendiciones())
 
   rpcs.marcar_notificaciones_leidas = async (route, a) => {
@@ -1139,6 +1317,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     v_movimientos_extracto: extracto,
     eventos: () => st.eventos,
     rendiciones: () => st.rendiciones.filter(veRendicion),
+    estimados: () => (interno() ? estimados.filter((e) => { const t = tramite(e.tramite_id); return !!t && tieneAlcance(t.empresa_id, null) }) : []),
+    parametros_estimador: () => (interno() ? parametros : []),
     rendicion_filas: () => st.rendicionFilas.filter((f) => veRendicion(rendicion(f.rendicion_id))),
     comprobantes: () => st.comprobantes.filter((c) => veRendicion(rendicion(c.rendicion_id))),
     comprobante_lineas: () => st.comprobanteLineas.filter((l) =>

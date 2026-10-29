@@ -27,7 +27,7 @@ async function sinDesborde(page: Page, ruta: string) {
 }
 
 const RUTAS: { usuario?: string; rutas: string[] }[] = [
-  { rutas: ['/tablero', '/tramites', '/habitualista'] },
+  { rutas: ['/tablero', '/tramites', '/habitualista', '/analisis'] },
   { usuario: GABRIELA, rutas: ['/mis-tramites'] },
 ]
 
