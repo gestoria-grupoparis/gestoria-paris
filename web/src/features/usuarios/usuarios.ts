@@ -167,12 +167,32 @@ export async function errorDeFuncion(e: unknown): Promise<Error> {
   return e instanceof Error ? e : new Error(String(e))
 }
 
-export async function invitarUsuario(d: DatosUsuario): Promise<string> {
-  const { data, error } = await supabase.functions.invoke<{ id: string }>('invitar-usuario', {
-    body: { email: d.email!.trim().toLowerCase(), nombre: d.nombre.trim(), rol: d.rol, alcances: alcancesDesdeSeleccion(d.seleccion) },
+/** Contraseña inicial legible (sin 0/O ni 1/l), 12 caracteres con letras y números. */
+export function generarClaveInicial(): string {
+  const letras = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
+  const numeros = '23456789'
+  const r = crypto.getRandomValues(new Uint32Array(12))
+  const parte = (alfabeto: string, desde: number, n: number) =>
+    Array.from(r.slice(desde, desde + n), (x) => alfabeto[x % alfabeto.length]).join('')
+  return `${parte(letras, 0, 4)}-${parte(numeros, 4, 4)}-${parte(letras, 8, 4)}`
+}
+
+/**
+ * Alta directa en la base (gerencia/admin): cuenta con contraseña inicial que la persona cambia
+ * en su primer ingreso. Con mandarEmail, además le llega un mail para elegir la suya.
+ */
+export async function crearUsuario(d: DatosUsuario, clave: string, mandarEmail: boolean): Promise<{ id: string; emailEnviado: boolean }> {
+  const email = d.email!.trim().toLowerCase()
+  const { data, error } = await supabase.rpc('crear_usuario', {
+    p_email: email, p_nombre: d.nombre.trim(), p_rol: d.rol, p_alcances: alcancesDesdeSeleccion(d.seleccion), p_clave: clave,
   })
-  if (error) throw await errorDeFuncion(error)
-  return data!.id
+  if (error) throw error
+  let emailEnviado = false
+  if (mandarEmail) {
+    const r = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/definir-clave` })
+    emailEnviado = !r.error
+  }
+  return { id: String(data), emailEnviado }
 }
 
 export async function editarUsuario(id: string, d: DatosUsuario, motivo: string): Promise<void> {

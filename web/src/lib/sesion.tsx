@@ -9,6 +9,8 @@ export interface Perfil {
   nombre: string
   rol: Rol
   activo: boolean
+  /** Alta con contraseña inicial: en el primer ingreso tiene que elegir la suya. */
+  debe_cambiar_clave?: boolean
 }
 export interface EstadoSesion {
   perfil: Perfil | null
@@ -53,7 +55,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     setDatos((d) => ({ ...d, cargando: true, error: null }))
     supabase
       .from('perfiles')
-      .select('id,nombre,rol,activo')
+      .select('id,nombre,rol,activo,debe_cambiar_clave')
       .eq('id', userId)
       .maybeSingle()
       .then(

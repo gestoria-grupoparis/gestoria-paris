@@ -76,6 +76,9 @@ export function Rutas() {
     if (pantalla === 'app' || pantalla === 'error_perfil')
       return <DefinirClave modo="definir" alTerminar={() => navegar('/', { replace: true })} />
   }
+  // Alta con contraseña inicial: antes de usar la app elige la suya.
+  if (pantalla === 'app' && sesion.perfil?.debe_cambiar_clave)
+    return <DefinirClave modo="definir" alTerminar={() => { sesion.reintentar(); navegar('/', { replace: true }) }} />
   if (pantalla === 'login') return <Login modoInicial={(state as { recuperar?: boolean } | null)?.recuperar ? 'recuperar' : 'ingresar'} />
   if (pantalla === 'login_inactivo')
     return <Login aviso="Usuario inactivo. Pedile a gerencia que lo reactive." />

@@ -55,6 +55,8 @@ export function DefinirClave({ modo, alTerminar }: { modo: 'definir' | 'cambiar'
       }
       const { error } = await supabase.auth.updateUser({ password: nueva })
       if (error) return setError(mensajeErrorClave(error))
+      // Si entró con contraseña inicial, ya no se le vuelve a pedir el cambio.
+      await supabase.rpc('clave_cambiada')
       setHecho(true)
     } catch (err) {
       setError(mensajeErrorClave({ message: err instanceof Error ? err.message : 'network' }))

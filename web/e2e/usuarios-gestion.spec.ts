@@ -8,40 +8,42 @@ const E1 = '00000000-0000-4000-8000-0000000000e1'
 const E2 = '00000000-0000-4000-8000-0000000000e2'
 const ADMIN_PERFIL = { id: ADMIN, nombre: 'Ana Administración', rol: 'admin', activo: true }
 
-test('admin invita un usuario con rol y alcance, y aparece en la lista', async ({ page }) => {
+test('admin crea un usuario con rol, alcance y contraseña inicial, y aparece en la lista', async ({ page }) => {
   const mock = await montarSupabase(page, [], { usuario: ADMIN, perfilesExtra: [ADMIN_PERFIL] })
   await page.goto('/usuarios')
   await expect(page.getByRole('link', { name: 'Usuarios' })).toBeVisible()
-  await page.getByRole('button', { name: 'Invitar usuario' }).click()
-  const dialogo = page.getByRole('dialog', { name: 'Invitar usuario' })
+  await page.getByRole('button', { name: 'Nuevo usuario' }).click()
+  const dialogo = page.getByRole('dialog', { name: 'Nuevo usuario' })
   await dialogo.getByLabel('Email').fill('nora')
   await dialogo.getByLabel('Nombre y apellido').fill('Nora Nueva')
-  await dialogo.getByRole('button', { name: 'Enviar invitación' }).click()
+  await dialogo.getByRole('button', { name: 'Crear usuario' }).click()
   await expect(dialogo.getByRole('alert')).toContainText('email válido')
 
   await dialogo.getByLabel('Email').fill('Nora@GrupoParis.com.ar')
-  await dialogo.getByRole('button', { name: 'Enviar invitación' }).click()
+  await dialogo.getByRole('button', { name: 'Crear usuario' }).click()
   await expect(dialogo.getByRole('alert')).toContainText('razón social')
 
   await dialogo.getByRole('checkbox', { name: 'Paris Cars' }).check()
   await dialogo.getByRole('radio', { name: 'Elegir sucursales' }).click()
   await dialogo.getByText('Rivadavia').click()
-  await dialogo.getByRole('button', { name: 'Enviar invitación' }).click()
-  await expect(page.getByRole('status')).toContainText('Invitación enviada a nora@grupoparis.com.ar')
+  await dialogo.getByRole('button', { name: 'Crear usuario' }).click()
+  await expect(page.getByRole('status')).toContainText('Usuario creado. Entra con nora@grupoparis.com.ar y la contraseña')
   expect(mock.invitaciones).toHaveLength(1)
+  expect(String(mock.invitaciones[0].clave)).toMatch(/^[A-Za-z]{4}-[2-9]{4}-[A-Za-z]{4}$/)
+  expect(mock.recuperaciones).toHaveLength(0)
   expect(mock.invitaciones[0]).toMatchObject({ email: 'nora@grupoparis.com.ar', nombre: 'Nora Nueva', rol: 'contable', alcances: [{ empresa_id: E2 }] })
   await expect(page.getByRole('table', { name: 'Usuarios' }).getByRole('row', { name: /Nora Nueva/ })).toContainText('Paris Cars · Rivadavia')
 })
 
-test('invitar un email existente muestra el error sin cerrar', async ({ page }) => {
+test('crear un email existente muestra el error sin cerrar', async ({ page }) => {
   await montarSupabase(page, [], { usuario: ADMIN, perfilesExtra: [ADMIN_PERFIL] })
   await page.goto('/usuarios')
-  await page.getByRole('button', { name: 'Invitar usuario' }).click()
+  await page.getByRole('button', { name: 'Nuevo usuario' }).click()
   const dialogo = page.getByRole('dialog')
   await dialogo.getByLabel('Email').fill('repetido@grupoparis.com.ar')
   await dialogo.getByLabel('Nombre y apellido').fill('Repetido')
   await dialogo.getByRole('radio', { name: /Gestora/ }).check()
-  await dialogo.getByRole('button', { name: 'Enviar invitación' }).click()
+  await dialogo.getByRole('button', { name: 'Crear usuario' }).click()
   await expect(dialogo.getByRole('alert')).toHaveText('Ya existe un usuario con ese email.')
 })
 

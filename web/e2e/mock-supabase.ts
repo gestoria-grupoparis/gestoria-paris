@@ -79,7 +79,7 @@ export interface OpcionesMock {
   /** Filas de public.alcances de todos los perfiles (pantalla de Usuarios). */
   tablaAlcances?: { perfil_id: string; empresa_id: string; sucursal_id: string | null }[]
   /** Perfiles adicionales a los de fixtures/catalogos.json (p. ej. un admin). */
-  perfilesExtra?: { id: string; nombre: string; rol: string; activo: boolean }[]
+  perfilesExtra?: { id: string; nombre: string; rol: string; activo: boolean; debe_cambiar_clave?: boolean }[]
   /**
    * Fuente fija de v_saldos (salida real de la base, p. ej. fixtures/escenario-saldos.json). Recibe el
    * estado y devuelve las filas, o undefined si el estado no tiene salida registrada: en ese caso la
@@ -373,6 +373,24 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     for (const a of (lista ?? []) as Fila[]) tablaAlcances.push({ perfil_id: perfil, empresa_id: a.empresa_id, sucursal_id: a.sucursal_id ?? null })
   }
   const rpcs: Record<string, (route: Route, a: Fila) => Promise<void>> = {
+    async crear_usuario(route, a) {
+      if (!gestionaUsuarios()) return errorNegocio(route, 'SIN_PERMISO: solo administración o gerencia gestionan usuarios')
+      const email = String(a.p_email ?? '').trim().toLowerCase()
+      const clave = String(a.p_clave ?? '')
+      if (clave.length < 10 || !/[A-Za-z]/.test(clave) || !/[0-9]/.test(clave))
+        return errorNegocio(route, 'DATO_INVALIDO: la contraseña inicial necesita al menos 10 caracteres, con letras y números')
+      if (email === 'repetido@grupoparis.com.ar') return errorNegocio(route, 'DUPLICADO: ya existe un usuario con ese email')
+      invitaciones.push({ email, nombre: a.p_nombre, rol: a.p_rol, alcances: a.p_alcances, clave })
+      const id = `00000000-0000-4000-8000-${String(700 + perfiles.length).padStart(12, '0')}`
+      perfiles.push({ id, nombre: String(a.p_nombre), rol: String(a.p_rol), activo: true, debe_cambiar_clave: true })
+      reemplazarAlcances(id, a.p_alcances)
+      await route.fulfill({ json: id })
+    },
+    async clave_cambiada(route) {
+      const p = perfiles.find((x) => x.id === yo)
+      if (p) p.debe_cambiar_clave = false
+      await route.fulfill({ status: 204, body: '' })
+    },
     async editar_usuario(route, a) {
       if (!gestionaUsuarios()) return errorNegocio(route, 'SIN_PERMISO: solo administración o gerencia gestionan usuarios')
       const p = perfiles.find((x) => x.id === a.p_perfil)

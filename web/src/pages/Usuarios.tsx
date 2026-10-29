@@ -113,7 +113,7 @@ export function Usuarios() {
           gestiona && consulta.data ? (
             <Button onClick={() => setEditando('nuevo')}>
               <IconoMas className="size-[18px]" />
-              Invitar usuario
+              Nuevo usuario
             </Button>
           ) : undefined
         }

@@ -6,7 +6,8 @@ import { IconoAlerta, IconoCheck } from '../../ui/Iconos'
 import { Dialogo } from '../tramites/Dialogo'
 import {
   editarUsuario,
-  invitarUsuario,
+  crearUsuario,
+  generarClaveInicial,
   ROLES_CON_ALCANCE,
   rolesAsignables,
   seleccionDesdeAlcances,
@@ -54,6 +55,8 @@ export function FormUsuario({
 }) {
   const alta = usuario == null
   const [email, setEmail] = useState('')
+  const [clave, setClave] = useState(() => generarClaveInicial())
+  const [mandarEmail, setMandarEmail] = useState(false)
   const [nombre, setNombre] = useState(usuario?.nombre ?? '')
   const [rol, setRol] = useState<Rol>(usuario?.rol ?? 'contable')
   const [seleccion, setSeleccion] = useState<Seleccion>(() => seleccionDesdeAlcances(usuario?.alcancesCrudos ?? []))
@@ -89,12 +92,18 @@ export function FormUsuario({
     const datos = { email, nombre, rol, seleccion: usaAlcance ? seleccion : {} }
     const invalido = validarUsuario(datos, alta ? 'alta' : 'edicion') ?? (!alta && !motivo.trim() ? 'Contá brevemente el motivo del cambio.' : null)
     if (invalido) return setError(invalido)
+    if (alta && (clave.length < 10 || !/[A-Za-z]/.test(clave) || !/[0-9]/.test(clave)))
+      return setError('La contraseña inicial necesita al menos 10 caracteres, con letras y números.')
     setError(null)
     setEnviando(true)
     try {
       if (alta) {
-        await invitarUsuario(datos)
-        onGuardado(`Invitación enviada a ${email.trim().toLowerCase()}.`)
+        const r = await crearUsuario(datos, clave, mandarEmail)
+        const correo = email.trim().toLowerCase()
+        onGuardado(
+          `Usuario creado. Entra con ${correo} y la contraseña ${clave} (se le pide cambiarla al entrar).` +
+            (mandarEmail ? (r.emailEnviado ? ' También le mandamos un mail para elegirla.' : ' El mail no se pudo enviar ahora (límite de envíos): pasale la contraseña.') : ''),
+        )
       } else {
         await editarUsuario(usuario.id, datos, motivo)
         onGuardado(`Cambios guardados para ${nombre.trim()}.`)
@@ -114,10 +123,10 @@ export function FormUsuario({
   }
 
   return (
-    <Dialogo titulo={alta ? 'Invitar usuario' : `Editar a ${usuario.nombre}`} rotulo="Usuarios y permisos" onCerrar={onCerrar} ancho="md:max-w-2xl">
+    <Dialogo titulo={alta ? 'Nuevo usuario' : `Editar a ${usuario.nombre}`} rotulo="Usuarios y permisos" onCerrar={onCerrar} ancho="md:max-w-2xl">
       <form onSubmit={enviar} noValidate className="flex flex-col gap-5">
         {alta && (
-          <Field label="Email" ayuda="Le llega un mail para definir su contraseña y entrar.">
+          <Field label="Email" ayuda="Con este email va a entrar.">
             {(p) => (
               <input
                 {...p}
@@ -130,6 +139,30 @@ export function FormUsuario({
               />
             )}
           </Field>
+        )}
+        {alta && (
+          <Field
+            label="Contraseña inicial"
+            ayuda="Pasásela a la persona. En su primer ingreso el sistema le pide elegir una propia."
+            extra={
+              <button type="button" className="text-[13px] font-medium text-acento hover:underline" onClick={() => setClave(generarClaveInicial())}>
+                Generar otra
+              </button>
+            }
+          >
+            {(p) => (
+              <input {...p} type="text" autoComplete="off" spellCheck={false} className={`${claseControl} font-mono`} value={clave} onChange={(e) => setClave(e.target.value)} />
+            )}
+          </Field>
+        )}
+        {alta && (
+          <label className="flex items-start gap-3 text-[14px]">
+            <input type="checkbox" className="mt-1 size-4 accent-marca" checked={mandarEmail} onChange={(e) => setMandarEmail(e.target.checked)} />
+            <span>
+              Además mandarle un correo para que elija su contraseña
+              <span className="block text-[13px] text-tenue">Opcional. El servicio de correos tiene un límite de pocos envíos por hora.</span>
+            </span>
+          </label>
         )}
         <Field label="Nombre y apellido">
           {(p) => <input {...p} className={claseControl} value={nombre} onChange={(e) => setNombre(e.target.value)} />}
@@ -249,7 +282,7 @@ export function FormUsuario({
             Cancelar
           </Button>
           <Button type="submit" disabled={enviando}>
-            {enviando ? 'Enviando…' : alta ? 'Enviar invitación' : 'Guardar cambios'}
+            {enviando ? 'Guardando…' : alta ? 'Crear usuario' : 'Guardar cambios'}
           </Button>
         </div>
       </form>

@@ -105,3 +105,20 @@ test.describe('móvil', () => {
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/definir-clave-375.png`, fullPage: true })
   })
 })
+
+test('primer ingreso con contraseña inicial: obliga a elegir una propia antes de usar la app', async ({ page }) => {
+  const NUEVA = '00000000-0000-4000-8000-000000000771'
+  const mock = await montarSupabase(page, [], {
+    usuario: NUEVA,
+    perfilesExtra: [{ id: NUEVA, nombre: 'Gestora Prueba', rol: 'gestora', activo: true, debe_cambiar_clave: true }],
+  })
+  await page.goto('/mis-tramites')
+  await expect(page.getByRole('heading', { name: 'Definí tu contraseña' })).toBeVisible()
+  await page.getByLabel('Contraseña nueva').fill('Tornillo-Verde-42')
+  await page.getByLabel('Repetí la contraseña').fill('Tornillo-Verde-42')
+  await page.getByRole('button', { name: 'Guardar contraseña' }).click()
+  await expect(page.getByRole('heading', { name: 'Contraseña guardada' })).toBeVisible()
+  await page.getByRole('button', { name: 'Ir al sistema' }).click()
+  await expect(page.getByRole('heading', { name: /Hola, Gestora/ })).toBeVisible()
+  expect(mock.perfiles.find((p) => p.id === NUEVA)?.debe_cambiar_clave).toBe(false)
+})
