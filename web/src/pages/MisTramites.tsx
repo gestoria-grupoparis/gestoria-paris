@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSesion } from '../lib/sesion'
 import { mensajeError } from '../lib/errores'
+import { useMutacionUnica } from '../lib/consultas'
 import { formatearPesos } from '../lib/dinero'
 import { cambiarEstado, desmarcar, marcar } from '../features/tramites/consultas'
 import { FormAccion } from '../features/tramites/AccionesTramite'
@@ -81,7 +82,7 @@ export function MisTramites() {
     onSettled: refrescar,
   })
 
-  const accion = useMutation({
+  const accion = useMutacionUnica({
     mutationFn: ({ t, a }: { t: TramiteGestora; a: AccionGestora }) => ejecutar(t, a),
     onMutate: () => setError(null),
     onError: (e, { t }) => setError({ id: t.id, texto: mensajeError(e) }),

@@ -1,4 +1,5 @@
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient, useMutation, type UseMutationOptions } from '@tanstack/react-query'
+import { useRef } from 'react'
 import { codigoError, esSesionVencida } from './errores'
 
 export const AVISO_SESION_VENCIDA = 'aviso-sesion-vencida'
@@ -23,4 +24,21 @@ export function crearQueryClient(alVencerSesion: () => void = () => {}): QueryCl
       mutations: { retry: 0 },
     },
   })
+}
+
+/**
+ * useMutation que ignora un segundo disparo mientras el primero sigue en curso (doble clic):
+ * isPending de React Query se notifica en diferido, así que el botón no llega a deshabilitarse a tiempo.
+ */
+export function useMutacionUnica<TData = unknown, TError = Error, TVariables = void, TContext = unknown>(
+  opciones: UseMutationOptions<TData, TError, TVariables, TContext>,
+) {
+  const m = useMutation(opciones)
+  const enCurso = useRef(false)
+  const mutate = (vars: TVariables) => {
+    if (enCurso.current) return
+    enCurso.current = true
+    m.mutate(vars, { onSettled: () => void (enCurso.current = false) })
+  }
+  return { ...m, mutate }
 }

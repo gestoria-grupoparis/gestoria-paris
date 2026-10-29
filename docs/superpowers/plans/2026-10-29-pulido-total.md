@@ -214,6 +214,7 @@ Decisión: sin `toHaveScreenshot` (las capturas dependen de fuentes y sistema, d
 **Archivos:** `web/src/ui/Button.tsx`, todos los formularios que usan `onClick` async sin `useMutation` (`FormUsuario.tsx` `DialogoEstadoUsuario` usa `enviando` manual; revisar `FormCarga`, `FormConciliacion`, `DefinirClave`, `Login`).
 **Cambios:** `Button` con `cargando` → `disabled` + `aria-busy` + spinner y ancho fijo (sin salto de layout); todos los formularios pasan por `useMutation` y usan `isPending`.
 **Aceptación:** E2E `web/e2e/robustez.spec.ts`: doble clic rápido en "Confirmar carga", "Crear usuario" y "Aprobar presupuesto" → el mock registra una sola llamada.
+Decisión: `Button` ya tenía `cargando` → `disabled` + `aria-busy`. El doble disparo real venía de `useMutation` (isPending se notifica en diferido): se agregó `useMutacionUnica` (lib/consultas.ts) en `FormAccion` y en las acciones de la gestora. Los formularios con `enviando` manual ya se deshabilitan en el mismo evento; el E2E cubre carga y aprobación.
 
 ## Tarea 32 — Idempotencia de alta en la base (P1)
 **Objetivo:** un reintento por red no crea dos trámites ni dos movimientos.

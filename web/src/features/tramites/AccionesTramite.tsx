@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { mensajeError } from '../../lib/errores'
+import { useMutacionUnica } from '../../lib/consultas'
 import { Button, claseControl, Field } from '../../ui'
 import { IconoCheck, IconoFlecha, IconoLapiz, IconoRetorno, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
 import { formatearPesos } from '../../lib/dinero'
@@ -278,7 +279,7 @@ export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, mot
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const m = useMutation({
+  const m = useMutacionUnica({
     mutationFn: () => ejecutar(gestora, motivo.trim()),
     onSuccess: () => {
       onHecho?.()
