@@ -26,6 +26,13 @@ export interface Estado {
   /** { cuenta_id, fecha_corte, diferencia, movimientos: id[] } */
   conciliaciones: Fila[]
   siguienteEvento: number
+  /** Rendiciones y lo que cuelga de ellas (importes en centavos, texto, con los alias del front). */
+  rendiciones: Fila[]
+  rendicionFilas: Fila[]
+  comprobantes: Fila[]
+  comprobanteLineas: Fila[]
+  /** Storage del bucket comprobantes: ruta -> contenido. */
+  archivos: Map<string, { cuerpo: Buffer; tipo: string }>
 }
 
 export interface Semilla {
@@ -44,6 +51,10 @@ export interface Semilla {
 export interface Extra {
   movimientos?: Fila[]
   conciliaciones?: Fila[]
+  rendiciones?: Fila[]
+  rendicionFilas?: Fila[]
+  comprobantes?: Fila[]
+  comprobanteLineas?: Fila[]
 }
 
 interface Canal {
@@ -195,6 +206,11 @@ export function crearServidor(semillas: Semilla[] = [], extra: Extra = {}): Serv
       movimientos: (extra.movimientos ?? []).map((m) => ({ ...m })),
       conciliaciones: (extra.conciliaciones ?? []).map((c) => ({ ...c })),
       siguienteEvento: 1,
+      rendiciones: (extra.rendiciones ?? []).map((x) => ({ ...x })),
+      rendicionFilas: (extra.rendicionFilas ?? []).map((x) => ({ ...x })),
+      comprobantes: (extra.comprobantes ?? []).map((x) => ({ ...x })),
+      comprobanteLineas: (extra.comprobanteLineas ?? []).map((x) => ({ ...x })),
+      archivos: new Map(),
     },
     sockets,
     siguienteInstante: () => new Date(Date.parse(catalogos.ahora) + ++tic * 1000).toISOString(),
@@ -376,6 +392,257 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     for (let i = tablaAlcances.length - 1; i >= 0; i--) if (tablaAlcances[i].perfil_id === perfil) tablaAlcances.splice(i, 1)
     for (const a of (lista ?? []) as Fila[]) tablaAlcances.push({ perfil_id: perfil, empresa_id: a.empresa_id, sucursal_id: a.sucursal_id ?? null })
   }
+  // --- Rendiciones (réplica de 20261101000100_rendiciones.sql y 20261101000200_controles_rendicion.sql) ---
+  function rendicion(id: unknown) {
+    return st.rendiciones.find((r) => r.id === id)
+  }
+  function veRendicion(r: Fila | undefined): boolean {
+    if (!r) return false
+    if (rol === 'gestora') return r.gestora_id === yo
+    if (rol === 'gerencia' || rol === 'contable') return tieneAlcance(r.empresa_id, null)
+    return false
+  }
+  const nuevoId = () => crypto.randomUUID()
+  const textoONull = (x: unknown) => (x == null || String(x).trim() === '' ? null : String(x).trim())
+
+  /** Igual que rendicion_editable(): existe, la ve y está en borrador u observada. */
+  function editable(route: Route, id: unknown): Fila | null {
+    const r = rendicion(id)
+    if (!r || !veRendicion(r)) {
+      void errorNegocio(route, 'NO_ENCONTRADO: rendición inexistente')
+      return null
+    }
+    if (!['borrador', 'observada'].includes(String(r.estado))) {
+      void errorNegocio(route, `TRANSICION_INVALIDA: la rendición está ${r.estado}; solo se edita en borrador u observada`)
+      return null
+    }
+    return r
+  }
+
+  function controlesDe(r: Fila): Fila {
+    const filas = st.rendicionFilas.filter((f) => f.rendicion_id === r.id).sort((a, b) => Number(a.orden) - Number(b.orden))
+    const comps = st.comprobantes.filter((c) => c.rendicion_id === r.id)
+    const esFactura = (c: Fila) => ['factura_honorarios', 'factura_electronica'].includes(String(c.tipo))
+    const porFila = filas.map((f) => {
+      const comp = comps.filter((c) => c.fila_id === f.id && !esFactura(c)).reduce((s, c) => s + (c.total == null ? 0n : big(c.total)), 0n)
+      const pago = big(f.pago)
+      return { fila_id: f.id, nombre: f.nombre, pago_cents: String(pago), comprobantes_cents: String(comp), diferencia_cents: String(comp - pago), ok: comp === pago }
+    })
+    const total = filas.reduce((s, f) => s + big(f.pago), 0n)
+    const mes = String(r.periodo).slice(0, 7)
+    const cuenta = cuentaDe(r.empresa_id)
+    const pagos = st.movimientos.filter((m) => m.cuenta_id === cuenta.id && m.tipo === 'pago_tramite' &&
+      String(m.fecha_operacion).slice(0, 7) === mes && !revertido(m))
+    const debitado = -pagos.reduce((s, m) => s + big(m.importe), 0n)
+    const vinculados = new Set(filas.map((f) => f.tramite_id).filter(Boolean))
+    const sinRendir = pagos.filter((m) => !vinculados.has(m.tramite_id)).map((m) => ({
+      movimiento_id: m.id, fecha: m.fecha_operacion, importe_cents: String(-big(m.importe)),
+      tramite_id: m.tramite_id, tramite_numero: tramite(m.tramite_id)?.numero ?? null,
+    }))
+    const noAut = filas.flatMap((f) => {
+      const t = f.tramite_id ? tramite(f.tramite_id) : undefined
+      const motivo = !f.tramite_id ? (f.vinculo === 'ambiguo' ? 'ambiguo' : 'sin_vincular')
+        : !t || !t.autorizado_at || ['cancelado', 'rechazado'].includes(String(t.estado)) ? 'no_autorizado' : null
+      return motivo ? [{ fila_id: f.id, nombre: f.nombre, motivo }] : []
+    })
+    const esperado = BigInt(filas.length) * big(r.honorario)
+    const facturado = comps.filter((c) => esFactura(c) && c.revision === 'confirmado').reduce((s, c) => s + (c.total == null ? 0n : big(c.total)), 0n)
+    return {
+      importes: {
+        filas: porFila, total_planilla_cents: String(total), debitado_habitualista_cents: String(debitado),
+        diferencia_cents: String(total - debitado), movimientos_sin_rendir: sinRendir,
+        ok: porFila.every((f) => f.ok) && total === debitado,
+      },
+      autorizados: { filas_no_autorizadas: noAut, ok: noAut.length === 0 },
+      honorarios: {
+        cantidad_tramites: filas.length, honorario_unitario_cents: String(r.honorario), esperado_cents: String(esperado),
+        facturado_cents: String(facturado), diferencia_cents: String(facturado - esperado), ok: facturado === esperado,
+      },
+    }
+  }
+
+  function rpcsRendiciones(): Record<string, (route: Route, a: Fila) => Promise<void>> {
+    return {
+      async crear_rendicion(route, a) {
+        let gestora: unknown
+        if (rol === 'gestora') gestora = yo
+        else if (rol === 'gerencia' || rol === 'contable') {
+          if (!tieneAlcance(a.p_empresa, null)) return errorNegocio(route, 'SIN_PERMISO: sin alcance sobre esa razón social')
+          const g = perfiles.find((p) => p.id === a.p_gestora && p.rol === 'gestora' && p.activo)
+          if (!g) return errorNegocio(route, 'DATO_INVALIDO: elegí una gestora activa')
+          gestora = g.id
+        } else return errorNegocio(route, 'SIN_PERMISO: solo la gestora, gerencia o contable crean rendiciones')
+        if (!a.p_periodo) return errorNegocio(route, 'DATO_INVALIDO: el mes de la rendición es obligatorio')
+        const hon = importe(a.p_honorario ?? '3250000')
+        if (hon == null || hon <= 0n) return errorNegocio(route, 'DATO_INVALIDO: el honorario debe ser mayor a cero')
+        const periodo = `${String(a.p_periodo).slice(0, 7)}-01`
+        if (st.rendiciones.some((r) => r.empresa_id === a.p_empresa && r.gestora_id === gestora && r.periodo === periodo))
+          return errorNegocio(route, 'DUPLICADO: ya existe la rendición de ese mes para esa gestora y razón social')
+        const r = {
+          id: nuevoId(), empresa_id: a.p_empresa, gestora_id: gestora, periodo, honorario: String(hon), estado: 'borrador',
+          motivo_observacion: null, creado_por: yo, created_at: servidor.siguienteInstante(), version: 1,
+        }
+        st.rendiciones.push(r)
+        await route.fulfill({ json: r.id })
+      },
+      async guardar_filas(route, a) {
+        const r = editable(route, a.p_rendicion)
+        if (!r) return
+        const lista = (a.p_filas ?? []) as Fila[]
+        const ids: unknown[] = []
+        for (const [i, f] of lista.entries()) {
+          if (!textoONull(f.nombre)) return errorNegocio(route, `DATO_INVALIDO: la fila ${i + 1} no tiene nombre`)
+          if (f.tramite_id && tramite(f.tramite_id)?.empresa_id !== r.empresa_id)
+            return errorNegocio(route, `DATO_INVALIDO: el trámite de la fila ${i + 1} no es de esa razón social`)
+        }
+        for (const [i, f] of lista.entries()) {
+          const datos = {
+            orden: i + 1, nombre: String(f.nombre).trim(), dominio: textoONull(f.dominio)?.toUpperCase() ?? null,
+            pago: String(importe(f.pago_cents) ?? 0n), honorarios: String(importe(f.honorarios_cents) ?? 0n),
+            tramite_id: f.tramite_id ?? null, vinculo: f.vinculo ?? (f.tramite_id ? 'manual' : 'sin_vincular'),
+            candidatos: (f.candidatos ?? []) as string[],
+          }
+          const existente = st.rendicionFilas.find((x) => x.id === f.id && x.rendicion_id === r.id)
+          if (existente) Object.assign(existente, datos)
+          else st.rendicionFilas.push({ id: nuevoId(), rendicion_id: r.id, ...datos })
+          ids.push(existente?.id ?? st.rendicionFilas[st.rendicionFilas.length - 1].id)
+        }
+        for (let i = st.rendicionFilas.length - 1; i >= 0; i--) {
+          const f = st.rendicionFilas[i]
+          if (f.rendicion_id === r.id && !ids.includes(f.id)) {
+            for (const c of st.comprobantes) if (c.fila_id === f.id) c.fila_id = null
+            st.rendicionFilas.splice(i, 1)
+          }
+        }
+        await route.fulfill({ status: 204, body: '' })
+      },
+      async guardar_comprobante(route, a) {
+        const r = editable(route, a.p_rendicion)
+        if (!r) return
+        const d = (a.p_datos ?? {}) as Fila
+        if (d.fila_id && !st.rendicionFilas.some((f) => f.id === d.fila_id && f.rendicion_id === r.id))
+          return errorNegocio(route, 'DATO_INVALIDO: la fila no es de esta rendición')
+        if (d.archivo_path && String(d.archivo_path).split('/')[0] !== r.id)
+          return errorNegocio(route, 'DATO_INVALIDO: el archivo no es de esta rendición')
+        const revision = String(d.revision ?? 'pendiente')
+        let c = d.id ? st.comprobantes.find((x) => x.id === d.id) : undefined
+        if (c && c.rendicion_id !== r.id) return errorNegocio(route, 'NO_ENCONTRADO: comprobante inexistente en esta rendición')
+        const campos = {
+          fila_id: d.fila_id ?? null, numero: textoONull(d.numero), emisor: textoONull(d.emisor), emisor_cuit: textoONull(d.emisor_cuit),
+          fecha: textoONull(d.fecha), total: textoONull(d.total_cents), dominio: textoONull(d.dominio)?.toUpperCase() ?? null,
+          documento: textoONull(d.documento), revision, revisado_por: revision === 'confirmado' ? yo : null,
+        }
+        if (c) {
+          Object.assign(c, campos, {
+            tipo: d.tipo ?? c.tipo, archivo_path: d.archivo_path ?? c.archivo_path, archivo_sha256: d.archivo_sha256 ?? c.archivo_sha256,
+            pagina: d.pagina ?? c.pagina, datos_extraidos: d.datos_extraidos ?? c.datos_extraidos,
+          })
+        } else {
+          c = {
+            id: d.id ?? nuevoId(), rendicion_id: r.id, tipo: d.tipo ?? 'otro', archivo_path: d.archivo_path ?? null,
+            archivo_sha256: d.archivo_sha256 ?? null, pagina: d.pagina ?? 1, datos_extraidos: d.datos_extraidos ?? {},
+            cargado_por: yo, created_at: servidor.siguienteInstante(), ...campos,
+          }
+          st.comprobantes.push(c)
+        }
+        if ('lineas' in d) {
+          for (let i = st.comprobanteLineas.length - 1; i >= 0; i--)
+            if (st.comprobanteLineas[i].comprobante_id === c.id) st.comprobanteLineas.splice(i, 1)
+          for (const l of (d.lineas ?? []) as Fila[]) {
+            if (!textoONull(l.concepto) || importe(l.importe_cents) == null)
+              return errorNegocio(route, 'DATO_INVALIDO: cada línea necesita concepto e importe')
+            st.comprobanteLineas.push({ id: nuevoId(), comprobante_id: c.id, concepto: String(l.concepto).trim(), importe: String(importe(l.importe_cents)) })
+          }
+        }
+        await route.fulfill({ json: c.id })
+      },
+      async cambiar_estado_rendicion(route, a) {
+        const r = rendicion(a.p_rendicion)
+        if (!r || !veRendicion(r)) return errorNegocio(route, 'NO_ENCONTRADO: rendición inexistente')
+        const hacia = String(a.p_estado)
+        if (hacia === 'enviada') {
+          if (rol !== 'gestora') return errorNegocio(route, 'SIN_PERMISO: solo la gestora envía su rendición a control')
+        } else if (hacia === 'observada' || hacia === 'aprobada') {
+          if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable observan o aprueban rendiciones')
+        } else return errorNegocio(route, 'DATO_INVALIDO: estado de rendición desconocido')
+        if (r.version !== a.p_version) return errorNegocio(route, 'VERSION_CONFLICTO: otro usuario modificó esta rendición; recargá')
+        if ((hacia === 'enviada' && !['borrador', 'observada'].includes(String(r.estado))) || (hacia !== 'enviada' && r.estado !== 'enviada'))
+          return errorNegocio(route, `TRANSICION_INVALIDA: no se puede pasar de ${r.estado} a ${hacia}`)
+        if (hacia === 'observada' && !conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: observar exige un motivo')
+        Object.assign(r, { estado: hacia, version: Number(r.version) + 1, ...(hacia === 'observada' ? { motivo_observacion: String(a.p_motivo).trim() } : {}) })
+        await route.fulfill({ status: 204, body: '' })
+      },
+      async controles_rendicion(route, a) {
+        const r = rendicion(a.p_rendicion)
+        if (!r || !veRendicion(r)) return errorNegocio(route, 'NO_ENCONTRADO: rendición inexistente')
+        await route.fulfill({ json: controlesDe(r) })
+      },
+      async comprobantes_duplicados(route, a) {
+        const r = rendicion(a.p_rendicion)
+        if (!r || !veRendicion(r)) return errorNegocio(route, 'NO_ENCONTRADO: rendición inexistente')
+        const visibles = st.comprobantes.filter((o) => veRendicion(rendicion(o.rendicion_id)))
+        const res: Fila[] = []
+        for (const c of st.comprobantes.filter((x) => x.rendicion_id === r.id)) {
+          for (const o of visibles) {
+            if (o.id === c.id) continue
+            if (c.archivo_sha256 && o.archivo_sha256 === c.archivo_sha256 && Number(o.pagina) === Number(c.pagina))
+              res.push({ comprobante_id: c.id, motivo: 'mismo_archivo', otro_id: o.id, otra_rendicion: o.rendicion_id })
+            else if (c.numero && o.tipo === c.tipo && o.numero === c.numero && o.archivo_sha256 !== c.archivo_sha256 &&
+              ((c.emisor_cuit && o.emisor_cuit === c.emisor_cuit) || String(o.emisor ?? '').toUpperCase() === String(c.emisor ?? '').toUpperCase()))
+              res.push({ comprobante_id: c.id, motivo: 'mismo_numero', otro_id: o.id, otra_rendicion: o.rendicion_id })
+          }
+        }
+        await route.fulfill({ json: res })
+      },
+    }
+  }
+
+  /** Storage del bucket privado comprobantes: subir (sin upsert), firmar URLs y descargar. */
+  async function storage(route: Route, url: URL) {
+    const req = route.request()
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 200, headers: cors, body: '' })
+    const ruta = decodeURIComponent(url.pathname)
+    const puede = (path: string) => veRendicion(rendicion(path.split('/')[0]))
+    if (req.method() === 'POST' && ruta === '/storage/v1/object/sign/comprobantes') {
+      const b = (req.postDataJSON() ?? {}) as { paths?: string[] }
+      return route.fulfill({
+        headers: cors,
+        json: (b.paths ?? []).map((path) => puede(path) && st.archivos.has(path)
+          ? { path, signedURL: `/object/sign/comprobantes/${path}?token=e2e`, error: null }
+          : { path, signedURL: null, error: 'Object not found' }),
+      })
+    }
+    const sub = /^\/storage\/v1\/object\/comprobantes\/(.+)$/.exec(ruta)
+    if (sub && req.method() === 'POST') {
+      const path = sub[1]
+      if (!puede(path)) return route.fulfill({ status: 400, headers: cors, json: { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' } })
+      if (st.archivos.has(path)) return route.fulfill({ status: 400, headers: cors, json: { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' } })
+      let cuerpo = req.postDataBuffer() ?? Buffer.alloc(0)
+      let tipo = req.headers()['content-type'] ?? 'application/octet-stream'
+      // supabase-js sube los Blob como multipart: se guarda solo la parte del archivo.
+      const borde = /boundary=(.+)$/.exec(tipo)?.[1]
+      if (borde) {
+        const texto = cuerpo.toString('latin1')
+        const parte = texto.split(`--${borde}`).find((p) => /filename=/.test(p))
+        if (parte) {
+          const [cab, ...resto] = parte.split('\r\n\r\n')
+          tipo = /Content-Type:\s*([^\r\n]+)/i.exec(cab)?.[1] ?? 'application/octet-stream'
+          cuerpo = Buffer.from(resto.join('\r\n\r\n').replace(/\r\n$/, ''), 'latin1')
+        }
+      }
+      st.archivos.set(path, { cuerpo, tipo })
+      return route.fulfill({ headers: cors, json: { Key: `comprobantes/${path}`, Id: nuevoId() } })
+    }
+    const firmado = /^\/storage\/v1\/object\/sign\/comprobantes\/(.+)$/.exec(ruta)
+    if (firmado && req.method() === 'GET') {
+      const a = st.archivos.get(firmado[1])
+      if (!a) return route.fulfill({ status: 404, headers: cors, body: '' })
+      return route.fulfill({ status: 200, headers: { ...cors, 'content-type': a.tipo }, body: a.cuerpo })
+    }
+    throw new Error(`Ruta de storage sin mock: ${req.method()} ${ruta}`)
+  }
+
   const rpcs: Record<string, (route: Route, a: Fila) => Promise<void>> = {
     async crear_usuario(route, a) {
       if (!gestionaUsuarios()) return errorNegocio(route, 'SIN_PERMISO: solo administración o gerencia gestionan usuarios')
@@ -837,6 +1104,8 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     },
   }
 
+  Object.assign(rpcs, rpcsRendiciones())
+
   rpcs.marcar_notificaciones_leidas = async (route, a) => {
     const ids = a.p_ids as string[] | null
     let n = 0
@@ -868,6 +1137,11 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     },
     v_movimientos_extracto: extracto,
     eventos: () => st.eventos,
+    rendiciones: () => st.rendiciones.filter(veRendicion),
+    rendicion_filas: () => st.rendicionFilas.filter((f) => veRendicion(rendicion(f.rendicion_id))),
+    comprobantes: () => st.comprobantes.filter((c) => veRendicion(rendicion(c.rendicion_id))),
+    comprobante_lineas: () => st.comprobanteLineas.filter((l) =>
+      veRendicion(rendicion(st.comprobantes.find((c) => c.id === l.comprobante_id)?.rendicion_id))),
   }
 
   if (!opciones.sinSesion) await page.addInitScript(
@@ -932,6 +1206,7 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       reemplazarAlcances(id, b.alcances)
       return responder(200, { id })
     }
+    if (url.pathname.startsWith('/storage/v1/')) return storage(route, url)
     const rpc = /^\/rest\/v1\/rpc\/(\w+)$/.exec(url.pathname)
     if (rpc) {
       const fn = rpcs[rpc[1]]
