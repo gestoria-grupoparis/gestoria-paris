@@ -45,3 +45,15 @@ for (const ancho of [320, 375, 768, 1024, 1440])
       }
     }
   })
+
+test('a 375 px los trámites se ven como tarjetas con número y estado', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.clock.setFixedTime(catalogos.ahora)
+  await montarSupabase(page, semilla, { saldosFijos })
+  await page.goto('/tramites')
+  const tarjetas = page.getByRole('list', { name: 'Trámites' }).getByRole('listitem')
+  await expect(tarjetas.first()).toContainText(/T-2026-000\d\d/)
+  await expect(tarjetas.filter({ hasText: 'T-2026-00012' })).toContainText('Presentado')
+  await expect(page.getByRole('table')).toBeHidden()
+  await sinDesborde(page, '/tramites')
+})

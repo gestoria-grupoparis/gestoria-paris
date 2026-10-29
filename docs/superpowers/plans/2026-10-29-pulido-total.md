@@ -115,6 +115,7 @@ Decisión: sin `toHaveScreenshot` (las capturas dependen de fuentes y sistema, d
 **Archivos:** `web/src/ui/DataTable.tsx`, `web/src/features/tramites/TablaTramites.tsx`, `web/src/features/habitualista/TablaExtracto.tsx`, `TablaCompromisos.tsx`, `web/src/pages/Informes.tsx`, `web/src/pages/Usuarios.tsx`.
 **Cambios:** `DataTable` acepta `vistaMovil` (render de tarjeta por fila) y la usa por debajo de `md`; columnas prioritarias (número, cliente, estado, monto). Contenedor con scroll horizontal y sombra indicadora sólo donde la tarjeta no aplica.
 **Aceptación:** E2E `web/e2e/responsive.spec.ts`: a 375 px cada pantalla muestra filas como `article` con número y estado visibles; sin scroll horizontal de página.
+Decisión: trámites, extracto y usuarios ya tenían tarjetas en móvil (`md:hidden`); se agregó el E2E. Compromisos e informes siguen como tabla con scroll horizontal dentro de su tarjeta (la página no desborda).
 
 ## Tarea 15 — Contraste y foco del sidebar y del login (P1)
 **Objetivo:** AA en todo texto sobre `noche`.
