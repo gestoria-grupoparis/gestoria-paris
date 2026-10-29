@@ -22,7 +22,7 @@ export function TarjetasSaldo({ saldo }: { saldo: Saldo }) {
   const vencida = conciliacionVencida(saldo.ultima_conciliacion_fecha, saldo.ultima_diferencia, hoyEnBuenosAires())
   const sinFondos = negativo(saldo.disponible)
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(5,minmax(0,1fr))]">
       <Tarjeta
         titulo="Disponible proyectado"
         className="sm:col-span-2"

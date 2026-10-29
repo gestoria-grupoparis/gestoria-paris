@@ -171,7 +171,7 @@ export function MisTramites() {
                 <p
                   data-testid="disponible"
                   className={cx(
-                    'cifra mt-2 font-display text-[clamp(22px,11cqi,34px)] leading-none font-medium tracking-[-0.03em] whitespace-nowrap',
+                    'cifra mt-2 font-display text-[clamp(14px,7.5cqi,34px)] leading-none font-medium tracking-[-0.03em] whitespace-nowrap',
                     negativo && 'text-sinfondos',
                   )}
                 >

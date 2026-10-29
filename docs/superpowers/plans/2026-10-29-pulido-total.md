@@ -105,6 +105,7 @@ Decisión: el test de DB importa `flujo.ts` directamente (no hace falta exportar
 **Archivos:** `web/src/pages/Tablero.tsx` (`TarjetaEmpresa`), `web/src/features/habitualista/TarjetasSaldo.tsx`, `web/src/pages/MisTramites.tsx`, `web/src/features/gestora/TarjetaTramite.tsx`, `web/src/ui/KpiTile.tsx`, `web/src/features/tramites/PanelDetalle.tsx`, `web/src/features/tramites/TablaTramites.tsx`, `web/src/index.css`.
 **Cambios:** montos con `@container` + tamaño fluido (`text-[clamp(20px,9cqi,32px)]`), `min-w-0` en todos los hijos flex/grid, `break-words`/`[overflow-wrap:anywhere]` en nombres de cliente, empresa y vehículo, `truncate` + `title` en celdas de tabla. Tablero: grid `md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))]`. `Intervencion`: el nombre del cliente con `min-w-0 truncate` real (hoy está dentro de `flex-wrap`).
 **Aceptación:** E2E nuevo `web/e2e/responsive.spec.ts`: fixture con cliente de 80 caracteres y saldo `-99999999999999` centavos; para anchos 320, 375, 768, 1024, 1440 y cada ruta por rol, `document.documentElement.scrollWidth <= innerWidth` y ningún `[data-testid=disponible]` con `scrollWidth > clientWidth`. Agregar screenshots de referencia `toHaveScreenshot` sólo para 375 y 1440.
+Decisión: sin `toHaveScreenshot` (las capturas dependen de fuentes y sistema, darían falsos rojos); el test mide desbordes en tablero, trámites, habitualista y mis-trámites.
 
 ## Tarea 14 — Tablas en móvil (P1)
 **Objetivo:** trámites, extracto, compromisos, informes y usuarios legibles en 320–767 px.

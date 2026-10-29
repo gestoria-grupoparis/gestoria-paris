@@ -38,7 +38,7 @@ export function KpiTile({
         {icono && <span aria-hidden className="opacity-70">{icono}</span>}
       </div>
       <span className={cx('cifra font-display font-medium leading-none tracking-[-0.03em] whitespace-nowrap', // la cifra se achica con el ancho de la tarjeta para no cortarse (montos de 8+ dígitos)
-        grande ? 'text-[clamp(26px,10cqi,44px)]' : 'text-[clamp(14px,9.5cqi,26px)]')}>{valor}</span>
+        grande ? 'text-[clamp(16px,8cqi,44px)]' : 'text-[clamp(12px,7.5cqi,26px)]')}>{valor}</span>
       {detalle && <span className={cx('text-[13px]', oscuro ? 'text-white/60' : 'text-tenue')}>{detalle}</span>}
     </div>
   )

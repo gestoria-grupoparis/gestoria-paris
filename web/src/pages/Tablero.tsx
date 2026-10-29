@@ -42,37 +42,37 @@ function TarjetaEmpresa({ s, hoy }: { s: Saldo; hoy: string }) {
     <article
       aria-label={s.empresa}
       className={cx(
-        'flex flex-col rounded-lg bg-superficie shadow-tarjeta ring-1',
+        '@container flex min-w-0 flex-col rounded-lg bg-superficie shadow-tarjeta ring-1',
         falta ? 'ring-sinfondos/40' : 'ring-linea',
       )}
     >
       <div className="flex items-start justify-between gap-3 px-5 pt-5">
-        <h3 className="text-lg font-semibold leading-tight">{s.empresa}</h3>
+        <h3 className="min-w-0 text-lg font-semibold leading-tight [overflow-wrap:anywhere]">{s.empresa}</h3>
         {falta ? <Chip tono="sinfondos">Sin fondos</Chip> : <Chip tono="disponible">Con fondos</Chip>}
       </div>
       <div className="px-5 pt-4">
         <div className="rotulo">Disponible</div>
         <div
           data-testid="disponible"
-          className={cx('cifra font-display text-[32px] font-semibold leading-tight tracking-tight', falta ? 'text-sinfondos' : 'text-marca')}
+          className={cx('cifra font-display text-[clamp(14px,7.5cqi,32px)] font-semibold leading-tight tracking-tight whitespace-nowrap', falta ? 'text-sinfondos' : 'text-marca')}
         >
           {formatearPesos(s.disponible)}
         </div>
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-linea px-5 py-4 text-sm">
+      <dl className="mt-4 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-4 gap-y-3 border-t border-linea px-5 py-4 text-sm">
         <div>
           <dt className="rotulo">Registrado</dt>
-          <dd data-testid="registrado" className={cx('cifra mt-0.5 font-semibold', negativo(s.registrado) && 'text-sinfondos')}>
+          <dd data-testid="registrado" className={cx('cifra mt-0.5 font-semibold [overflow-wrap:anywhere]', negativo(s.registrado) && 'text-sinfondos')}>
             {formatearPesos(s.registrado)}
           </dd>
         </div>
         <div>
           <dt className="rotulo">Comprometido</dt>
-          <dd data-testid="comprometido" className="cifra mt-0.5 font-semibold text-comprometido">{formatearPesos(s.comprometido)}</dd>
+          <dd data-testid="comprometido" className="cifra mt-0.5 font-semibold text-comprometido [overflow-wrap:anywhere]">{formatearPesos(s.comprometido)}</dd>
         </div>
         <div>
           <dt className="rotulo">Necesidad de recarga</dt>
-          <dd data-testid="recarga" className={cx('cifra mt-0.5 font-semibold', falta ? 'text-sinfondos' : 'text-tenue')}>
+          <dd data-testid="recarga" className={cx('cifra mt-0.5 font-semibold [overflow-wrap:anywhere]', falta ? 'text-sinfondos' : 'text-tenue')}>
             {formatearPesos(recarga)}
           </dd>
         </div>
@@ -117,7 +117,7 @@ export function Tablero() {
         descripcion="Cómo están los fondos de cada razón social y qué trámites necesitan que alguien haga algo hoy."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 lg:grid-cols-4">
         <KpiTile rotulo="Trámites abiertos" tono="destacado" icono={<IconoDoc />} valor={kpi(abiertos)} detalle="Sin contar cerrados, cancelados ni rechazados" />
         <KpiTile
           rotulo="Requieren intervención"
@@ -161,7 +161,7 @@ export function Tablero() {
         ) : saldos.data.length === 0 ? (
           <EmptyState titulo="Sin razones sociales a la vista" descripcion="Tu usuario no tiene alcance sobre ninguna cuenta de la Habitualista." />
         ) : (
-          <div className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(340px,1fr))]">
+          <div className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))]">
             {saldos.data.map((s) => <TarjetaEmpresa key={s.cuenta_id} s={s} hoy={hoy} />)}
           </div>
         )}
