@@ -337,7 +337,7 @@ function Detalle({ id, onVolver }: { id: string; onVolver: () => void }) {
           </button>
         ))}
       </div>
-      {vista === 'planilla' && <CargaPlanilla rendicion={r} editable={puedeEditar(r.estado)} />}
+      {vista === 'planilla' && <CargaPlanilla key={r.filas.map((f) => f.id).join()} rendicion={r} editable={puedeEditar(r.estado)} />}
       {vista === 'comprobantes' && <CargaComprobantes rendicion={r} editable={puedeEditar(r.estado)} filaFoco={filaFoco} />}
       {vista === 'controles' && <PanelControles rendicion={r} onIr={ir} />}
     </>
