@@ -12,3 +12,5 @@ web/dist-presupuesto/
 web/public/ocr/
 
 graphify-out/
+
+.local/
