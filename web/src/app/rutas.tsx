@@ -10,6 +10,7 @@ const MisTramites = lazy(() => import('../pages/MisTramites').then((m) => ({ def
 const Habitualista = lazy(() => import('../pages/Habitualista').then((m) => ({ default: m.Habitualista })))
 const Tablero = lazy(() => import('../pages/Tablero').then((m) => ({ default: m.Tablero })))
 const Usuarios = lazy(() => import('../pages/Usuarios').then((m) => ({ default: m.Usuarios })))
+const Rendiciones = lazy(() => import('../pages/Rendiciones').then((m) => ({ default: m.Rendiciones })))
 const Informes = lazy(() => import('../pages/Informes').then((m) => ({ default: m.Informes })))
 import { Button, PaginaPendiente, PantallaCarga, PantallaMensaje } from '../ui'
 import { DefinirClave } from '../features/acceso/DefinirClave'
@@ -53,6 +54,7 @@ const PANTALLAS: Record<string, ComponentType> = {
   '/tablero': Tablero,
   '/usuarios': Usuarios,
   '/informes': Informes,
+  '/rendiciones': Rendiciones,
 }
 
 function Pendiente({ titulo }: { titulo: string }) {

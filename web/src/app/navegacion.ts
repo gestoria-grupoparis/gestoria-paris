@@ -10,16 +10,17 @@ const TRAMITES = { ruta: '/tramites', etiqueta: 'Trámites' }
 const HABITUALISTA = { ruta: '/habitualista', etiqueta: 'Habitualista' }
 const INFORMES = { ruta: '/informes', etiqueta: 'Informes' }
 const USUARIOS = { ruta: '/usuarios', etiqueta: 'Usuarios' }
+const RENDICIONES = { ruta: '/rendiciones', etiqueta: 'Rendiciones' }
 const MIS_TRAMITES = { ruta: '/mis-tramites', etiqueta: 'Mis trámites' }
 
 export function navegacionPorRol(rol: Rol | null): ItemNav[] {
   switch (rol) {
     case 'gerencia':
-      return [TABLERO, TRAMITES, HABITUALISTA, INFORMES, USUARIOS]
+      return [TABLERO, TRAMITES, HABITUALISTA, INFORMES, RENDICIONES, USUARIOS]
     case 'contable':
-      return [TRAMITES, HABITUALISTA, INFORMES, TABLERO]
+      return [TRAMITES, HABITUALISTA, INFORMES, RENDICIONES, TABLERO]
     case 'gestora':
-      return [MIS_TRAMITES]
+      return [MIS_TRAMITES, RENDICIONES]
     case 'admin':
       return [USUARIOS]
     default:

@@ -21,6 +21,7 @@ const ICONOS: Record<string, ReactNode> = {
   '/habitualista': <path d="M3 7h18v12H3zM3 11h18M7 15h3" />,
   '/informes': <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   '/usuarios': <><circle cx="9" cy="8.5" r="3.2" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M15.5 5.5a3 3 0 0 1 0 6M17.5 14.8c1.5.6 2.5 2 3 4.2" /></>,
+  '/rendiciones': <path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3" />,
   '/mis-tramites': <path d="M9 5h10M9 12h10M9 19h10M4 5h1M4 12h1M4 19h1" />,
 }
 
