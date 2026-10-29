@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useSesion } from '../lib/sesion'
 import {
   cambiarActivoUsuario,
+  restablecerClave,
   cargarUsuariosYCatalogo,
   etiquetaRol,
   filtrarUsuarios,
@@ -11,7 +12,7 @@ import {
   ROLES,
   type Usuario,
 } from '../features/usuarios/usuarios'
-import { DialogoEstadoUsuario, FormUsuario } from '../features/usuarios/FormUsuario'
+import { DialogoClaveUsuario, DialogoEstadoUsuario, FormUsuario } from '../features/usuarios/FormUsuario'
 import { Button, Card, Cargando, Chip, claseControl, cx, DataTable, EmptyState, ErrorState, PageHeader, type TonoChip } from '../ui'
 import { IconoBuscar, IconoCheck, IconoEscudo, IconoMas } from '../ui/Iconos'
 
@@ -58,6 +59,18 @@ function Alcances({ u }: { u: Usuario }) {
   )
 }
 
+/** "Sos vos", "Nunca entró" o "Tiene que cambiar la contraseña": lo que gerencia necesita saber al dar soporte. */
+function Ingreso({ u, esYo }: { u: Usuario; esYo: boolean }) {
+  const texto = esYo
+    ? 'Sos vos'
+    : u.email && !u.ultimo_ingreso
+      ? 'Todavía no entró'
+      : u.debe_cambiar_clave
+        ? 'Tiene que elegir su contraseña'
+        : null
+  return texto ? <div className="mt-0.5 text-[12px] text-tenue">{texto}</div> : null
+}
+
 function Estado({ u }: { u: Usuario }) {
   return u.activo ? <Chip tono="disponible">Activo</Chip> : <Chip tono="apagado">Inactivo</Chip>
 }
@@ -69,6 +82,7 @@ export function Usuarios() {
   const [rol, setRol] = useState('')
   const [editando, setEditando] = useState<Usuario | 'nuevo' | null>(null)
   const [estadoDe, setEstadoDe] = useState<Usuario | null>(null)
+  const [claveDe, setClaveDe] = useState<Usuario | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const consulta = useQuery({ queryKey: ['usuarios', 'gestion'], queryFn: cargarUsuariosYCatalogo, staleTime: 60_000 })
   const usuarios = consulta.data?.usuarios
@@ -91,6 +105,11 @@ export function Usuarios() {
         <Button variante="secundario" tamano={compacto ? "md" : "sm"} aria-label={`Editar a ${u.nombre}`} onClick={() => setEditando(u)}>
           Editar
         </Button>
+        {u.id !== perfil?.id && (
+          <Button variante="fantasma" tamano={compacto ? "md" : "sm"} aria-label={`Nueva contraseña para ${u.nombre}`} onClick={() => setClaveDe(u)}>
+            Contraseña
+          </Button>
+        )}
         {puedeCambiarEstado(miRol, perfil?.id, u) && (
           <Button variante="fantasma" tamano={compacto ? "md" : "sm"} aria-label={`${u.activo ? 'Desactivar' : 'Reactivar'} a ${u.nombre}`} onClick={() => setEstadoDe(u)}>
             {u.activo ? 'Desactivar' : 'Reactivar'}
@@ -176,7 +195,7 @@ export function Usuarios() {
               <input
                 type="search"
                 aria-label="Buscar usuario"
-                placeholder="Buscar por nombre o razón social"
+                placeholder="Buscar por nombre, email o razón social"
                 className={cx(claseControl, 'h-12 pl-10 text-[14px] shadow-tarjeta')}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
@@ -227,7 +246,8 @@ export function Usuarios() {
                             <Avatar u={u} />
                             <div className="leading-tight">
                               <div className="font-semibold text-tinta">{u.nombre}</div>
-                              {u.id === perfil?.id && <div className="mt-0.5 text-[12px] text-tenue">Sos vos</div>}
+                              {u.email && <div className="mt-0.5 text-[13px] break-all text-tenue">{u.email}</div>}
+                              <Ingreso u={u} esYo={u.id === perfil?.id} />
                             </div>
                           </div>
                         </td>
@@ -256,6 +276,8 @@ export function Usuarios() {
                         <Avatar u={u} />
                         <div className="min-w-0 flex-1 leading-tight">
                           <div className="truncate font-semibold text-tinta">{u.nombre}</div>
+                          {u.email && <div className="mt-0.5 text-[13px] break-all text-tenue">{u.email}</div>}
+                          <Ingreso u={u} esYo={u.id === perfil?.id} />
                           <div className="mt-1.5 flex flex-wrap gap-1.5">
                             <Chip tono={TONO_ROL[u.rol]} punto={false}>
                               {etiquetaRol(u.rol)}
@@ -303,6 +325,16 @@ export function Usuarios() {
           catalogo={consulta.data}
           onCerrar={() => setEditando(null)}
           onGuardado={listo}
+        />
+      )}
+      {claveDe && (
+        <DialogoClaveUsuario
+          usuario={claveDe}
+          onCerrar={() => setClaveDe(null)}
+          onConfirmar={async (clave, motivo) => {
+            await restablecerClave(claveDe.id, clave, motivo)
+            listo(`Contraseña nueva para ${claveDe.nombre}${claveDe.email ? ` (${claveDe.email})` : ''}: ${clave}. Al entrar se le pide cambiarla.`)
+          }}
         />
       )}
       {estadoDe && (

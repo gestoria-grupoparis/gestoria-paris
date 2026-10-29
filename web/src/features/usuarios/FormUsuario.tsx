@@ -290,6 +290,77 @@ export function FormUsuario({
   )
 }
 
+export function DialogoClaveUsuario({
+  usuario,
+  onCerrar,
+  onConfirmar,
+}: {
+  usuario: Usuario
+  onCerrar: () => void
+  onConfirmar: (clave: string, motivo: string) => Promise<void>
+}) {
+  const [clave, setClave] = useState(() => generarClaveInicial())
+  const [motivo, setMotivo] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    if (clave.length < 10 || !/[A-Za-z]/.test(clave) || !/[0-9]/.test(clave))
+      return setError('La contraseña necesita al menos 10 caracteres, con letras y números.')
+    if (!motivo.trim()) return setError('Contá brevemente el motivo.')
+    setEnviando(true)
+    setError(null)
+    try {
+      await onConfirmar(clave, motivo)
+    } catch (err) {
+      setError(mensajeError(err))
+      setEnviando(false)
+    }
+  }
+  return (
+    <Dialogo titulo={`Nueva contraseña para ${usuario.nombre}`} rotulo="Usuarios y permisos" onCerrar={onCerrar}>
+      <form onSubmit={enviar} noValidate className="flex flex-col gap-4">
+        <p className="text-[14px] leading-relaxed text-tenue">
+          Para cuando se olvidó la contraseña o nunca recibió el correo. Pasale esta contraseña; al entrar el sistema le pide elegir una propia.
+          {usuario.email && (
+            <>
+              {' '}Entra con <strong className="text-tinta">{usuario.email}</strong>.
+            </>
+          )}
+        </p>
+        <Field
+          label="Contraseña nueva"
+          extra={
+            <button type="button" className="text-[13px] font-medium text-acento hover:underline" onClick={() => setClave(generarClaveInicial())}>
+              Generar otra
+            </button>
+          }
+        >
+          {(p) => (
+            <input {...p} type="text" autoComplete="off" spellCheck={false} className={`${claseControl} font-mono`} value={clave} onChange={(e) => setClave(e.target.value)} />
+          )}
+        </Field>
+        <Field label="Motivo" ayuda="Queda en el historial de auditoría.">
+          {(p) => <input {...p} className={claseControl} value={motivo} onChange={(e) => setMotivo(e.target.value)} />}
+        </Field>
+        {error && (
+          <p role="alert" className="text-[13px] font-medium text-sinfondos">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-col-reverse gap-2 border-t border-linea pt-4 sm:flex-row sm:justify-end">
+          <Button type="button" variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={enviando}>
+            Guardar contraseña
+          </Button>
+        </div>
+      </form>
+    </Dialogo>
+  )
+}
+
 export function DialogoEstadoUsuario({
   usuario,
   onCerrar,

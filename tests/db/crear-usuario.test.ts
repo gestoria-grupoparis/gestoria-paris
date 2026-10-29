@@ -41,3 +41,26 @@ test('validaciones: rol, permisos, email repetido y contraseña débil', async (
   await rpc(gerencia, 'crear_usuario', base)
   await expect(rpc(gerencia, 'crear_usuario', { ...base, p_email: 'A@B.com' })).rejects.toThrow(/^DUPLICADO:/)
 })
+
+test('gerencia ve los emails y restablece la contraseña de una gestora; otros roles no', async () => {
+  const gerencia = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
+  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
+  const id = (
+    await rpc(gerencia, 'crear_usuario', { p_email: 'g@x.com', p_nombre: 'G', p_rol: 'gestora', p_alcances: '[]', p_clave: 'Inicial2026x' })
+  ).rows[0].crear_usuario as string
+  await comoUsuario(id, (c) => c.query('select public.clave_cambiada()'))
+
+  const emails = await comoUsuario(gerencia, async (c) => (await c.query('select id, email from public.emails_usuarios()')).rows)
+  expect(emails.find((e) => e.id === id)?.email).toBe('g@x.com')
+  expect(await comoUsuario(contable, async (c) => (await c.query('select * from public.emails_usuarios()')).rows)).toEqual([])
+
+  await expect(rpc(contable, 'restablecer_clave', { p_perfil: id, p_clave: 'Nueva2026abc', p_motivo: 'x' })).rejects.toThrow(/^SIN_PERMISO:/)
+  await expect(rpc(gerencia, 'restablecer_clave', { p_perfil: id, p_clave: 'Nueva2026abc', p_motivo: '' })).rejects.toThrow(/^DATO_INVALIDO:/)
+  await expect(rpc(gerencia, 'restablecer_clave', { p_perfil: id, p_clave: 'corta', p_motivo: 'x' })).rejects.toThrow(/^DATO_INVALIDO:/)
+  await expect(rpc(gerencia, 'restablecer_clave', { p_perfil: gerencia, p_clave: 'Nueva2026abc', p_motivo: 'x' })).rejects.toThrow(/^DATO_INVALIDO:/)
+  await rpc(gerencia, 'restablecer_clave', { p_perfil: id, p_clave: 'Nueva2026abc', p_motivo: 'se la olvidó' })
+  const [u] = await sqlAdmin(
+    `select u.encrypted_password = extensions.crypt('Nueva2026abc', u.encrypted_password) as ok, p.debe_cambiar_clave
+       from auth.users u join public.perfiles p on p.id = u.id where u.id = $1`, [id])
+  expect(u).toEqual({ ok: true, debe_cambiar_clave: true })
+})

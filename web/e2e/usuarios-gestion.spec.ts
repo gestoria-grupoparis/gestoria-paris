@@ -87,3 +87,22 @@ test('gerencia edita rol y alcance con motivo, y desactiva a una gestora', async
   await expect(tabla.getByRole('button', { name: 'Reactivar a Gabriela Gestora' })).toBeVisible()
 })
 
+
+test('gerencia ve el email de cada usuario y le da una contraseña nueva', async ({ page }) => {
+  const mock = await montarSupabase(page, [], { usuario: GERENTE })
+  await page.goto('/usuarios')
+  const fila = page.getByRole('table', { name: 'Usuarios' }).getByRole('row', { name: /Silvia Gestora/ })
+  await expect(fila).toContainText('silvia.gestora@grupoparis.com.ar')
+  await page.getByPlaceholder(/Buscar/).fill('silvia.gestora@')
+  await expect(page.getByRole('table', { name: 'Usuarios' }).getByRole('row')).toHaveCount(2)
+  await fila.getByRole('button', { name: 'Nueva contraseña para Silvia Gestora' }).click()
+  const d = page.getByRole('dialog', { name: 'Nueva contraseña para Silvia Gestora' })
+  await expect(d).toContainText('silvia.gestora@grupoparis.com.ar')
+  await d.getByRole('button', { name: 'Guardar contraseña' }).click()
+  await expect(d.getByRole('alert')).toContainText('motivo')
+  await d.getByLabel('Motivo').fill('se la olvidó')
+  await d.getByRole('button', { name: 'Guardar contraseña' }).click()
+  await expect(page.getByRole('status')).toContainText('Contraseña nueva para Silvia Gestora (silvia.gestora@grupoparis.com.ar)')
+  expect(mock.invitaciones.at(-1)).toMatchObject({ restablecer: '00000000-0000-4000-8000-000000000072' })
+  await expect(fila).toContainText('Todavía no entró')
+})

@@ -6,6 +6,10 @@ export interface PerfilUsuario {
   nombre: string
   rol: Rol
   activo: boolean
+  /** Solo lo ven administración y gerencia (emails_usuarios). */
+  email?: string | null
+  ultimo_ingreso?: string | null
+  debe_cambiar_clave?: boolean
 }
 export interface Alcance {
   perfil_id: string
@@ -74,7 +78,12 @@ export function armarUsuarios(perfiles: PerfilUsuario[], alcances: Alcance[], em
 export function filtrarUsuarios(lista: Usuario[], texto: string, rol: string): Usuario[] {
   const q = texto.trim().toLocaleLowerCase('es')
   return lista.filter(
-    (u) => (!rol || u.rol === rol) && (!q || u.nombre.toLocaleLowerCase('es').includes(q) || u.alcances.some((a) => a.empresa.toLocaleLowerCase('es').includes(q))),
+    (u) =>
+      (!rol || u.rol === rol) &&
+      (!q ||
+        u.nombre.toLocaleLowerCase('es').includes(q) ||
+        (u.email ?? '').toLocaleLowerCase('es').includes(q) ||
+        u.alcances.some((a) => a.empresa.toLocaleLowerCase('es').includes(q))),
   )
 }
 
@@ -97,7 +106,16 @@ export async function cargarUsuariosYCatalogo(): Promise<{ usuarios: Usuario[] }
   for (const r of [p, a, e, s]) if (r.error) throw r.error
   const empresas = e.data ?? []
   const sucursales = s.data ?? []
-  return { usuarios: armarUsuarios((p.data ?? []) as PerfilUsuario[], (a.data ?? []) as Alcance[], empresas, sucursales), empresas, sucursales }
+  // Emails y último ingreso: la función devuelve vacío a quien no gestiona usuarios.
+  const m = await supabase.rpc('emails_usuarios')
+  const extra = new Map(
+    ((m.error ? [] : m.data) as { id: string; email: string; ultimo_ingreso: string | null; debe_cambiar_clave: boolean }[] ?? []).map((x) => [x.id, x]),
+  )
+  const perfiles = ((p.data ?? []) as PerfilUsuario[]).map((x) => {
+    const d = extra.get(x.id)
+    return d ? { ...x, email: d.email, ultimo_ingreso: d.ultimo_ingreso, debe_cambiar_clave: d.debe_cambiar_clave } : x
+  })
+  return { usuarios: armarUsuarios(perfiles, (a.data ?? []) as Alcance[], empresas, sucursales), empresas, sucursales }
 }
 
 // --- Gestión (admin y gerencia) ---------------------------------------------------------------
@@ -203,6 +221,12 @@ export async function editarUsuario(id: string, d: DatosUsuario, motivo: string)
     p_alcances: alcancesDesdeSeleccion(d.seleccion),
     p_motivo: motivo.trim(),
   })
+  if (error) throw error
+}
+
+/** Gerencia/admin le da una contraseña nueva (temporal: la cambia al entrar). */
+export async function restablecerClave(id: string, clave: string, motivo: string): Promise<void> {
+  const { error } = await supabase.rpc('restablecer_clave', { p_perfil: id, p_clave: clave, p_motivo: motivo.trim() })
   if (error) throw error
 }
 

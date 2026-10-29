@@ -79,7 +79,7 @@ export interface OpcionesMock {
   /** Filas de public.alcances de todos los perfiles (pantalla de Usuarios). */
   tablaAlcances?: { perfil_id: string; empresa_id: string; sucursal_id: string | null }[]
   /** Perfiles adicionales a los de fixtures/catalogos.json (p. ej. un admin). */
-  perfilesExtra?: { id: string; nombre: string; rol: string; activo: boolean; debe_cambiar_clave?: boolean }[]
+  perfilesExtra?: { id: string; nombre: string; rol: string; activo: boolean; debe_cambiar_clave?: boolean; email?: string }[]
   /**
    * Fuente fija de v_saldos (salida real de la base, p. ej. fixtures/escenario-saldos.json). Recibe el
    * estado y devuelve las filas, o undefined si el estado no tiene salida registrada: en ese caso la
@@ -389,6 +389,26 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       perfiles.push({ id, nombre: String(a.p_nombre), rol: String(a.p_rol), activo: true, debe_cambiar_clave: true })
       reemplazarAlcances(id, a.p_alcances)
       await route.fulfill({ json: id })
+    },
+    async emails_usuarios(route) {
+      if (!gestionaUsuarios()) return route.fulfill({ json: [] })
+      const slug = (n: unknown) => String(n).toLowerCase().normalize('NFD').replace(/[^a-z ]/g, '').trim().replace(/ +/g, '.')
+      await route.fulfill({
+        json: perfiles.map((p) => ({
+          id: p.id, email: p.email ?? `${slug(p.nombre)}@grupoparis.com.ar`,
+          ultimo_ingreso: p.debe_cambiar_clave ? null : '2026-10-27T12:00:00.000Z', debe_cambiar_clave: !!p.debe_cambiar_clave,
+        })),
+      })
+    },
+    async restablecer_clave(route, a) {
+      if (!gestionaUsuarios()) return errorNegocio(route, 'SIN_PERMISO: solo administración o gerencia gestionan usuarios')
+      if (a.p_perfil === yo) return errorNegocio(route, 'DATO_INVALIDO: tu propia contraseña la cambiás desde "Cambiar contraseña"')
+      if (!conMotivo(a)) return errorNegocio(route, 'DATO_INVALIDO: indicá el motivo')
+      const p = perfiles.find((x) => x.id === a.p_perfil)
+      if (!p) return errorNegocio(route, 'NO_ENCONTRADO: usuario inexistente')
+      p.debe_cambiar_clave = true
+      invitaciones.push({ restablecer: p.id, clave: a.p_clave })
+      await route.fulfill({ status: 204, body: '' })
     },
     async clave_cambiada(route) {
       const p = perfiles.find((x) => x.id === yo)

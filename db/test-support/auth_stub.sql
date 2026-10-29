@@ -34,7 +34,8 @@ create table if not exists auth.users (
   confirmation_token text,
   recovery_token text,
   email_change_token_new text,
-  email_change text
+  email_change text,
+  last_sign_in_at timestamptz
 );
 
 create table if not exists auth.identities (
