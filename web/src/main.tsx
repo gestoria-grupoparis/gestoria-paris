@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProveedorSesion } from './lib/sesion'
 import { Rutas } from './app/rutas'
+import { LimiteError } from './ui'
 import './index.css'
 
 const queryClient = new QueryClient()
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ProveedorSesion>
-          <Rutas />
+          <LimiteError>
+            <Rutas />
+          </LimiteError>
         </ProveedorSesion>
       </BrowserRouter>
     </QueryClientProvider>

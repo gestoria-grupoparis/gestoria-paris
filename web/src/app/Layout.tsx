@@ -1,9 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSesion, type Rol } from '../lib/sesion'
 import { navegacionPorRol } from './navegacion'
-import { Button, LogoGrupoParis, cx } from '../ui'
+import { Button, LimiteError, LogoGrupoParis, cx } from '../ui'
 import { Campana } from '../features/notificaciones/Campana'
 import { useNotificacionesEnVivo } from '../features/notificaciones/consultas'
 
@@ -59,6 +59,7 @@ export function Layout() {
   const items = navegacionPorRol(rol)
   useNotificacionesEnVivo(perfil?.id)
   const [cuenta, setCuenta] = useState(false)
+  const { pathname } = useLocation()
   const rolTexto = rol ? ROL_ETIQUETA[rol] : ''
   const salir = () => void supabase.auth.signOut()
   const navegar = useNavigate()
@@ -147,7 +148,9 @@ export function Layout() {
           </div>
         </header>
         <main className="min-w-0 pb-24 md:pb-0">
-          <Outlet />
+          <LimiteError compacto key={pathname}>
+            <Outlet />
+          </LimiteError>
         </main>
       </div>
 
