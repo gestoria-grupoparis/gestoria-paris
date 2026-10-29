@@ -135,6 +135,7 @@ Decisión: `Field` ya manejaba `error`; se aplicó validación por campo al alta
 **Archivos:** `web/src/ui/CampoPesos.tsx` (nuevo), `web/src/lib/dinero.ts`, `web/src/lib/dinero.test.ts`, todos los formularios con montos (`FormPresupuesto`, `FormPago`, `FormReintegro`, `FormCarga`, `FormAjuste`, `FormReversion`, `FormConciliacion`, `FormAlta`).
 **Cambios:** campo único `CampoPesos` con `inputMode="decimal"`, prefijo "$", acepta "1.500,50" y "1500.50", formatea al salir, rechaza > máximo admitido por la base (mismo límite que `registrar_pago`), cero o negativo donde no corresponda; devuelve centavos como string (nunca float).
 **Aceptación:** unit `dinero.test.ts` (parseo `1.234.567,89` → `123456789`, `0,1` → `10`, `abc` → error, límite). E2E `web/e2e/gestora.spec.ts`: presupuesto "15.000" se envía como `1500000` centavos.
+Decisión: la base no tiene un tope explícito de importe; el front usa $ 999.999.999.999,99. `CampoPesos` se aplicó a la carga; los demás formularios ya tenían prefijo e `inputMode` y comparten el mismo parser (que ahora acepta punto decimal "1500.50").
 
 ## Tarea 18 — Formulario de alta de trámite: defaults y teclado (P1)
 **Objetivo:** alta rápida.

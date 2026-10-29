@@ -30,6 +30,21 @@ describe('parsearPesos', () => {
     expect(() => parsearPesos('abc')).toThrow(/importe/i)
     expect(() => parsearPesos('')).toThrow()
     expect(() => parsearPesos('1,234')).toThrow()
-    expect(() => parsearPesos('65.00')).toThrow()
+    expect(parsearPesos('65.00')).toBe(6500n) // punto decimal del teclado numérico
+  })
+})
+
+describe('entrada de montos', () => {
+  it('acepta coma o punto decimal y rechaza basura y excesos', async () => {
+    const { normalizarPesos } = await import('./dinero')
+    expect(parsearPesos('1.234.567,89')).toBe(123456789n)
+    expect(parsearPesos('0,1')).toBe(10n)
+    expect(parsearPesos('1500.50')).toBe(150050n)
+    expect(parsearPesos('1500.5')).toBe(150050n)
+    expect(parsearPesos('15.000')).toBe(1500000n)
+    expect(() => parsearPesos('abc')).toThrow()
+    expect(() => parsearPesos('1.000.000.000.000,00')).toThrow(/máximo/)
+    expect(normalizarPesos('1500.5')).toBe('1.500,50')
+    expect(normalizarPesos('abc')).toBe('abc')
   })
 })

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { formatearPesos, parsearPesos } from '../../lib/dinero'
-import { useAviso } from '../../ui'
+import { CampoPesos, useAviso } from '../../ui'
 import { mensajeError } from '../../lib/errores'
 import { CLASE_CAMPO, CLASE_ETIQUETA, CLASE_PRIMARIO, CLASE_SECUNDARIO, Dialogo } from '../tramites/Dialogo'
 import { hoyEnBuenosAires } from '../tramites/filtros'
@@ -48,8 +48,7 @@ export function FormCarga({ empresa, onCerrar, onGuardado }: {
         <p className="text-sm text-tenue">Fondos acreditados en la Habitualista de {empresa.nombre}.</p>
         <label className={CLASE_ETIQUETA}>
           Importe
-          <input inputMode="decimal" required value={importe} onChange={(e) => setImporte(e.target.value)}
-            placeholder="500.000,00" className={CLASE_CAMPO} />
+          <CampoPesos required value={importe} onValor={setImporte} placeholder="500.000,00" className="mt-1.5" />
         </label>
         <label className={CLASE_ETIQUETA}>
           Fecha de la carga

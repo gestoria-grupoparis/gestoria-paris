@@ -84,3 +84,14 @@ test('gestora sin trámites asignados ve el estado vacío', async ({ page }) => 
   await page.goto('/mis-tramites')
   await expect(page.getByRole('heading', { name: 'Estás al día' })).toBeVisible()
 })
+
+test('presupuesto "15.000" viaja como 1500000 centavos', async ({ page }) => {
+  await montarSupabase(page, [{ operacion: f.operacion, tramite: f.autorizado }], { usuario: GABRIELA })
+  await page.goto('/mis-tramites')
+  await page.getByRole('article', { name: /T-2026-00011/ }).getByRole('button', { name: 'Cargar presupuesto' }).click()
+  const form = page.getByRole('dialog', { name: 'Cargar presupuesto' })
+  await form.getByLabel('Arancel').fill('15.000')
+  const pedido = page.waitForRequest((r) => r.url().includes('/rpc/registrar_presupuesto'))
+  await form.getByRole('button', { name: 'Guardar presupuesto' }).click()
+  expect(JSON.stringify((await pedido).postDataJSON())).toContain('"1500000"')
+})
