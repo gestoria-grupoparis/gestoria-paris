@@ -14,7 +14,7 @@ async function preparar() {
   const gerencia = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
   const gestora = await crearUsuario('gestora', [])
   const empresa = await idPorNombre('empresas', 'Paris Autos')
-  const sucursal = await idPorNombre('sucursales', 'San Luis')
+  const sucursal = await idPorNombre('sucursales', 'San Luis Capital')
   let n = 0
 
   const carga = (importe: bigint) =>
@@ -184,7 +184,7 @@ test('las vistas filtran por usuario: gestora solo sus trámites autorizados; sa
   const [{ gestora_id: gestora }] = await sqlAdmin(`select gestora_id from public.tramites where id = $1`, [t])
   const otraGestora = await crearUsuario('gestora', [])
   const contableSJ = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Juan' }])
-  const contableSL = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const contableSL = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
 
   const ver = (userId: string, vista: string) =>
     comoUsuario(userId, async (c) => (await c.query(`select * from public.${vista}`)).rows)

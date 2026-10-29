@@ -12,7 +12,7 @@ async function preparar() {
   const gestora = await crearUsuario('gestora', [])
   const empresa = await idPorNombre('empresas', 'Paris Autos')
   const otra = await idPorNombre('empresas', 'Paris Cars')
-  const sucursal = await idPorNombre('sucursales', 'San Luis')
+  const sucursal = await idPorNombre('sucursales', 'San Luis Capital')
   let n = 0
   const carga = (emp: string, importe: bigint, fecha: string) =>
     rpc(gerencia, 'registrar_carga', { p_idem: randomUUID(), p_empresa: emp, p_importe: importe, p_fecha: fecha })

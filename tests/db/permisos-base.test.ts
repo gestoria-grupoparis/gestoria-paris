@@ -35,27 +35,29 @@ test('mi_rol devuelve el rol del usuario y null si está inactivo', async () => 
 
 test('tiene_alcance con sucursal null habilita todas las sucursales de esa empresa', async () => {
   const todas = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
-  const soloSanLuis = await crearUsuario('comercial', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const soloSanLuis = await crearUsuario('comercial', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
 
-  expect(await tieneAlcance(todas, 'Paris Autos', 'San Luis')).toBe(true)
+  expect(await tieneAlcance(todas, 'Paris Autos', 'San Luis Capital')).toBe(true)
   expect(await tieneAlcance(todas, 'Paris Autos', 'San Juan')).toBe(true)
-  expect(await tieneAlcance(soloSanLuis, 'Paris Autos', 'San Luis')).toBe(true)
+  expect(await tieneAlcance(soloSanLuis, 'Paris Autos', 'San Luis Capital')).toBe(true)
   expect(await tieneAlcance(soloSanLuis, 'Paris Autos', 'San Juan')).toBe(false)
 })
 
 test('tiene_alcance es false para otra empresa', async () => {
   const id = await crearUsuario('gestora', [{ empresa: 'Paris Autos' }])
 
-  expect(await tieneAlcance(id, 'Paris Autos', 'San Luis')).toBe(true)
-  expect(await tieneAlcance(id, 'Paris Cars', 'San Luis')).toBe(false)
+  expect(await tieneAlcance(id, 'Paris Autos', 'San Luis Capital')).toBe(true)
+  expect(await tieneAlcance(id, 'Paris Cars', 'San Luis Capital')).toBe(false)
   expect(await tieneAlcance(id, 'Paris Motor', 'San Juan')).toBe(false)
 })
 
 const CATALOGOS = {
-  empresas: ['Paris Autos', 'Paris Cars', 'Paris Motor'],
+  empresas: ['Doral', 'Paris Autos', 'Paris Cars', 'Paris Motor', 'Paris Track'],
   sucursales: [
+    { nombre: 'Merlo', provincia: 'San Luis' },
     { nombre: 'San Juan', provincia: 'San Juan' },
-    { nombre: 'San Luis', provincia: 'San Luis' },
+    { nombre: 'San Luis Capital', provincia: 'San Luis' },
+    { nombre: 'Villa Mercedes', provincia: 'San Luis' },
   ],
   tipos: ['patentamiento_0km', 'transferencia_parte_pago', 'transferencia_usado'],
   cuentas: ['Habitualista Paris Autos', 'Habitualista Paris Cars', 'Habitualista Paris Motor'],
@@ -101,18 +103,20 @@ test('las migraciones solas (sin seed) crean los catálogos y son idempotentes',
 
 test('sucursales no admite dos filas con el mismo nombre y provincia', async () => {
   await expect(
-    sqlAdmin(`insert into public.sucursales (nombre, provincia) values ('San Luis', 'San Luis')`),
+    sqlAdmin(`insert into public.sucursales (nombre, provincia) values ('San Luis Capital', 'San Luis')`),
   ).rejects.toThrow(/duplicate key/)
 })
 
-test('los catálogos iniciales incluyen Paris Autos, Paris Cars y Paris Motor', async () => {
+test('los catálogos iniciales incluyen las cinco razones sociales (Habitualista solo las tres Paris)', async () => {
   const empresas = await sqlAdmin('select nombre from public.empresas order by nombre')
-  expect(empresas.map((r) => r.nombre)).toEqual(['Paris Autos', 'Paris Cars', 'Paris Motor'])
+  expect(empresas.map((r) => r.nombre)).toEqual(['Doral', 'Paris Autos', 'Paris Cars', 'Paris Motor', 'Paris Track'])
 
   const sucursales = await sqlAdmin('select nombre, provincia from public.sucursales order by nombre')
   expect(sucursales).toEqual([
+    { nombre: 'Merlo', provincia: 'San Luis' },
     { nombre: 'San Juan', provincia: 'San Juan' },
-    { nombre: 'San Luis', provincia: 'San Luis' },
+    { nombre: 'San Luis Capital', provincia: 'San Luis' },
+    { nombre: 'Villa Mercedes', provincia: 'San Luis' },
   ])
 
   const tipos = await sqlAdmin('select codigo, activo from public.tipos_tramite order by codigo')

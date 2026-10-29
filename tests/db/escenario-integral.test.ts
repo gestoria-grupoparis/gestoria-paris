@@ -21,7 +21,7 @@ const FECHA = '2026-10-27'
 
 test('escenario integral (sección K): saldos de Paris Autos con San Luis y San Juan', async () => {
   const gerenciaGeneral = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
-  const contableSL = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const contableSL = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
   const gerenciaSJ = await crearUsuario('gerencia', [{ empresa: 'Paris Autos', sucursal: 'San Juan' }])
   const gestora = await crearUsuario('gestora', [])
   const empresa = await idPorNombre('empresas', 'Paris Autos')
@@ -62,7 +62,7 @@ test('escenario integral (sección K): saldos de Paris Autos con San Luis y San 
   expect(S(await saldo('Paris Autos'))).toEqual(paso('cargas=0,presupuestos=0,pagos=0'))
   await carga(300000000n)
   expect(S(await saldo('Paris Autos'))).toEqual(paso('cargas=1,presupuestos=0,pagos=0'))
-  const t1 = await tramitePresupuestado(contableSL, 'San Luis', 'OF-1', 70000000n)
+  const t1 = await tramitePresupuestado(contableSL, 'San Luis Capital', 'OF-1', 70000000n)
   expect(S(await saldo('Paris Autos'))).toEqual([300000000n, 70000000n, 230000000n])
   expect(S(await saldo('Paris Autos'))).toEqual(paso('cargas=1,presupuestos=1,pagos=0'))
 

@@ -86,7 +86,7 @@ test('editar_usuario cambia nombre, rol y reemplaza alcances con motivo auditado
   const admin = await crearUsuario('admin', [])
   const u = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
   const cars = await id('empresas', 'Paris Cars')
-  const sanLuis = await id('sucursales', 'San Luis')
+  const sanLuis = await id('sucursales', 'San Luis Capital')
   await expect(
     rpc(admin, 'editar_usuario', { p_perfil: u, p_nombre: 'Z', p_rol: 'gerencia', p_alcances: '[]', p_motivo: ' ' }),
   ).rejects.toThrow(/^DATO_INVALIDO/)
@@ -99,7 +99,7 @@ test('editar_usuario cambia nombre, rol y reemplaza alcances con motivo auditado
   })
   const [p] = await sqlAdmin('select nombre, rol from public.perfiles where id = $1', [u])
   expect(p).toEqual({ nombre: 'Gonzalo', rol: 'gerencia' })
-  expect(await alcancesDe(u)).toEqual([{ empresa: 'Paris Cars', sucursal: 'San Luis' }])
+  expect(await alcancesDe(u)).toEqual([{ empresa: 'Paris Cars', sucursal: 'San Luis Capital' }])
   const motivos = await sqlAdmin(
     `select distinct entidad, motivo from public.eventos where entidad_id = $1 and actor_id = $2 order by 1`,
     [u, admin],

@@ -87,3 +87,26 @@ export async function cerrarPool() {
   await pool?.end()
   pool = undefined
 }
+
+// Deja el trámite listo para que la gestora lo presente (ping pong): presupuesto vigente
+// aprobado y legajo retirado. Si no tiene presupuesto, carga uno mínimo. Va directo por SQL
+// porque los tests que lo usan prueban estados, no fondos.
+export async function habilitarPresentacion(tramite: string, por: string): Promise<void> {
+  // El legajo lo retira la gestora asignada.
+  const [{ gestora_id: gestora }] = await sqlAdmin('select gestora_id from public.tramites where id = $1', [tramite])
+  await sqlAdmin(
+    `insert into public.presupuestos (tramite_id, version, arancel_cents, creado_por)
+     select $1, 1, 1000, $2 where not exists (select 1 from public.presupuestos where tramite_id = $1)`,
+    [tramite, por],
+  )
+  await sqlAdmin(
+    `insert into public.aprobaciones_presupuesto (tramite_id, version, aprobado_por)
+     select $1, max(version), $2 from public.presupuestos where tramite_id = $1
+     on conflict do nothing`,
+    [tramite, por],
+  )
+  await sqlAdmin(
+    `insert into public.tramite_marcas (tramite_id, marca, por) values ($1, 'retirado', $2) on conflict do nothing`,
+    [tramite, gestora],
+  )
+}

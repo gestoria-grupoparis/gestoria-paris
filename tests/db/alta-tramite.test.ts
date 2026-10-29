@@ -24,7 +24,7 @@ const crearTramite = async (userId: string, a: Alta = {}) => {
   const args = {
     p_idem: a.idem ?? randomUUID(),
     p_empresa: await idPorNombre('empresas', a.empresa ?? 'Paris Autos'),
-    p_sucursal: await idPorNombre('sucursales', a.sucursal ?? 'San Luis'),
+    p_sucursal: await idPorNombre('sucursales', a.sucursal ?? 'San Luis Capital'),
     p_tipo: a.tipo ?? 'patentamiento_0km',
     p_cliente: 'Juan Pérez',
     p_cuenta_personal: 'CP-1001',
@@ -51,7 +51,7 @@ test('contable crea un trámite en borrador con número T-2026-00001', async () 
   expect(t.creado_por).toBe(contable)
   expect(t.dominio).toBe('AB123CD')
   expect(t.empresa_id).toBe(await idPorNombre('empresas', 'Paris Autos'))
-  expect(t.sucursal_id).toBe(await idPorNombre('sucursales', 'San Luis'))
+  expect(t.sucursal_id).toBe(await idPorNombre('sucursales', 'San Luis Capital'))
 
   const [op] = await sqlAdmin(`select * from public.operaciones where id = $1`, [t.operacion_id])
   expect(op).toMatchObject({
@@ -97,7 +97,7 @@ test('mismo idem_key devuelve el mismo id y no crea otro', async () => {
 
 test('la empresa y sucursal del trámite son las de su operación', async () => {
   const gerente = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
-  const id = await crearTramite(gerente, { sucursal: 'San Luis' })
+  const id = await crearTramite(gerente, { sucursal: 'San Luis Capital' })
 
   // La misma oferta no puede reaparecer en otra sucursal.
   await expect(

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach, expect, test } from 'vitest'
-import { crearUsuario, resetDb, rpc, sqlAdmin } from './helpers'
+import { crearUsuario, resetDb, rpc, sqlAdmin, habilitarPresentacion } from './helpers'
 
 beforeEach(resetDb)
 
@@ -11,7 +11,7 @@ const crearTramite = async (userId: string, oferta = 'OF-700') => {
   const r = await rpc(userId, 'crear_tramite', {
     p_idem: randomUUID(),
     p_empresa: await idPorNombre('empresas', 'Paris Autos'),
-    p_sucursal: await idPorNombre('sucursales', 'San Luis'),
+    p_sucursal: await idPorNombre('sucursales', 'San Luis Capital'),
     p_tipo: 'patentamiento_0km',
     p_cliente: 'Juan Pérez',
     p_cuenta_personal: 'CP-1001',
@@ -119,7 +119,7 @@ test('gestora asignada carga presupuesto; total = suma de conceptos', async () =
   expect(ev).toEqual([{ actor_id: gestora, accion: 'insert' }])
 
   // Gerencia y contable con alcance también cargan; el siguiente trámite toma el orden siguiente.
-  const gerente = await crearUsuario('gerencia', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const gerente = await crearUsuario('gerencia', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
   const otro = (await tramiteAutorizado(gestora, 'OF-701')).id
   expect(await registrar(gerente, otro, { arancel: 100n, prenda: 0n, sellado: 0n, otros: 0n })).toBe(1)
   expect((await tramite(otro)).orden_compromiso).toBe(2n)
@@ -175,6 +175,7 @@ test('presupuesto en borrador da NO_AUTORIZADO', async () => {
   await rpc(contable, 'autorizar_tramite', { p_tramite: id, p_gestora: gestora, p_version: 1 })
   await rpc(contable, 'cambiar_estado', { p_tramite: id, p_estado: 'en_gestoria', p_motivo: null, p_version: 2 })
   expect(await registrar(gestora, id, BASE)).toBe(1)
+  await habilitarPresentacion(id, contable)
   await rpc(gestora, 'cambiar_estado', { p_tramite: id, p_estado: 'presentado', p_motivo: null, p_version: 3 })
   expect(await registrar(gestora, id, BASE, 'reajuste')).toBe(2)
   await rpc(gestora, 'cambiar_estado', {

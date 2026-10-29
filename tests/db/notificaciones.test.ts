@@ -13,7 +13,7 @@ async function preparar() {
   const ajena = await crearUsuario('contable', [{ empresa: 'Paris Cars' }])
   const gestora = await crearUsuario('gestora', [])
   const empresa = await idPorNombre('empresas', 'Paris Autos')
-  const sucursal = await idPorNombre('sucursales', 'San Luis')
+  const sucursal = await idPorNombre('sucursales', 'San Luis Capital')
   let n = 0
   const crear = async (por = contable) => {
     n += 1

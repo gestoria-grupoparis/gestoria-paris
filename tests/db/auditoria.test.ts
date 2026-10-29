@@ -5,7 +5,7 @@ beforeEach(resetDb)
 
 test('cambiar el rol de un perfil genera un evento con antes/después y actor', async () => {
   const gerente = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
-  const gestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const gestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
 
   // Simula una RPC SECURITY DEFINER: escribe como dueño de la tabla con las claims del gerente
   // y el motivo guardado con set_config('app.motivo', ..., true).

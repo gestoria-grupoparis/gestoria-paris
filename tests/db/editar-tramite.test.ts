@@ -11,7 +11,7 @@ const crearTramite = async (userId: string, oferta = 'OF-555', dominio = 'AB123C
   const r = await rpc(userId, 'crear_tramite', {
     p_idem: randomUUID(),
     p_empresa: await idPorNombre('empresas', 'Paris Autos'),
-    p_sucursal: await idPorNombre('sucursales', 'San Luis'),
+    p_sucursal: await idPorNombre('sucursales', 'San Luis Capital'),
     p_tipo: 'patentamiento_0km',
     p_cliente: 'Juan Pérez',
     p_cuenta_personal: 'CP-1001',

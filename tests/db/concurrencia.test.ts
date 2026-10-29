@@ -73,7 +73,7 @@ async function preparar() {
   const gerencia = await crearUsuario('gerencia', [{ empresa: 'Paris Autos' }])
   const gestora = await crearUsuario('gestora', [])
   const empresa = await idPorNombre('empresas', 'Paris Autos')
-  const sucursal = await idPorNombre('sucursales', 'San Luis')
+  const sucursal = await idPorNombre('sucursales', 'San Luis Capital')
   let n = 0
 
   const tramite = async () => {

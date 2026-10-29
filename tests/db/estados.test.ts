@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach, expect, test } from 'vitest'
-import { crearUsuario, resetDb, rpc, sqlAdmin } from './helpers'
+import { crearUsuario, resetDb, rpc, sqlAdmin, habilitarPresentacion } from './helpers'
 
 beforeEach(resetDb)
 
@@ -11,7 +11,7 @@ const crearTramite = async (userId: string, oferta = 'OF-555') => {
   const r = await rpc(userId, 'crear_tramite', {
     p_idem: randomUUID(),
     p_empresa: await idPorNombre('empresas', 'Paris Autos'),
-    p_sucursal: await idPorNombre('sucursales', 'San Luis'),
+    p_sucursal: await idPorNombre('sucursales', 'San Luis Capital'),
     p_tipo: 'patentamiento_0km',
     p_cliente: 'Juan Pérez',
     p_cuenta_personal: 'CP-1001',
@@ -38,7 +38,7 @@ const permitida = async (desde: string, hacia: string, rol: string, asignada = f
 
 test('autorizar exige rol habilitado y deja autorizado_por y autorizado_at', async () => {
   const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
-  const gerente = await crearUsuario('gerencia', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const gerente = await crearUsuario('gerencia', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
   const gestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos' }])
   const id = await crearTramite(contable)
 
@@ -93,7 +93,7 @@ test('no se puede pasar de borrador a presentado (TRANSICION_INVALIDA)', async (
   expect(await permitida('autorizado', 'presentado', 'gestora', false)).toBe(false)
   expect(await permitida('presentado', 'finalizado_registro', 'gestora', true)).toBe(true)
   expect(await permitida('autorizado', 'en_gestoria', 'gestora', true)).toBe(false)
-  expect(await permitida('finalizado_registro', 'devuelto', 'gestora', true)).toBe(false)
+  expect(await permitida('finalizado_registro', 'devuelto', 'gestora', true)).toBe(true)
   expect(await permitida('devuelto', 'cerrado', 'contable')).toBe(true)
   expect(await permitida('cerrado', 'cancelado', 'gerencia')).toBe(false)
   expect(await permitida('rechazado', 'suspendido', 'gerencia')).toBe(false)
@@ -138,6 +138,7 @@ test('gestora asignada marca presentado; otra gestora recibe SIN_PERMISO', async
   await expect(cambiarEstado(asignada, id, 'en_gestoria', 2)).rejects.toThrow(/^SIN_PERMISO:/)
   await expect(cambiarEstado(asignada, id, 'cancelado', 2, 'no va')).rejects.toThrow(/^SIN_PERMISO:/)
 
+  await habilitarPresentacion(id, contable)
   await cambiarEstado(asignada, id, 'presentado', 2)
   expect((await tramite(id)).estado).toBe('presentado')
   await expect(cambiarEstado(otra, id, 'finalizado_registro', 3)).rejects.toThrow(/^SIN_PERMISO:/)
@@ -213,6 +214,7 @@ test('suspender y reanudar vuelve al estado previo', async () => {
   expect(t.version).toBe(5)
 
   // Una segunda suspensión recuerda el estado de ese momento, no el de la primera.
+  await habilitarPresentacion(id, contable)
   await cambiarEstado(gestora, id, 'presentado', 5)
   await cambiarEstado(contable, id, 'suspendido', 6, 'consulta del registro')
   await expect(cambiarEstado(contable, id, 'en_gestoria', 7, 'sigue')).rejects.toThrow(/^TRANSICION_INVALIDA:/)
@@ -276,6 +278,7 @@ test('reasignar en lote cambia la gestora y registra el motivo en eventos', asyn
 
   // La nueva gestora ya puede operar; la anterior no.
   await expect(cambiarEstado(vieja, a, 'presentado', 3)).rejects.toThrow(/^SIN_PERMISO:/)
+  await habilitarPresentacion(a, contable)
   await cambiarEstado(nueva, a, 'presentado', 3)
 })
 
@@ -285,6 +288,7 @@ test('el historial de eventos de un trámite reconstruye alta → autorización 
   const gestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos' }])
   const id = await crearTramite(contable)
   await autorizar(gerente, id, gestora, 1)
+  await habilitarPresentacion(id, gerente)
   await cambiarEstado(gestora, id, 'presentado', 2)
 
   const historial = await sqlAdmin(

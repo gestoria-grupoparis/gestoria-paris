@@ -18,7 +18,7 @@ async function preparar() {
   const otraGestora = await crearUsuario('gestora', [])
   const autos = await idPorNombre('empresas', 'Paris Autos')
   const cars = await idPorNombre('empresas', 'Paris Cars')
-  const sanLuis = await idPorNombre('sucursales', 'San Luis')
+  const sanLuis = await idPorNombre('sucursales', 'San Luis Capital')
   let n = 0
 
   const crear = async (empresa: string) => {
@@ -134,7 +134,7 @@ test('gestora: v_saldos devuelve 0 filas; v_tramite_finanzas solo sus trámites 
 
 test('contable con alcance San Luis/Paris Autos no ve trámites de Paris Cars', async () => {
   const f = await preparar()
-  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
 
   const ids = (await filas(contable, 'select id from public.tramites order by numero')).map((r) => r.id)
   expect(ids).toEqual([f.propio, f.ajeno, f.borrador])
@@ -149,7 +149,7 @@ test('contable con alcance San Luis/Paris Autos no ve trámites de Paris Cars', 
 
 test('contable con alcance Paris Autos no ve el historial (eventos) de Paris Cars', async () => {
   const f = await preparar()
-  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis' }])
+  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos', sucursal: 'San Luis Capital' }])
 
   expect(await filas(contable, 'select id from public.eventos where entidad_id = $1', [f.deCars])).toEqual([])
   const tram = await filas(contable, `select despues from public.eventos where entidad = 'tramites'`)
