@@ -4,10 +4,10 @@ import { mensajeError } from '../../lib/errores'
 import { Button, claseControl, Field } from '../../ui'
 import { IconoCheck, IconoFlecha, IconoLapiz, IconoRetorno, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
 import { formatearPesos } from '../../lib/dinero'
-import { aprobarPresupuesto, autorizarTramite, cambiarEstado, revocarAprobacion, historial, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
+import { aprobarPresupuesto, autorizarTramite, cambiarEstado, revocarAprobacion, estadoPrevio, reanudarTramite, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
 import { Dialogo } from './Dialogo'
 import { etiquetaEstado } from './filtros'
-import { AVANCE, RETROCESO, estadoPrevioSuspension, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
+import { AVANCE, RETROCESO, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
 import { FormEdicion } from './FormEdicion'
 
 type Accion = 'editar' | 'aprobar' | 'revocar' | 'retroceder' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
@@ -22,12 +22,12 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
   const cerrar = () => setAbierta(null)
   const e = tramite.estado
   const avance = AVANCE[e]
-  const eventos = useQuery({
-    queryKey: ['tramites', 'historial', tramite.id],
-    queryFn: () => historial(tramite.id),
+  const previoQ = useQuery({
+    queryKey: ['tramites', 'estado-previo', tramite.id, tramite.version],
+    queryFn: () => estadoPrevio(tramite.id),
     enabled: e === 'suspendido',
   })
-  const previo = eventos.data ? estadoPrevioSuspension(eventos.data) : null
+  const previo = previoQ.data ?? null
   const fin = tramite.finanzas
   // Ping pong: la gestora presupuestó y espera que la empresa apruebe (y guarde la plata).
   const antesDePresentar = e === 'autorizado' || e === 'en_gestoria'
@@ -76,7 +76,7 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
     )
   if (e === 'suspendido')
     secundarias.push(
-      <Button key="rean" variante="secundario" tamano="sm" icono={<IconoPlay className="size-4" />} disabled={!previo} onClick={() => setAbierta('reanudar')}>
+      <Button key="rean" variante="secundario" tamano="sm" icono={<IconoPlay className="size-4" />} cargando={previoQ.isPending} onClick={() => setAbierta('reanudar')}>
         Reanudar
       </Button>,
     )
@@ -227,14 +227,14 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
           onCerrar={cerrar}
         />
       )}
-      {abierta === 'reanudar' && previo && (
+      {abierta === 'reanudar' && (
         <FormAccion
           titulo="Reanudar trámite"
           rotulo={tramite.numero}
           boton="Confirmar"
-          aviso={`Vuelve a ${etiquetaEstado(previo)}.`}
+          aviso={previo ? `Vuelve a ${etiquetaEstado(previo)}.` : previoQ.isError ? mensajeError(previoQ.error) : 'Vuelve al estado en que estaba.'}
           pideMotivo="Indicá el motivo para reanudarlo."
-          ejecutar={cambio(previo)}
+          ejecutar={(_, motivo) => reanudarTramite(tramite.id, motivo, tramite.version)}
           onCerrar={cerrar}
         />
       )}

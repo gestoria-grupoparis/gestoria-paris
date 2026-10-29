@@ -97,3 +97,16 @@ test.describe('gestora (móvil)', () => {
     await expect(t('Para devolver')).toBeVisible()
   })
 })
+
+test('suspender un trámite presentado y reanudarlo desde el panel vuelve a Presentado', async ({ page }) => {
+  const { detalle, mock } = await panel(page, { operacion: f.operacion, tramite: { ...f.autorizado, estado: 'presentado' }, presupuestos: ['70000000'], aprobado: true })
+  await detalle.getByRole('button', { name: 'Suspender' }).click()
+  await confirmarConMotivo(page, 'Suspender trámite', 'Confirmar suspensión', 'Consulta del registro')
+  await expect(detalle.getByTestId('estado')).toHaveText('Suspendido')
+  await detalle.getByRole('button', { name: 'Reanudar' }).click()
+  const d = page.getByRole('dialog', { name: 'Reanudar trámite' })
+  await expect(d).toContainText('Vuelve a Presentado.')
+  await confirmarConMotivo(page, 'Reanudar trámite', 'Confirmar', 'Respondida')
+  await expect(detalle.getByTestId('estado')).toHaveText('Presentado')
+  expect(mock.rutasPedidas.some((r) => r.includes('reanudar_tramite'))).toBe(true)
+})

@@ -299,6 +299,16 @@ export const autorizarTramite = (id: string, gestora: string, version: number) =
 export const cambiarEstado = (id: string, estado: string, motivo: string, version: number) =>
   sinRetorno(supabase.rpc('cambiar_estado', { p_tramite: id, p_estado: estado, p_motivo: motivo, p_version: version }))
 
+/** Estado al que vuelve un trámite suspendido, resuelto por la base. */
+export async function estadoPrevio(id: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('estado_previo_suspension', { p_tramite: id })
+  if (error) throw error
+  return (data as string | null) ?? null
+}
+
+export const reanudarTramite = (id: string, motivo: string, version: number) =>
+  sinRetorno(supabase.rpc('reanudar_tramite', { p_tramite: id, p_motivo: motivo, p_version: version }))
+
 export const marcar = (id: string, marca: string) =>
   sinRetorno(supabase.rpc('marcar', { p_tramite: id, p_marca: marca }))
 

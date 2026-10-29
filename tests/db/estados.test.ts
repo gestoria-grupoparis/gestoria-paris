@@ -303,3 +303,26 @@ test('el historial de eventos de un trámite reconstruye alta → autorización 
     { accion: 'update', actor_id: gestora, desde: 'autorizado', hacia: 'presentado', autorizado_por: gerente },
   ])
 })
+
+test('reanudar_tramite vuelve al estado previo resuelto en la base', async () => {
+  const contable = await crearUsuario('contable', [{ empresa: 'Paris Autos' }])
+  const gestora = await crearUsuario('gestora', [{ empresa: 'Paris Autos' }])
+  const id = await crearTramite(contable)
+  await autorizar(contable, id, gestora, 1)
+  await cambiarEstado(contable, id, 'en_gestoria', 2)
+  await habilitarPresentacion(id, contable)
+  await cambiarEstado(gestora, id, 'presentado', 3)
+  const v = (await tramite(id)).version
+  await cambiarEstado(contable, id, 'suspendido', v, 'consulta')
+
+  const previo = await rpc(contable, 'estado_previo_suspension', { p_tramite: id })
+  expect(previo.rows[0].estado_previo_suspension).toBe('presentado')
+
+  const reanudar = (u: string, motivo: string | null) =>
+    rpc(u, 'reanudar_tramite', { p_tramite: id, p_motivo: motivo, p_version: v + 1 })
+  await expect(reanudar(contable, '  ')).rejects.toThrow(/^DATO_INVALIDO:/)
+  await expect(reanudar(gestora, 'sigue')).rejects.toThrow(/^SIN_PERMISO:/)
+  const r = await reanudar(contable, 'respondida')
+  expect(r.rows[0].reanudar_tramite).toBe('presentado')
+  expect((await tramite(id)).estado).toBe('presentado')
+})

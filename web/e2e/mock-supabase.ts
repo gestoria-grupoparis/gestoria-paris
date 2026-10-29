@@ -245,6 +245,10 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
   }
   const { st, situacionForzada } = servidor
 
+  function estadoPrevioDe(id: unknown): string | null {
+    const ev = [...st.eventos].reverse().find((e) => e.entidad === 'tramites' && e.entidad_id === id && e.estado_despues === 'suspendido' && e.estado_antes !== 'suspendido')
+    return ev ? String(ev.estado_antes) : null
+  }
   function registrarEvento(e: Fila) {
     st.eventos.push({ id: st.siguienteEvento++, at: ahora, actor_id: yo, motivo: null, ...e })
   }
@@ -488,6 +492,26 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       registrarEvento({ entidad: 'tramites', entidad_id: t.id, accion: 'update', estado_antes: t.estado, estado_despues: a.p_estado, motivo })
       Object.assign(t, { estado: a.p_estado, version: Number(t.version) + 1 })
       await route.fulfill({ status: 204, body: '' })
+    },
+    async estado_previo_suspension(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      await route.fulfill({ json: estadoPrevioDe(t.id) })
+    },
+    async reanudar_tramite(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if (rol === 'gestora' || !tieneAlcance(t.empresa_id, t.sucursal_id))
+        return errorNegocio(route, 'SIN_PERMISO: solo la oficina reanuda trámites suspendidos')
+      if (t.estado !== 'suspendido') return errorNegocio(route, 'TRANSICION_INVALIDA: el trámite no está suspendido')
+      const motivo = String(a.p_motivo ?? '').trim()
+      if (!motivo) return errorNegocio(route, 'DATO_INVALIDO: indicá el motivo para reanudar')
+      const previo = estadoPrevioDe(t.id)
+      if (!previo) return errorNegocio(route, 'NO_ENCONTRADO: no se encontró el estado previo a la suspensión')
+      if (t.version !== a.p_version) return errorNegocio(route, 'VERSION_CONFLICTO: recargá')
+      registrarEvento({ entidad: 'tramites', entidad_id: t.id, accion: 'update', estado_antes: t.estado, estado_despues: previo, motivo })
+      Object.assign(t, { estado: previo, version: Number(t.version) + 1 })
+      await route.fulfill({ json: previo })
     },
     async marcar(route, a) {
       const tm = tramite(a.p_tramite)
