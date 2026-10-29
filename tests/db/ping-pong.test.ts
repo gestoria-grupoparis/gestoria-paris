@@ -140,11 +140,11 @@ test('la gestora ve disponible y apartado de las razones sociales con las que tr
   expect(await saldos(f.gerencia)).toEqual([])
 })
 
-test('Doral y Paris Track existen sin Habitualista; San Luis tiene tres ciudades', async () => {
+test('Doral y Paris Trac existen sin Habitualista; San Luis tiene tres ciudades', async () => {
   const sinCuenta = await sqlAdmin(
     `select e.nombre from public.empresas e where not exists (select 1 from public.cuentas c where c.empresa_id = e.id) order by 1`,
   )
-  expect(sinCuenta.map((r) => r.nombre)).toEqual(['Doral', 'Paris Track'])
+  expect(sinCuenta.map((r) => r.nombre)).toEqual(['Doral', 'Paris Trac'])
   const sl = await sqlAdmin(`select nombre from public.sucursales where provincia = 'San Luis' order by 1`)
   expect(sl.map((r) => r.nombre)).toEqual(['Merlo', 'San Luis Capital', 'Villa Mercedes'])
 })

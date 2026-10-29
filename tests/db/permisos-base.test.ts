@@ -52,7 +52,7 @@ test('tiene_alcance es false para otra empresa', async () => {
 })
 
 const CATALOGOS = {
-  empresas: ['Doral', 'Paris Autos', 'Paris Cars', 'Paris Motor', 'Paris Track'],
+  empresas: ['Doral', 'Paris Autos', 'Paris Cars', 'Paris Motor', 'Paris Trac'],
   sucursales: [
     { nombre: 'Merlo', provincia: 'San Luis' },
     { nombre: 'San Juan', provincia: 'San Juan' },
@@ -109,7 +109,7 @@ test('sucursales no admite dos filas con el mismo nombre y provincia', async () 
 
 test('los catálogos iniciales incluyen las cinco razones sociales (Habitualista solo las tres Paris)', async () => {
   const empresas = await sqlAdmin('select nombre from public.empresas order by nombre')
-  expect(empresas.map((r) => r.nombre)).toEqual(['Doral', 'Paris Autos', 'Paris Cars', 'Paris Motor', 'Paris Track'])
+  expect(empresas.map((r) => r.nombre)).toEqual(['Doral', 'Paris Autos', 'Paris Cars', 'Paris Motor', 'Paris Trac'])
 
   const sucursales = await sqlAdmin('select nombre, provincia from public.sucursales order by nombre')
   expect(sucursales).toEqual([
