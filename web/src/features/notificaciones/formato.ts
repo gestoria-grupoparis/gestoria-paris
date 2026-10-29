@@ -1,12 +1,13 @@
 import type { TonoChip } from '../../ui'
 
-export type TipoNotificacion = 'asignado' | 'observado' | 'sin_fondos' | 'presupuesto_cargado'
+export type TipoNotificacion = 'asignado' | 'observado' | 'sin_fondos' | 'presupuesto_cargado' | 'presupuesto_aprobado'
 
 export const TIPO_NOTIFICACION: Record<TipoNotificacion, { etiqueta: string; tono: TonoChip }> = {
   asignado: { etiqueta: 'Asignado', tono: 'info' },
   observado: { etiqueta: 'Observado', tono: 'comprometido' },
   sin_fondos: { etiqueta: 'Sin fondos', tono: 'sinfondos' },
   presupuesto_cargado: { etiqueta: 'Presupuesto', tono: 'marca' },
+  presupuesto_aprobado: { etiqueta: 'Aprobado', tono: 'disponible' },
 }
 
 export function haceCuanto(iso: string, ahora: Date = new Date()): string {

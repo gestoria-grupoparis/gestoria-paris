@@ -11,7 +11,7 @@ const fila = (extra: Partial<TramiteFila> = {}): TramiteFila => ({
     cliente_nombre: 'María "Mary" Gómez', cuenta_personal: 'CP-7788', oferta_ref: 'OF-5521',
     empresa: { nombre: 'Paris Autos' }, sucursal: { nombre: 'Casa central', provincia: 'San Luis' },
   },
-  finanzas: { presupuesto: '65000050', pagado: null, situacion: 'sin_fondos' },
+  finanzas: { presupuesto: '65000050', pagado: null, situacion: 'sin_fondos', presupuesto_version: 1, presupuesto_aprobado: false },
   ...extra,
 })
 

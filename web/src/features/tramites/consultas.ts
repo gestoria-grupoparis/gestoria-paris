@@ -11,6 +11,9 @@ export interface Finanzas {
   presupuesto: string | null
   pagado: string | null
   situacion: string
+  /** Versión vigente del presupuesto y si la empresa ya la aprobó (circuito con la gestora). */
+  presupuesto_version: number | null
+  presupuesto_aprobado: boolean
 }
 
 export interface TramiteFila {
@@ -80,7 +83,8 @@ const SELECT_TRAMITE =
   'tipo:tipos_tramite(codigo,nombre),' +
   'operacion:operaciones(cliente_nombre,cuenta_personal,oferta_ref,empresa:empresas(nombre),sucursal:sucursales(nombre,provincia))'
 
-const SELECT_FINANZAS = 'tramite_id,presupuesto:presupuesto_cents::text,pagado:pagado_cents::text,situacion'
+const SELECT_FINANZAS =
+  'tramite_id,presupuesto:presupuesto_cents::text,pagado:pagado_cents::text,situacion,presupuesto_version,presupuesto_aprobado'
 
 export const LIMITE = 500
 
@@ -94,7 +98,10 @@ async function finanzasDe(ids: string[]): Promise<Map<string, Finanzas>> {
   const { data, error } = await supabase.from('v_tramite_finanzas').select(SELECT_FINANZAS).in('tramite_id', ids)
   if (error) throw error
   for (const f of (data ?? []) as unknown as (Finanzas & { tramite_id: string })[]) {
-    mapa.set(f.tramite_id, { presupuesto: f.presupuesto, pagado: f.pagado, situacion: f.situacion })
+    mapa.set(f.tramite_id, {
+      presupuesto: f.presupuesto, pagado: f.pagado, situacion: f.situacion,
+      presupuesto_version: f.presupuesto_version ?? null, presupuesto_aprobado: !!f.presupuesto_aprobado,
+    })
   }
   return mapa
 }
@@ -140,6 +147,19 @@ export async function listarTramites(f: FiltrosTramites, sucursalesDeProvincia?:
     case 'autorizados_sin_presentar':
       consulta = consulta.in('estado', ['autorizado', 'en_gestoria'])
       break
+    case 'para_aprobar': {
+      // Presupuesto cargado por la gestora que la empresa todavía no aprobó.
+      const pa = await supabase
+        .from('v_tramite_finanzas')
+        .select('tramite_id')
+        .eq('presupuesto_aprobado', false)
+        .not('presupuesto_version', 'is', null)
+      if (pa.error) throw pa.error
+      const ids = (pa.data ?? []).map((x) => x.tramite_id as string)
+      if (!ids.length) return sinResultados()
+      consulta = consulta.in('id', ids).in('estado', ['autorizado', 'en_gestoria'])
+      break
+    }
     case 'sin_fondos': {
       const sf = await supabase.from('v_tramite_finanzas').select('tramite_id').eq('situacion', 'sin_fondos')
       if (sf.error) throw sf.error
@@ -305,6 +325,10 @@ export const editarTramite = (id: string, version: number, d: EdicionTramite) =>
     p_oferta: d.oferta, p_vehiculo: d.vehiculo, p_dominio: d.dominio || null, p_chasis: d.chasis || null,
     p_motivo: d.motivo || null,
   }))
+
+/** La empresa aprueba la versión vigente del presupuesto que cargó la gestora (le guarda la plata). */
+export const aprobarPresupuesto = (id: string, version: number) =>
+  sinRetorno(supabase.rpc('aprobar_presupuesto', { p_tramite: id, p_version: version }))
 
 export const aprobarExcepcionFondos = (id: string, motivo: string) =>
   sinRetorno(supabase.rpc('aprobar_excepcion_fondos', { p_tramite: id, p_motivo: motivo }))

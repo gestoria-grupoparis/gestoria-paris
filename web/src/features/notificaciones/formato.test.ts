@@ -18,6 +18,6 @@ describe('notificaciones', () => {
   it('cuenta no leídas y etiqueta cada tipo', () => {
     expect(noLeidas([{ leida_at: null }, { leida_at: 'x' }, { leida_at: null }])).toBe(2)
     expect(TIPO_NOTIFICACION.sin_fondos.etiqueta).toBe('Sin fondos')
-    expect(Object.keys(TIPO_NOTIFICACION).sort()).toEqual(['asignado', 'observado', 'presupuesto_cargado', 'sin_fondos'])
+    expect(Object.keys(TIPO_NOTIFICACION).sort()).toEqual(['asignado', 'observado', 'presupuesto_aprobado', 'presupuesto_cargado', 'sin_fondos'])
   })
 })

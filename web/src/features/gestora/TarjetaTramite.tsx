@@ -7,12 +7,14 @@ import {
   IconoDoc,
   IconoFlecha,
   IconoProhibido,
+  IconoReloj,
+  IconoRetorno,
 } from "../../ui/Iconos";
 import { etiquetaEstado } from "../tramites/filtros";
-import type { Grupo, TramiteGestora } from "./consultas";
+import { legajoRetirado, type Grupo, type TramiteGestora } from "./consultas";
 
 export type AccionGestora =
-  "presupuesto" | "presentado" | "pago" | "finalizado" | "retirado";
+  "presupuesto" | "retirado" | "presentado" | "pago" | "finalizado" | "devuelto";
 
 const SITUACION: Record<string, { texto: string; clase: string }> = {
   pagado: { texto: "Pagado", clase: "text-disponible" },
@@ -21,12 +23,13 @@ const SITUACION: Record<string, { texto: string; clase: string }> = {
 };
 
 /** Pasos que recorre la gestora con cada trámite. */
-const PASOS = ["Presupuesto", "Presentado", "Finalizado", "Retirado"] as const;
+const PASOS = ["Presupuesto", "Aprobación", "Presentar", "Finalizado", "Devuelto"] as const;
 const PASO_ACTUAL: Record<Grupo, number> = {
   presupuestar: 0,
-  listos: 1,
-  presentados: 2,
-  retirar: 3,
+  aprobacion: 1,
+  listos: 2,
+  presentados: 3,
+  devolver: 4,
 };
 
 function Pasos({ grupo }: { grupo: Grupo }) {
@@ -76,6 +79,7 @@ export function TarjetaTramite({
 }) {
   const sinFondos = t.situacion === "sin_fondos";
   const pagado = t.situacion === "pagado";
+  const retirado = legajoRetirado(t);
   const situacion = SITUACION[t.situacion];
   const tituloId = `tarjeta-${t.id}`;
   return (
@@ -128,7 +132,7 @@ export function TarjetaTramite({
           )}
           <span>{t.operacion.empresa.nombre}</span>
           <span aria-hidden>·</span>
-          <span>Registro de {t.operacion.sucursal.provincia}</span>
+          <span>{t.operacion.sucursal.nombre}</span>
         </div>
 
         {(t.presupuesto || situacion) && (
@@ -174,7 +178,36 @@ export function TarjetaTramite({
             Cargar presupuesto
           </Button>
         )}
-        {grupo === "listos" && (
+        {grupo === "aprobacion" && (
+          <>
+            <p className="flex items-center gap-2 rounded-md bg-hundido px-3 py-2.5 text-[13px] text-tinta">
+              <IconoReloj className="size-4 shrink-0 text-tenue" />
+              La empresa está revisando el presupuesto. Te avisamos cuando lo aprueben.
+            </p>
+            <Button
+              tamano="lg"
+              ancho
+              variante="secundario"
+              icono={<IconoDoc />}
+              disabled={ocupado}
+              onClick={() => onAccion("presupuesto")}
+            >
+              Corregir presupuesto
+            </Button>
+          </>
+        )}
+        {grupo === "listos" && !retirado && (
+          <Button
+            tamano="lg"
+            ancho
+            icono={<IconoCheck />}
+            disabled={ocupado}
+            onClick={() => onAccion("retirado")}
+          >
+            Retiré el legajo
+          </Button>
+        )}
+        {grupo === "listos" && retirado && (
           <Button
             tamano="lg"
             ancho
@@ -185,7 +218,7 @@ export function TarjetaTramite({
             Marcar presentado
           </Button>
         )}
-        {grupo !== "presupuestar" && !pagado && (
+        {(grupo === "listos" || grupo === "presentados" || grupo === "devolver") && !pagado && (
           <Button
             tamano="lg"
             ancho
@@ -207,15 +240,15 @@ export function TarjetaTramite({
             Marcar finalizado
           </Button>
         )}
-        {grupo === "retirar" && (
+        {grupo === "devolver" && (
           <Button
             tamano="lg"
             ancho
-            icono={<IconoCheck />}
+            icono={<IconoRetorno />}
             disabled={ocupado}
-            onClick={() => onAccion("retirado")}
+            onClick={() => onAccion("devuelto")}
           >
-            Marcar retirado
+            Marcar devuelto
           </Button>
         )}
       </div>

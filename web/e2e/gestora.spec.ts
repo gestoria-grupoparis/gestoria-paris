@@ -6,7 +6,7 @@ const GABRIELA = '00000000-0000-4000-8000-000000000071'
 
 test.use({ viewport: { width: 375, height: 812 } })
 
-test('gestora carga presupuesto 700.000 y lo ve en Listos para presentar', async ({ page }) => {
+test('gestora carga presupuesto 700.000 y queda esperando la aprobación de la empresa', async ({ page }) => {
   await montarSupabase(page, [{ operacion: f.operacion, tramite: f.autorizado }], { usuario: GABRIELA })
   await page.goto('/')
   await expect(page).toHaveURL(/\/mis-tramites$/)
@@ -24,10 +24,12 @@ test('gestora carga presupuesto 700.000 y lo ve en Listos para presentar', async
   await expect(form).toBeHidden()
 
   await expect(presupuestar).toBeHidden()
-  const listos = page.getByRole('region', { name: 'Listos para presentar' })
-  const enListos = listos.getByRole('article', { name: /T-2026-00011/ })
-  await expect(enListos.getByTestId('presupuesto')).toHaveText('$ 700.000,00')
-  await expect(enListos.getByRole('button', { name: 'Marcar presentado' })).toBeEnabled()
+  const espera = page.getByRole('region', { name: 'Esperando aprobación' }).getByRole('article', { name: /T-2026-00011/ })
+  await expect(espera.getByTestId('presupuesto')).toHaveText('$ 700.000,00')
+  await expect(espera).toContainText('La empresa está revisando el presupuesto')
+  // Hasta que la empresa apruebe no puede retirar el legajo ni presentar.
+  await expect(espera.getByRole('button', { name: 'Marcar presentado' })).toHaveCount(0)
+  await expect(espera.getByRole('button', { name: 'Retiré el legajo' })).toHaveCount(0)
 })
 
 test('gestora registra pago final 650.000 y el trámite muestra pagado', async ({ page }) => {
@@ -47,22 +49,25 @@ test('gestora registra pago final 650.000 y el trámite muestra pagado', async (
   await expect(tarjeta.getByRole('button', { name: 'Registrar pago' })).toHaveCount(0)
 })
 
-test('gestora no ve el menú Habitualista ni importes de saldo', async ({ page }) => {
+test('gestora ve la plata disponible y lo apartado, pero no la Habitualista', async ({ page }) => {
   const mock = await montarSupabase(
     page,
-    [{ operacion: f.operacion, tramite: f.autorizado, presupuestos: ['90000000'], situacion: 'sin_fondos' }],
+    [{ operacion: f.operacion, tramite: f.autorizado, presupuestos: ['90000000'], situacion: 'sin_fondos', aprobado: true, marcas: ['retirado'] }],
     { usuario: GABRIELA },
   )
   await page.goto('/mis-tramites')
 
-  const tarjeta = page.getByRole('region', { name: 'Listos para presentar' }).getByRole('article', { name: /T-2026-00011/ })
+  const saldo = page.getByRole('article', { name: 'Saldo Paris Autos' })
+  await expect(saldo).toContainText('Paris Autos · disponible')
+  await expect(saldo.getByTestId('apartado')).toHaveText('$ 900.000,00')
+
+  const tarjeta = page.getByRole('region', { name: 'Retirar y presentar' }).getByRole('article', { name: /T-2026-00011/ })
   await expect(tarjeta.getByRole('alert')).toHaveText('No presentar: sin fondos')
   await expect(tarjeta.getByRole('button', { name: 'Marcar presentado' })).toBeDisabled()
 
   const nav = page.getByRole('navigation', { name: 'Principal móvil' })
   await expect(nav.getByRole('link', { name: 'Mis trámites' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Habitualista' })).toHaveCount(0)
-  await expect(page.getByText(/saldo|disponible|comprometido/i)).toHaveCount(0)
   expect(mock.rutasPedidas.filter((r) => /v_saldos|cuentas|movimientos/.test(r))).toEqual([])
 })
 
@@ -70,7 +75,7 @@ test('gestora ve el resumen cuenta por grupo', async ({ page }) => {
   await montarSupabase(page, [{ operacion: f.operacion, tramite: f.autorizado }], { usuario: GABRIELA })
   await page.goto('/mis-tramites')
   const resumen = page.getByRole('navigation', { name: 'Resumen' })
-  await expect(resumen.getByRole('link', { name: /Presupuestar/ })).toContainText('1')
+  await expect(resumen.getByRole('button', { name: /Presupuestar/ })).toContainText('1')
   await expect(page.getByText('Próximo paso:')).toContainText('Presupuesto')
 })
 

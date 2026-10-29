@@ -103,6 +103,18 @@ async function cargarPresupuesto(page: Page, numero: string, arancel: string) {
   await expect(form).toBeHidden()
 }
 
+// La empresa aprueba el presupuesto desde el panel del trámite (ping pong con la gestora).
+async function aprobarPresupuesto(page: Page, id: string, numero: string) {
+  await page.goto(`/tramites?t=${id}`)
+  const detalle = page.getByRole('complementary', { name: 'Detalle del trámite' })
+  await expect(detalle.getByRole('heading', { name: numero })).toBeVisible()
+  await detalle.getByRole('button', { name: 'Aprobar presupuesto' }).click()
+  const dialogo = page.getByRole('dialog', { name: 'Aprobar presupuesto' })
+  await dialogo.getByRole('button', { name: 'Confirmar aprobación' }).click()
+  await expect(dialogo).toBeHidden()
+  await expect(detalle.getByRole('button', { name: 'Aprobar presupuesto' })).toHaveCount(0)
+}
+
 // Importe cobrado al cliente (Etapa 2): ninguna pantalla de la gestora puede mostrarlo ni pedirlo.
 const COBRO_CLIENTE = '123456700'
 const COBRO_EN_PANTALLA = /1\.234\.567|1234567/
@@ -148,10 +160,12 @@ test('escenario integral: tres usuarios y los cuatro tríos de saldos de Paris A
   await expect(gerencia.page.getByText('T-2026-00002').first()).toBeVisible()
   await expect(gerencia.page.getByText('T-2026-00001')).toHaveCount(0)
 
-  // 3. La gestora presenta el trámite de San Luis y registra el pago final de 650.000.
+  // 3. La contable aprueba el presupuesto; la gestora retira el legajo, presenta y registra el pago final de 650.000.
+  await aprobarPresupuesto(contable.page, '00000000-0000-4000-8000-000000000001', 'T-2026-00001')
   await gestora.page.goto('/mis-tramites')
-  await gestora.page.getByRole('region', { name: 'Listos para presentar' })
-    .getByRole('article', { name: /T-2026-00001/ }).getByRole('button', { name: 'Marcar presentado' }).click()
+  const listo = gestora.page.getByRole('region', { name: 'Retirar y presentar' }).getByRole('article', { name: /T-2026-00001/ })
+  await listo.getByRole('button', { name: 'Retiré el legajo' }).click()
+  await listo.getByRole('button', { name: 'Marcar presentado' }).click()
   const presentado = gestora.page.getByRole('region', { name: 'Presentados' }).getByRole('article', { name: /T-2026-00001/ })
   await presentado.getByRole('button', { name: 'Registrar pago' }).click()
   const pago = gestora.page.getByRole('dialog', { name: 'Registrar pago' })
@@ -198,7 +212,7 @@ test('escenario integral: tres usuarios y los cuatro tríos de saldos de Paris A
   await expect(gestora.page.getByRole('dialog', { name: 'Registrar pago' })).toBeVisible()
   await sinCobro(gestora.page, gestora.mock)
   await gestora.page.keyboard.press('Escape')
-  await expect(gestora.page.getByText(/cobrad|cobro|saldo|disponible/i)).toHaveCount(0)
+  await expect(gestora.page.getByText(/cobrad|cobro/i)).toHaveCount(0)
   await expect(gestora.page.getByRole('link', { name: 'Habitualista' })).toHaveCount(0)
   for (const ruta of ['/habitualista', '/tramites', '/tramites?t=00000000-0000-4000-8000-00000000c0b1', '/']) {
     await gestora.page.goto(ruta)

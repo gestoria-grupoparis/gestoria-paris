@@ -1,24 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import { grupoDe } from './consultas'
 
-const t = (estado: string, situacion: string, marcas: string[] = []) => ({
-  estado, situacion, marcas: marcas.map((marca) => ({ marca })),
+const t = (estado: string, situacion: string, aprobado = false, marcas: string[] = []) => ({
+  estado, situacion, presupuesto_aprobado: aprobado, marcas: marcas.map((marca) => ({ marca })),
 })
 
-describe('grupoDe', () => {
+describe('grupoDe (ping pong con la empresa)', () => {
   it('sin presupuesto va a Presupuestar aunque esté presentado', () => {
     expect(grupoDe(t('autorizado', 'sin_presupuesto'))).toBe('presupuestar')
     expect(grupoDe(t('presentado', 'sin_presupuesto'))).toBe('presupuestar')
   })
-  it('autorizado o en gestoría con presupuesto está listo para presentar', () => {
-    expect(grupoDe(t('autorizado', 'comprometido'))).toBe('listos')
-    expect(grupoDe(t('en_gestoria', 'sin_fondos'))).toBe('listos')
+  it('con presupuesto sin aprobar espera a la empresa', () => {
+    expect(grupoDe(t('autorizado', 'comprometido'))).toBe('aprobacion')
+    expect(grupoDe(t('en_gestoria', 'sin_fondos'))).toBe('aprobacion')
   })
-  it('presentado con presupuesto va a Presentados', () => {
-    expect(grupoDe(t('presentado', 'pagado'))).toBe('presentados')
+  it('aprobado pasa a Retirar y presentar, con o sin el legajo retirado', () => {
+    expect(grupoDe(t('autorizado', 'comprometido', true))).toBe('listos')
+    expect(grupoDe(t('en_gestoria', 'comprometido', true, ['retirado']))).toBe('listos')
   })
-  it('finalizado sin la marca retirado va a Para retirar; con la marca, sale de la lista', () => {
-    expect(grupoDe(t('finalizado_registro', 'pagado'))).toBe('retirar')
-    expect(grupoDe(t('finalizado_registro', 'pagado', ['retirado']))).toBeNull()
+  it('presentado va a Presentados y finalizado a Para devolver', () => {
+    expect(grupoDe(t('presentado', 'pagado', true))).toBe('presentados')
+    expect(grupoDe(t('finalizado_registro', 'pagado', true, ['retirado']))).toBe('devolver')
+  })
+  it('devuelto o cerrado ya no es de la gestora', () => {
+    expect(grupoDe(t('devuelto', 'pagado', true))).toBeNull()
+    expect(grupoDe(t('cerrado', 'pagado', true))).toBeNull()
   })
 })

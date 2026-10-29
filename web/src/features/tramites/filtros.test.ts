@@ -17,7 +17,7 @@ describe('filtros de trámites en la URL', () => {
     expect(filtrosDesdeURL(filtrosAURL(f, new URLSearchParams()))).toEqual(f)
   })
   it('las vistas guardadas son las del spec G.1', () => {
-    expect(VISTAS.map((v) => v.etiqueta)).toEqual(['Para revisar', 'Autorizados sin presentar', 'Sin fondos', 'Demorados'])
+    expect(VISTAS.map((v) => v.etiqueta)).toEqual(['Para revisar', 'Presupuestos para aprobar', 'Autorizados sin presentar', 'Sin fondos', 'Demorados'])
   })
 })
 

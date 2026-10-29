@@ -3,13 +3,14 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { mensajeError } from '../../lib/errores'
 import { Button, claseControl, Field } from '../../ui'
 import { IconoCheck, IconoFlecha, IconoLapiz, IconoPausa, IconoPlay, IconoProhibido, IconoUsuario } from '../../ui/Iconos'
-import { autorizarTramite, cambiarEstado, historial, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
+import { formatearPesos } from '../../lib/dinero'
+import { aprobarPresupuesto, autorizarTramite, cambiarEstado, historial, reasignarGestora, type Catalogos, type TramiteDetalle } from './consultas'
 import { Dialogo } from './Dialogo'
 import { etiquetaEstado } from './filtros'
 import { AVANCE, estadoPrevioSuspension, puedeCancelar, puedeEditar, puedeRechazar, puedeSuspender } from './flujo'
 import { FormEdicion } from './FormEdicion'
 
-type Accion = 'editar' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
+type Accion = 'editar' | 'aprobar' | 'autorizar' | 'observar' | 'asignar' | 'avanzar' | 'rechazar' | 'suspender' | 'reanudar' | 'cancelar' | null
 
 const ESTADOS_ASIGNABLES = ['autorizado', 'en_gestoria', 'presentado', 'finalizado_registro', 'devuelto', 'suspendido']
 const PELIGRO_SUAVE = 'text-sinfondos hover:bg-sinfondos-suave'
@@ -27,6 +28,10 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
     enabled: e === 'suspendido',
   })
   const previo = eventos.data ? estadoPrevioSuspension(eventos.data) : null
+  const fin = tramite.finanzas
+  // Ping pong: la gestora presupuestó y espera que la empresa apruebe (y guarde la plata).
+  const porAprobar =
+    (e === 'autorizado' || e === 'en_gestoria') && !!fin?.presupuesto && fin.presupuesto_version != null && !fin.presupuesto_aprobado
   const cambio = (hacia: string) => (_: string, motivo: string) => cambiarEstado(tramite.id, hacia, motivo, tramite.version)
 
   const secundarias: ReactNode[] = []
@@ -75,6 +80,17 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
 
   return (
     <div className="space-y-2.5">
+      {porAprobar && (
+        <div className="space-y-2 rounded-md bg-comprometido-suave px-3.5 py-3 ring-1 ring-comprometido/25">
+          <p className="text-[13px] text-tinta">
+            La gestora presupuestó <strong className="cifra font-semibold">{formatearPesos(fin!.presupuesto!)}</strong>. Aprobalo para que
+            pueda retirar el legajo y presentar.
+          </p>
+          <Button ancho icono={<IconoCheck className="size-4" />} onClick={() => setAbierta('aprobar')}>
+            Aprobar presupuesto
+          </Button>
+        </div>
+      )}
       {(e === 'borrador' || avance) && (
         <div className="flex flex-wrap gap-2">
           {e === 'borrador' && (
@@ -92,6 +108,16 @@ export function AccionesTramite({ tramite, catalogos }: { tramite: TramiteDetall
       {secundarias.length > 0 && <div className="flex flex-wrap gap-1.5">{secundarias}</div>}
 
       {abierta === 'editar' && <FormEdicion tramite={tramite} onCerrar={cerrar} />}
+      {abierta === 'aprobar' && porAprobar && (
+        <FormAccion
+          titulo="Aprobar presupuesto"
+          rotulo={tramite.numero}
+          boton="Confirmar aprobación"
+          aviso={`Se aparta ${formatearPesos(fin!.presupuesto!)} de la Habitualista de ${tramite.operacion.empresa.nombre} y la gestora recibe el aviso para retirar el legajo.`}
+          ejecutar={() => aprobarPresupuesto(tramite.id, fin!.presupuesto_version!)}
+          onCerrar={cerrar}
+        />
+      )}
       {abierta === 'autorizar' && (
         <FormAccion
           titulo="Autorizar trámite"
@@ -233,7 +259,12 @@ export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, mot
     <Dialogo titulo={titulo} rotulo={rotulo} onCerrar={onCerrar}>
       <form onSubmit={confirmar} noValidate className="space-y-4">
         {aviso && <p className="rounded-md bg-hundido px-4 py-3 text-[14px]">{aviso}</p>}
-        {pideGestora && (
+        {pideGestora && gestoras.length === 0 && (
+          <p role="alert" className="rounded-md bg-comprometido-suave px-4 py-3 text-[14px] text-tinta">
+            Todavía no hay gestoras activas. Invitá a la gestora desde <strong>Usuarios</strong> (rol Gestora) y volvé a intentarlo.
+          </p>
+        )}
+        {pideGestora && gestoras.length > 0 && (
           <Field label="Gestora">
             {(p) => (
               <select {...p} className={claseControl} value={gestora} onChange={(e) => setGestora(e.target.value)}>
@@ -263,7 +294,7 @@ export function FormAccion({ titulo, rotulo, boton, pideGestora, pideMotivo, mot
           <Button variante="secundario" onClick={onCerrar}>
             Cancelar
           </Button>
-          <Button type="submit" variante={peligro ? 'peligro' : 'primario'} cargando={m.isPending}>
+          <Button type="submit" variante={peligro ? 'peligro' : 'primario'} cargando={m.isPending} disabled={pideGestora && gestoras.length === 0}>
             {boton}
           </Button>
         </div>

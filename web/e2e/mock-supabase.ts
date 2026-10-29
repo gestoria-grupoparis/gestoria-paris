@@ -19,6 +19,8 @@ export interface Estado {
   marcas: Fila[]
   eventos: Fila[]
   presupuestos: Fila[]
+  /** { tramite_id, version } de cada presupuesto aprobado por la empresa. */
+  aprobaciones: Fila[]
   /** importe con signo en centavos (texto), como movimientos.importe_cents. */
   movimientos: Fila[]
   /** { cuenta_id, fecha_corte, diferencia, movimientos: id[] } */
@@ -33,6 +35,10 @@ export interface Semilla {
   presupuestos?: string[]
   /** Fuerza la situación financiera (p. ej. sin_fondos, que depende del saldo de la cuenta). */
   situacion?: string
+  /** La empresa ya aprobó la última versión del presupuesto. */
+  aprobado?: boolean
+  /** Marcas documentales ya registradas (p. ej. 'retirado'). */
+  marcas?: string[]
 }
 
 export interface Extra {
@@ -137,6 +143,8 @@ function cumple(fila: Fila, col: string, expr: string): boolean {
       return v != null && String(v) <= valor
     case 'is':
       return valor === 'null' ? v == null : String(v) === valor
+    case 'not':
+      return !cumple(fila, col, valor)
     case 'ilike': {
       const re = new RegExp('^' + valor.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i')
       return v != null && re.test(String(v))
@@ -177,10 +185,13 @@ export function crearServidor(semillas: Semilla[] = [], extra: Extra = {}): Serv
     st: {
       operaciones: [...new Map(semillas.map((s) => [s.operacion.id, { ...s.operacion }])).values()],
       tramites: semillas.map((s) => ({ ...s.tramite })),
-      marcas: [],
+      marcas: semillas.flatMap((s) =>
+        (s.marcas ?? []).map((marca) => ({ tramite_id: s.tramite.id, marca, at: catalogos.ahora, por: s.tramite.gestora_id }))),
       eventos: [],
       presupuestos: semillas.flatMap((s) =>
         (s.presupuestos ?? []).map((total, i) => ({ tramite_id: s.tramite.id, version: i + 1, total }))),
+      aprobaciones: semillas.filter((s) => s.aprobado && s.presupuestos?.length)
+        .map((s) => ({ tramite_id: s.tramite.id, version: s.presupuestos!.length })),
       movimientos: (extra.movimientos ?? []).map((m) => ({ ...m })),
       conciliaciones: (extra.conciliaciones ?? []).map((c) => ({ ...c })),
       siguienteEvento: 1,
@@ -281,9 +292,12 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     else if (comprometido > 0n && pagado <= 0n) situacion = 'comprometido'
     else if (enCurso && !presupuesto) situacion = 'sin_presupuesto'
     else if (enCurso && pagado > 0n) situacion = 'pagado_parcial'
+    const version = versiones.length || null
+    const aprobado = version != null && st.aprobaciones.some((a) => a.tramite_id === t.id && a.version === version)
     return {
       tramite_id: t.id, empresa_id: t.empresa_id, presupuesto, pagado: String(pagado),
       comprometido: String(comprometido), comprometido_cents: String(comprometido), situacion,
+      presupuesto_version: version, presupuesto_aprobado: aprobado,
     }
   }
 
@@ -438,11 +452,24 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       const motivo = String(a.p_motivo ?? '').trim()
       if (!motivo && ['observado', 'rechazado', 'suspendido', 'cancelado'].includes(String(a.p_estado)))
         return errorNegocio(route, 'DATO_INVALIDO: el motivo es obligatorio')
+      if (rol === 'gestora') {
+        const permitidas = [['autorizado', 'presentado'], ['en_gestoria', 'presentado'], ['presentado', 'finalizado_registro'], ['finalizado_registro', 'devuelto']]
+        if (t.gestora_id !== yo || !permitidas.some(([d, h]) => d === t.estado && h === a.p_estado))
+          return errorNegocio(route, `SIN_PERMISO: su rol no puede pasar el trámite de ${t.estado} a ${a.p_estado}`)
+        if (a.p_estado === 'presentado') {
+          if (!finanzas(t).presupuesto_aprobado) return errorNegocio(route, 'NO_AUTORIZADO: el presupuesto todavía no fue aprobado por la empresa')
+          if (!st.marcas.some((m) => m.tramite_id === t.id && m.marca === 'retirado'))
+            return errorNegocio(route, 'DATO_INVALIDO: primero marcá que retiraste el legajo')
+        }
+      }
       registrarEvento({ entidad: 'tramites', entidad_id: t.id, accion: 'update', estado_antes: t.estado, estado_despues: a.p_estado, motivo })
       Object.assign(t, { estado: a.p_estado, version: Number(t.version) + 1 })
       await route.fulfill({ status: 204, body: '' })
     },
     async marcar(route, a) {
+      const tm = tramite(a.p_tramite)
+      if (rol === 'gestora' && tm && ['autorizado', 'en_gestoria'].includes(String(tm.estado)) && !finanzas(tm).presupuesto_aprobado)
+        return errorNegocio(route, 'NO_AUTORIZADO: esperá que la empresa apruebe el presupuesto antes de retirar el legajo')
       if (!st.marcas.some((m) => m.tramite_id === a.p_tramite && m.marca === a.p_marca)) {
         st.marcas.push({ tramite_id: a.p_tramite, marca: a.p_marca, at: ahora, por: yo })
         registrarEvento({ entidad: 'tramite_marcas', entidad_id: a.p_tramite, accion: 'insert', marca: a.p_marca, motivo: '' })
@@ -462,6 +489,33 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       st.presupuestos.push({ tramite_id: t.id, version, total: String(total), motivo: a.p_motivo ?? null, created_at: ahora })
       servidor.notificar('presupuestos')
       await route.fulfill({ json: version })
+    },
+    async aprobar_presupuesto(route, a) {
+      const t = tramite(a.p_tramite)
+      if (!t) return errorNegocio(route, 'NO_ENCONTRADO: trámite inexistente')
+      if ((rol !== 'gerencia' && rol !== 'contable') || !tieneAlcance(t.empresa_id, t.sucursal_id))
+        return errorNegocio(route, 'SIN_PERMISO: no puede aprobar presupuestos de este trámite')
+      if (!['autorizado', 'en_gestoria'].includes(String(t.estado)))
+        return errorNegocio(route, `TRANSICION_INVALIDA: solo se aprueba el presupuesto antes de presentar (está ${t.estado})`)
+      const f = finanzas(t)
+      if (f.presupuesto_version == null) return errorNegocio(route, 'NO_ENCONTRADO: el trámite todavía no tiene presupuesto')
+      if (f.presupuesto_version !== a.p_version)
+        return errorNegocio(route, `VERSION_CONFLICTO: la gestora cambió el presupuesto (versión vigente ${f.presupuesto_version})`)
+      if (f.situacion === 'sin_fondos')
+        return errorNegocio(route, 'NO_AUTORIZADO: no hay fondos para este presupuesto; cargá fondos o aprobá la excepción')
+      if (!f.presupuesto_aprobado) {
+        st.aprobaciones.push({ tramite_id: t.id, version: f.presupuesto_version })
+        if (t.gestora_id && t.gestora_id !== yo) servidor.notificar('notificaciones')
+      }
+      await route.fulfill({ status: 204, body: '' })
+    },
+    async saldos_gestora(route) {
+      if (rol !== 'gestora') return route.fulfill({ json: [] })
+      const mias = new Set(st.tramites.filter((t) => t.gestora_id === yo && ESTADOS_EN_CURSO.includes(String(t.estado))).map((t) => t.empresa_id))
+      const filas = (opciones.saldosFijos ? opciones.saldosFijos(st) ?? [] : saldos())
+        .filter((f) => mias.has(f.empresa_id))
+        .map((f) => ({ empresa_id: f.empresa_id, empresa: f.empresa, disponible: f.disponible, comprometido: f.comprometido }))
+      await route.fulfill({ json: filas })
     },
     async registrar_pago(route, a) {
       const t = tramite(a.p_tramite)

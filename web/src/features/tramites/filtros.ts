@@ -20,6 +20,7 @@ export const CLAVES_FILTRO = [
 // Vistas guardadas de la sección G.1 del spec.
 export const VISTAS = [
   { id: 'para_revisar', etiqueta: 'Para revisar' },
+  { id: 'para_aprobar', etiqueta: 'Presupuestos para aprobar' },
   { id: 'autorizados_sin_presentar', etiqueta: 'Autorizados sin presentar' },
   { id: 'sin_fondos', etiqueta: 'Sin fondos' },
   { id: 'demorados', etiqueta: 'Demorados' },
