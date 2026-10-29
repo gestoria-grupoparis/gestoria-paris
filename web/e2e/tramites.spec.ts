@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { montarSupabase } from './mock-supabase'
+import { crearServidor, montarSupabase } from './mock-supabase'
 import borrador from './fixtures/tramite-borrador.json' with { type: 'json' }
 
 async function completarAlta(page: Page) {
@@ -119,4 +119,34 @@ test('suspender y reanudar vuelve al estado previo; marcas documentales y cancel
   await expect(detalle.getByTestId('estado')).toHaveText('Cancelado')
   await expect(detalle.getByRole('button', { name: 'Cancelar trámite' })).toHaveCount(0)
   await expect(detalle.getByRole('list', { name: 'Historial' }).getByRole('listitem').first()).toContainText('Se cayó la venta')
+})
+
+test('el diálogo conserva el foco y lo escrito aunque lleguen cambios en vivo; Escape no cierra durante el envío', async ({ page }) => {
+  const servidor = crearServidor([borrador])
+  await montarSupabase(page, [], { servidor })
+  await page.goto('/tramites')
+  await page.getByRole('row', { name: /T-2026-00001/ }).click()
+  const detalle = page.getByRole('complementary', { name: 'Detalle del trámite' })
+  await detalle.getByRole('button', { name: 'Suspender' }).click()
+  const dialogo = page.getByRole('dialog', { name: 'Suspender trámite' })
+  const motivo = dialogo.getByLabel('Motivo')
+  await motivo.pressSequentially('Cliente ')
+  const refetch = page.waitForRequest((r) => r.url().includes('/rest/v1/tramites'))
+  servidor.notificar('tramites')
+  await refetch
+  await page.keyboard.type('de viaje')
+  await expect(motivo).toHaveValue('Cliente de viaje')
+
+  let soltar = () => {}
+  const espera = new Promise<void>((r) => (soltar = r))
+  await page.route('**/rest/v1/rpc/cambiar_estado', async (route) => {
+    await espera
+    await route.fallback()
+  })
+  await dialogo.getByRole('button', { name: 'Confirmar suspensión' }).click()
+  await page.keyboard.press('Escape')
+  await expect(dialogo).toBeVisible()
+  soltar()
+  await expect(dialogo).toBeHidden()
+  await expect(detalle.getByTestId('estado')).toHaveText('Suspendido')
 })
