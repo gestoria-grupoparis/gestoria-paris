@@ -10,6 +10,7 @@ import { MisTramites } from '../pages/MisTramites'
 import { Habitualista } from '../pages/Habitualista'
 import { Tablero } from '../pages/Tablero'
 import { Usuarios } from '../pages/Usuarios'
+import { Informes } from '../pages/Informes'
 import { Button, PaginaPendiente, PantallaCarga, PantallaMensaje } from '../ui'
 import { DefinirClave } from '../features/acceso/DefinirClave'
 import { errorEnUrl } from '../lib/clave'
@@ -51,6 +52,7 @@ const PANTALLAS: Record<string, ComponentType> = {
   '/habitualista': Habitualista,
   '/tablero': Tablero,
   '/usuarios': Usuarios,
+  '/informes': Informes,
 }
 
 function Pendiente({ titulo }: { titulo: string }) {

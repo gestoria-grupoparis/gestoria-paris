@@ -569,6 +569,60 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
       const m = nuevoMovimiento({ idem: a.p_idem, cuenta_id: cuentaDe(t.empresa_id).id, tipo: 'reintegro', importe: String(imp), fecha_operacion: a.p_fecha, tramite_id: t.id })
       await route.fulfill({ json: m.id })
     },
+    // Réplicas de las RPC de informes: ya devuelven los alias ::text que pide el front.
+    async informe_cierre_mensual(route, a) {
+      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable consultan informes')
+      if (!a.p_mes) return errorNegocio(route, 'DATO_INVALIDO: el mes del informe es obligatorio')
+      if (a.p_empresa && !tieneAlcance(a.p_empresa, null)) return errorNegocio(route, 'SIN_PERMISO: sin alcance sobre esa razón social')
+      const mes = String(a.p_mes).slice(0, 7)
+      const filas = catalogos.cuentas
+        .filter((c) => tieneAlcance(c.empresa_id, null) && (!a.p_empresa || c.empresa_id === a.p_empresa))
+        .map((c) => {
+          const movs = st.movimientos.filter((m) => m.cuenta_id === c.id)
+          const antes = movs.filter((m) => String(m.fecha_operacion).slice(0, 7) < mes)
+          const enMes = movs.filter((m) => String(m.fecha_operacion).slice(0, 7) === mes)
+          const suma = (l: Fila[]) => l.reduce((s, m) => s + big(m.importe), 0n)
+          const porTipo = (t: string) => suma(enMes.filter((m) => m.tipo === t))
+          const inicial = big(c.saldo_inicial) + suma(antes)
+          return {
+            mes: `${mes}-01`, empresa_id: c.empresa_id, empresa: nombreDe(catalogos.empresas, c.empresa_id)!.nombre, cuenta_id: c.id,
+            saldo_inicial: String(inicial), cargas: String(porTipo('carga')), pagos: String(-porTipo('pago_tramite')),
+            ajustes: String(porTipo('ajuste')), reintegros: String(porTipo('reintegro')), reversiones: String(porTipo('reversion')),
+            saldo_final: String(inicial + suma(enMes)), movimientos: enMes.length,
+          }
+        })
+        .sort((x, y) => x.empresa.localeCompare(y.empresa))
+      await route.fulfill({ json: filas })
+    },
+    async informe_costos_tramites(route, a) {
+      if (rol !== 'gerencia' && rol !== 'contable') return errorNegocio(route, 'SIN_PERMISO: solo gerencia o contable consultan informes')
+      if (!a.p_mes) return errorNegocio(route, 'DATO_INVALIDO: el mes del informe es obligatorio')
+      if (a.p_empresa && !tieneAlcance(a.p_empresa, null)) return errorNegocio(route, 'SIN_PERMISO: sin alcance sobre esa razón social')
+      const mes = String(a.p_mes).slice(0, 7)
+      const filas = st.tramites
+        .filter((t) => tieneAlcance(t.empresa_id, t.sucursal_id) && (!a.p_empresa || t.empresa_id === a.p_empresa))
+        .flatMap((t) => {
+          const enMes = st.movimientos.filter((m) => m.tramite_id === t.id && String(m.fecha_operacion).slice(0, 7) === mes)
+          if (!enMes.length) return []
+          const f = finanzas(t)
+          const pagoFinal = f.situacion === 'pagado'
+          const desvio = pagoFinal && f.presupuesto != null ? big(f.pagado) - big(f.presupuesto as string) : null
+          const pct = desvio != null && big(f.presupuesto as string) > 0n
+            ? (Number((desvio * 10000n) / big(f.presupuesto as string)) / 100).toFixed(2) : null
+          const op = nombreDe(st.operaciones, t.operacion_id)!
+          return [{
+            mes: `${mes}-01`, tramite_id: t.id, numero: t.numero, empresa_id: t.empresa_id,
+            empresa: nombreDe(catalogos.empresas, t.empresa_id)!.nombre,
+            sucursal: nombreDe(catalogos.sucursales, t.sucursal_id)!.nombre,
+            tipo: nombreDe(catalogos.tipos_tramite, t.tipo_id)!.nombre, cliente: op.cliente_nombre,
+            gestora: nombreDe(perfiles, t.gestora_id)?.nombre ?? null, estado: t.estado,
+            presupuesto: f.presupuesto, costo_mes: String(-enMes.reduce((s, m) => s + big(m.importe), 0n)),
+            pagado_total: f.pagado, pago_final: pagoFinal, desvio: desvio == null ? null : String(desvio), desvio_pct: pct,
+          }]
+        })
+        .sort((x, y) => String(x.empresa).localeCompare(String(y.empresa)) || String(x.numero).localeCompare(String(y.numero)))
+      await route.fulfill({ json: filas })
+    },
     async reasignar_gestora(route, a) {
       let n = 0
       for (const id of a.p_tramites as string[]) {
