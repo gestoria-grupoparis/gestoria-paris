@@ -1230,6 +1230,9 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
     const tipo = nombreDe(catalogos.tipos_tramite, t.tipo_id)!.codigo
     const provincia = String(a.p_provincia ?? nombreDe(catalogos.sucursales, t.sucursal_id)!.provincia)
     const declarado = a.p_valor == null || String(a.p_valor) === '0' ? null : big(a.p_valor)
+    const vigente = valuacionesTablas.filter((x) => x.completa && String(x.vigente_desde) <= ahora.slice(0, 10))
+      .sort((x, y) => String(y.vigente_desde).localeCompare(String(x.vigente_desde)))[0]
+    if (a.p_mtm != null && a.p_tabla !== vigente?.id) return errorNegocio(route, 'DATO_INVALIDO: la tabla de valuaciones elegida no es la vigente (o esta incompleta); busca el vehiculo de nuevo')
     const val = a.p_mtm == null ? null : valuaciones.find((v) => v.tabla_id === a.p_tabla && v.mtm === a.p_mtm && v.anio === a.p_anio)
     if (a.p_mtm != null && !val) return errorNegocio(route, 'DATO_INVALIDO: el vehiculo elegido no figura en la tabla de valuaciones')
     const valor = val && big(val.valor_cents) > (declarado ?? 0n) ? big(val.valor_cents) : declarado
