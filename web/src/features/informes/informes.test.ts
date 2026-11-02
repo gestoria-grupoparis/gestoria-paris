@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { planillaACsv } from '../../lib/planilla'
 import type { CierreMensual, CostoTramite } from './consultas'
 import { COLUMNAS_CIERRE_PLANILLA, COLUMNAS_COSTOS_PLANILLA } from './exportar'
-import { etiquetaMes, mesesRecientes, primerDiaDelMes, tonoDesvio } from './meses'
+import { esCero, etiquetaMes, mesesRecientes, primerDiaDelMes, tonoDesvio } from './meses'
 
 describe('meses del informe', () => {
   it('lista los últimos meses desde el mes de hoy, del más reciente al más viejo', () => {
@@ -43,5 +43,12 @@ describe('informes a planilla', () => {
     expect(enc).toBe('Trámite;Razón social;Sucursal;Tipo;Cliente;Gestora;Estado;Presupuesto;Costo del mes;Pagado total;Pago final;Desvío;Desvío %')
     expect(l1).toBe('T-2026-00021;Paris Autos;San Luis;Patentamiento 0km;Héctor Ponce;Gabriela Gestora;Presentado;300000,00;230000,00;330000,00;Sí;30000,00;10,00')
     expect(l2).toBe('T-2026-00021;Paris Autos;San Luis;Patentamiento 0km;Héctor Ponce;Gabriela Gestora;Presentado;;230000,00;330000,00;No;;')
+  })
+})
+
+describe('ceros sin color', () => {
+  it('reconoce el cero en centavos, con o sin signo', () => {
+    expect(['0', '000', '-0'].map(esCero)).toEqual([true, true, true])
+    expect(['1', '-100', '10'].map(esCero)).toEqual([false, false, false])
   })
 })

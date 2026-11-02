@@ -6,7 +6,7 @@ import { exportarPlanilla } from '../lib/planilla'
 import { listarSaldos } from '../features/habitualista/consultas'
 import { informeCierre, informeCostos, type CierreMensual, type CostoTramite } from '../features/informes/consultas'
 import { COLUMNAS_CIERRE_PLANILLA, COLUMNAS_COSTOS_PLANILLA } from '../features/informes/exportar'
-import { etiquetaMes, formatearPct, mesesRecientes, primerDiaDelMes, tonoDesvio } from '../features/informes/meses'
+import { esCero, etiquetaMes, formatearPct, mesesRecientes, primerDiaDelMes, tonoDesvio } from '../features/informes/meses'
 import { etiquetaEstado, hoyEnBuenosAires } from '../features/tramites/filtros'
 import {
   Button, Cargando, Chip, ChipEstado, DataTable, EmptyState, ErrorState, KpiTile, MenuExportar, PageHeader,
@@ -18,6 +18,8 @@ const MESES_SELECCIONABLES = 24
 
 const Importe = ({ cents }: { cents: string }) => <span data-testid="importe">{formatearPesos(cents)}</span>
 const negativo = (cents: string) => cents.startsWith('-') && !/^-0+$/.test(cents)
+/** Un importe en cero no lleva color: gris tenue, para que resalte lo que sí se movió. */
+const tono = (cents: string, clase: string) => (esCero(cents) ? 'text-tenue' : clase)
 
 function Kpi({ titulo, ...p }: { titulo: string; valor: ReactNode; detalle?: ReactNode; tono?: TonoKpi; grande?: boolean; className?: string }) {
   return (
@@ -169,6 +171,11 @@ function Cierre({ filas, mes, unaEmpresa }: { filas: CierreMensual[]; mes: strin
           <h2 className="text-[15px] font-semibold">Cierre de {etiquetaMes(mes).toLowerCase()}</h2>
           <p className="text-[13px] text-tenue">Saldo final = inicial + cargas − pagos + ajustes + reintegros + reversiones</p>
         </div>
+        {filas.length > 0 && filas.every((c) => c.movimientos === 0) && (
+          <p role="status" className="rounded-md bg-hundido px-4 py-3 text-sm text-tenue">
+            Sin movimientos en {etiquetaMes(mes).toLowerCase()}: no se registraron cargas, pagos ni ajustes.
+          </p>
+        )}
         <DataTable aria-label="Cierre mensual" className="min-w-[960px] [&_th]:whitespace-nowrap">
           <thead>
             <tr>
@@ -190,12 +197,12 @@ function Cierre({ filas, mes, unaEmpresa }: { filas: CierreMensual[]; mes: strin
                   <span className="block text-[12px] font-normal text-tenue">{c.movimientos} mov.</span>
                 </td>
                 <td className={cx(celdaMonto, 'text-tenue')}>{formatearPesos(c.saldo_inicial)}</td>
-                <td className={cx(celdaMonto, 'text-disponible')}>{formatearPesos(c.cargas)}</td>
-                <td className={cx(celdaMonto, 'text-comprometido')}>{formatearPesos(c.pagos)}</td>
-                <td className={celdaMonto}>{formatearPesos(c.ajustes)}</td>
-                <td className={celdaMonto}>{formatearPesos(c.reintegros)}</td>
-                <td className={celdaMonto}>{formatearPesos(c.reversiones)}</td>
-                <td className={cx(celdaMonto, 'font-semibold', negativo(c.saldo_final) ? 'text-sinfondos' : 'text-tinta')}>
+                <td className={cx(celdaMonto, tono(c.cargas, 'text-disponible'))}>{formatearPesos(c.cargas)}</td>
+                <td className={cx(celdaMonto, tono(c.pagos, 'text-comprometido'))}>{formatearPesos(c.pagos)}</td>
+                <td className={cx(celdaMonto, tono(c.ajustes, 'text-tinta'))}>{formatearPesos(c.ajustes)}</td>
+                <td className={cx(celdaMonto, tono(c.reintegros, 'text-tinta'))}>{formatearPesos(c.reintegros)}</td>
+                <td className={cx(celdaMonto, tono(c.reversiones, 'text-tinta'))}>{formatearPesos(c.reversiones)}</td>
+                <td className={cx(celdaMonto, 'font-semibold', negativo(c.saldo_final) ? 'text-sinfondos' : tono(c.saldo_final, 'text-tinta'))}>
                   {formatearPesos(c.saldo_final)}
                 </td>
               </tr>

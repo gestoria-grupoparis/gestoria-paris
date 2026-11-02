@@ -38,3 +38,6 @@ export function formatearPct(pct: string): string {
   const [ent, dec = '00'] = pct.split('.')
   return `${ent.startsWith('-') ? '' : '+'}${ent},${dec.padEnd(2, '0').slice(0, 2)} %`
 }
+
+/** Importe en centavos igual a cero (texto, sin aritmética). */
+export const esCero = (cents: string) => /^-?0+$/.test(cents)
