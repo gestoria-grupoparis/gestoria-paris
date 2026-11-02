@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { useSesion } from '../lib/sesion'
 import { Login } from '../pages/Login'
 import { Layout } from './Layout'
-import { navegacionPorRol } from './navegacion'
+import { inicioPorRol, navegacionPorRol } from './navegacion'
 import { pantallaPara } from '../lib/perfil'
 const Tramites = lazy(() => import('../pages/Tramites').then((m) => ({ default: m.Tramites })))
 const MisTramites = lazy(() => import('../pages/MisTramites').then((m) => ({ default: m.MisTramites })))
@@ -108,7 +108,7 @@ export function Rutas() {
       />
     )
   const items = navegacionPorRol(rol)
-  const inicio = items[0]?.ruta
+  const inicio = inicioPorRol(rol)
   return (
     <Routes>
       <Route path="/cambiar-clave" element={<DefinirClave modo="cambiar" alTerminar={() => navegar(-1)} />} />

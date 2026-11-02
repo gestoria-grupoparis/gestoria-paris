@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSesion, type Rol } from '../lib/sesion'
-import { navegacionPorRol } from './navegacion'
+import { navegacionPorRol, partirBarraMovil } from './navegacion'
 import { Button, LimiteError, LogoGrupoParis, cx } from '../ui'
 import { Campana } from '../features/notificaciones/Campana'
 import { useNotificacionesEnVivo } from '../features/notificaciones/consultas'
@@ -19,7 +19,7 @@ const ICONOS: Record<string, ReactNode> = {
   '/tablero': <path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z" />,
   '/tramites': <path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6" />,
   '/habitualista': <path d="M3 7h18v12H3zM3 11h18M7 15h3" />,
-  '/informes': <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  '/informes': <path d="M5 3h14v18H5zM5 9h14M5 15h14M11 9v12" />,
   '/usuarios': <><circle cx="9" cy="8.5" r="3.2" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M15.5 5.5a3 3 0 0 1 0 6M17.5 14.8c1.5.6 2.5 2 3 4.2" /></>,
   '/analisis': <path d="M3 20h18M4 16c3-6 5-7 8-4s5 1 8-6" />,
   '/rendiciones': <path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3" />,
@@ -39,6 +39,8 @@ function iniciales(nombre?: string) {
 }
 
 const EMPRESA = 'Grupo Paris'
+const CLASE_BARRA = 'relative flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[12px] font-medium'
+const ACTIVO_BARRA = 'text-tinta after:absolute after:top-0 after:h-[2px] after:w-8 after:rounded-b after:bg-marca'
 
 function IconoSalir({ className = 'size-5' }: { className?: string }) {
   return (
@@ -61,18 +63,22 @@ export function Layout() {
   const items = navegacionPorRol(rol)
   useNotificacionesEnVivo(perfil?.id)
   const [cuenta, setCuenta] = useState(false)
+  const [mas, setMas] = useState(false)
   const { pathname } = useLocation()
+  const barra = partirBarraMovil(items)
+  const masActivo = barra.mas.some((i) => pathname.startsWith(i.ruta))
   const rolTexto = rol ? ROL_ETIQUETA[rol] : ''
   const salir = () => void supabase.auth.signOut()
   const navegar = useNavigate()
   const cambiarClave = () => { setCuenta(false); navegar('/cambiar-clave') }
 
   useEffect(() => {
-    if (!cuenta) return
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && setCuenta(false)
+    if (!cuenta && !mas) return
+    const f = (e: KeyboardEvent) => { if (e.key === 'Escape') { setCuenta(false); setMas(false) } }
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
-  }, [cuenta])
+  }, [cuenta, mas])
+  useEffect(() => setMas(false), [pathname])
 
   return (
     <div className="min-h-dvh md:flex print:block print:min-h-0">
@@ -149,7 +155,7 @@ export function Layout() {
           </button>
           </div>
         </header>
-        <main className="min-w-0 pb-24 md:pb-0 print:pb-0">
+        <main className="min-w-0 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0 print:pb-0">
           <LimiteError compacto key={pathname}>
             <Outlet />
           </LimiteError>
@@ -190,25 +196,62 @@ export function Layout() {
         </div>
       )}
 
+      {mas && (
+        <div className="fixed inset-0 z-40 md:hidden print:hidden">
+          <button type="button" aria-label="Cerrar" tabIndex={-1} className="absolute inset-0 bg-noche/50" onClick={() => setMas(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Más secciones"
+            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-superficie px-3 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-flotante"
+          >
+            <span aria-hidden className="mx-auto mb-3 block h-1 w-10 rounded-full bg-linea-fuerte" />
+            <ul className="flex flex-col">
+              {barra.mas.map((i, n) => (
+                <li key={i.ruta}>
+                  <NavLink
+                    to={i.ruta}
+                    autoFocus={n === 0}
+                    className={({ isActive }) => cx('flex min-h-12 items-center gap-3 rounded-md px-3 text-[15px] font-medium', isActive ? 'bg-marca-suave text-tinta' : 'text-tinta hover:bg-hover')}
+                  >
+                    <Icono ruta={i.ruta} />
+                    {i.etiqueta}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <nav
         aria-label="Principal móvil"
         className="fixed inset-x-0 bottom-0 z-30 flex border-t border-linea bg-superficie/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden print:hidden"
       >
-        {items.map((i) => (
+        {barra.fijos.map((i) => (
           <NavLink
             key={i.ruta}
             to={i.ruta}
-            className={({ isActive }) =>
-              cx(
-                'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium',
-                isActive ? 'text-tinta after:absolute after:top-0 after:h-[2px] after:w-8 after:rounded-b after:bg-marca' : 'text-tenue',
-              )
-            }
+            className={({ isActive }) => cx(CLASE_BARRA, isActive ? ACTIVO_BARRA : 'text-tenue')}
           >
             <Icono ruta={i.ruta} />
             {i.etiqueta}
           </NavLink>
         ))}
+        {barra.mas.length > 0 && (
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={mas}
+            onClick={() => setMas(true)}
+            className={cx(CLASE_BARRA, masActivo ? ACTIVO_BARRA : 'text-tenue')}
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="size-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+            Más
+          </button>
+        )}
       </nav>
     </div>
   )
