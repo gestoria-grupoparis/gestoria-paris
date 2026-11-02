@@ -21,3 +21,22 @@ test('el tablero muestra los presupuestos por aprobar y el clic lleva a la lista
   await expect(page.getByRole('row', { name: /T-2026-000(11|19)/ })).toHaveCount(2)
   await expect(page.getByRole('row', { name: /T-2026-00012/ })).toHaveCount(0)
 })
+
+test('los indicadores de fondos salen de v_saldos y no se contradicen; trámites por estado en dona', async ({ page }) => {
+  await page.clock.setFixedTime(catalogos.ahora)
+  await montarSupabase(page, [
+    { operacion: f.operacion, tramite: f.autorizado, presupuestos: ['70000000'], situacion: 'sin_fondos' },
+    { operacion: f.operacion, tramite: f.presentado, presupuestos: ['70000000'] },
+  ])
+  await page.goto('/tablero')
+  const pa = page.getByRole('article', { name: 'Paris Autos' })
+  await expect(pa).toContainText('1 trámite sin fondos')
+  await expect(page.getByText('Trámites sin fondos', { exact: true })).toBeVisible()
+  const dona = page.getByRole('figure', { name: 'Trámites por estado' })
+  await expect(dona.locator('.recharts-pie')).toHaveCount(1)
+  await expect(page.getByTestId('dona-total')).toHaveText('2')
+  await expect(page.locator('.recharts-bar, .recharts-bar-rectangle')).toHaveCount(0)
+  await expect(page.getByText('9 estados sin trámites')).toBeVisible()
+  await dona.getByRole('link', { name: /Presentado/ }).click()
+  await expect(page).toHaveURL(/\/tramites\?estado=presentado/)
+})

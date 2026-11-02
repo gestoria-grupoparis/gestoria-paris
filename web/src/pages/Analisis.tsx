@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { formatearPesos } from '../lib/dinero'
 import { exportarPlanilla, type Columna } from '../lib/planilla'
@@ -9,7 +9,9 @@ import { cargarCatalogos } from '../features/tramites/consultas'
 import { hoyEnBuenosAires } from '../features/tramites/filtros'
 import { obtenerAnalisis, type Analisis as DatosAnalisis } from '../features/analisis/consultas'
 import { ETIQUETA_CONCEPTO, PERIODOS, aNumero, etiquetaSemana, etiquetaVariacion, rangoPeriodo, type Periodo } from '../features/analisis/formato'
-import { GraficoDona, GraficoLineas } from '../features/analisis/Graficos'
+// Recharts (el grueso del peso) baja recién cuando se muestran gráficos, no en Previsión ni Parámetros.
+const GraficoDona = lazy(() => import('../features/analisis/Graficos').then((m) => ({ default: m.GraficoDona })))
+const GraficoLineas = lazy(() => import('../features/analisis/Graficos').then((m) => ({ default: m.GraficoLineas })))
 import { Prevision } from '../features/analisis/Prevision'
 import { Parametros } from '../features/analisis/Parametros'
 import { TablasValuaciones } from '../features/analisis/ImportarValuaciones'
@@ -182,6 +184,7 @@ function Gasto({ a }: { a: DatosAnalisis }) {
         <section aria-label="Honorarios"><KpiTile rotulo="Honorarios" valor={formatearPesos(k.honorarios_cents)} detalle="Según las rendiciones del período" className="h-full" /></section>
       </div>
 
+      <Suspense fallback={<div role="status" className="grid h-72 place-items-center rounded-lg bg-hundido text-sm text-tenue">Cargando gráficos…</div>}>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <GraficoLineas
           titulo={a.granularidad === 'dia' ? 'Gasto diario' : 'Gasto semanal'}
@@ -200,6 +203,7 @@ function Gasto({ a }: { a: DatosAnalisis }) {
         <GraficoDona titulo="Gasto por razón social" porciones={a.por_empresa} etiqueta={(x) => x} />
         <GraficoDona titulo="Gasto por concepto" porciones={a.por_concepto} etiqueta={(x) => ETIQUETA_CONCEPTO[x] ?? x} />
       </div>
+      </Suspense>
     </div>
   )
 }

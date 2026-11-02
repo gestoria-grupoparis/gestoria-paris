@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
+import { lazy, Suspense } from 'react'
 import { Link } from 'react-router'
 import { formatearPesos } from '../lib/dinero'
 import { listarSaldos, type Saldo } from '../features/habitualista/consultas'
 import { useFinanzasEnVivo } from '../features/habitualista/enVivo'
-import { conciliacionVencida, fechaOperativa, necesidadRecarga } from '../features/habitualista/saldos'
+import { conciliacionVencida, fechaOperativa } from '../features/habitualista/saldos'
 import { contarPorEstado, listarIntervencion, resumenTablero, sumar, type Motivo } from '../features/tablero/consultas'
 import { ESTADOS, hoyEnBuenosAires } from '../features/tramites/filtros'
 import {
   Card, CardHeader, Chip, EmptyState, ErrorState, IconoAlerta, IconoCheck, IconoChevron, IconoDoc, IconoProhibido,
-  IconoReloj, KpiTile, PageHeader, Skeleton, TONO_ESTADO, cx, type TonoChip,
+  IconoReloj, KpiTile, PageHeader, Skeleton, cx, type TonoChip,
 } from '../ui'
 
 const MOTIVOS: Record<Motivo, { texto: string; tono: TonoChip }> = {
@@ -27,23 +28,30 @@ const ETAPAS = [
   { campo: 'devueltos', texto: 'Devueltos sin cerrar', enlace: '/tramites?estado=devuelto' },
 ] as const
 
-/** Color de la barra por tono de estado (mismo código que los chips). */
-const BARRA: Record<TonoChip, string> = {
-  neutro: 'bg-linea-fuerte',
-  marca: 'bg-marca',
-  info: 'bg-info',
-  disponible: 'bg-disponible',
-  comprometido: 'bg-comprometido',
-  sinfondos: 'bg-sinfondos',
-  apagado: 'bg-linea',
-  solido: 'bg-noche',
+// Recharts baja recién al mostrar la dona (no forma parte de la descarga inicial del Tablero).
+const DonaConteo = lazy(() => import('../features/analisis/Graficos').then((m) => ({ default: m.DonaConteo })))
+
+/** Color de cada estado en la dona: misma familia que los chips, sin repetir dentro de la dona. */
+const COLOR_ESTADO: Record<string, string> = {
+  borrador: 'var(--color-linea-fuerte)',
+  observado: 'var(--color-comprometido)',
+  autorizado: 'var(--color-acento)',
+  en_gestoria: 'var(--color-tenue)',
+  presentado: 'var(--color-marca)',
+  finalizado_registro: 'var(--color-disponible)',
+  devuelto: 'color-mix(in srgb, var(--color-disponible) 55%, white)',
+  cerrado: 'var(--color-plata)',
+  suspendido: 'color-mix(in srgb, var(--color-comprometido) 55%, white)',
+  cancelado: 'var(--color-linea)',
+  rechazado: 'var(--color-sinfondos)',
 }
 
 const negativo = (cents: string) => cents.startsWith('-') && !/^-0+$/.test(cents)
 
 function TarjetaEmpresa({ s, hoy }: { s: Saldo; hoy: string }) {
-  const recarga = necesidadRecarga(s.disponible)
-  const falta = recarga !== '0'
+  // Ambos indicadores vienen de v_saldos: el faltante y los trámites "sin fondos" (misma definición que el tablero).
+  const recarga = s.recarga
+  const falta = !/^0+$/.test(recarga)
   const vencida = conciliacionVencida(s.ultima_conciliacion_fecha, s.ultima_diferencia, hoy)
   return (
     <article
@@ -55,7 +63,13 @@ function TarjetaEmpresa({ s, hoy }: { s: Saldo; hoy: string }) {
     >
       <div className="flex items-start justify-between gap-3 px-5 pt-5">
         <h3 className="min-w-0 text-lg font-semibold leading-tight [overflow-wrap:anywhere]">{s.empresa}</h3>
-        {falta ? <Chip tono="sinfondos">Sin fondos</Chip> : <Chip tono="disponible">Con fondos</Chip>}
+        {s.tramites_sin_fondos > 0 ? (
+          <Chip tono="sinfondos">{s.tramites_sin_fondos === 1 ? '1 trámite sin fondos' : `${s.tramites_sin_fondos} trámites sin fondos`}</Chip>
+        ) : falta ? (
+          <Chip tono="sinfondos">A recargar</Chip>
+        ) : (
+          <Chip tono="disponible">Con fondos</Chip>
+        )}
       </div>
       <div className="px-5 pt-4">
         <div className="rotulo">Disponible</div>
@@ -112,9 +126,11 @@ export function Tablero() {
 
   // Conteos de trámites (enteros, no montos).
   const porAprobar = resumen.data ? sumar(resumen.data, 'por_aprobar') : null
-  const maximo = conteo.data ? Math.max(1, ...ESTADOS.map((e) => conteo.data[e.id] ?? 0)) : 1
-  const cuenta = (m: Motivo) => intervencion.data?.filter((t) => t.motivos.includes(m)).length ?? null
-  const conRecarga = saldos.data?.filter((s) => necesidadRecarga(s.disponible) !== '0').length ?? null
+  const totalTramites = conteo.data ? ESTADOS.reduce((n, e) => n + (conteo.data[e.id] ?? 0), 0) : 0
+  const sinTramites = conteo.data ? ESTADOS.filter((e) => !(conteo.data[e.id] ?? 0)).length : 0
+  // Conteos (no montos) a partir de v_saldos: misma fuente que las tarjetas de cada razón social.
+  const sinFondos = saldos.data ? saldos.data.reduce((n, s) => n + Number(s.tramites_sin_fondos ?? 0), 0) : null
+  const conRecarga = saldos.data?.filter((s) => !/^0+$/.test(s.recarga)).length ?? null
   const kpi = (n: number | null) => (n == null ? <Skeleton className="h-7 w-16" /> : n)
 
   return (
@@ -137,11 +153,11 @@ export function Tablero() {
           detalle="Observados, por aprobar, sin fondos o demorados"
         />
         <KpiTile
-          rotulo="Sin fondos"
-          tono={cuenta('sin_fondos') ? 'sinfondos' : 'neutro'}
+          rotulo="Trámites sin fondos"
+          tono={sinFondos ? 'sinfondos' : 'neutro'}
           icono={<IconoProhibido />}
-          valor={kpi(cuenta('sin_fondos'))}
-          detalle="La gestora no puede presentarlos"
+          valor={kpi(sinFondos)}
+          detalle="Su presupuesto no entra en lo cargado: la gestora no puede presentarlos"
         />
         <KpiTile
           rotulo="Cuentas a recargar"
@@ -174,7 +190,7 @@ export function Tablero() {
                 ))}
               </ol>
               {resumen.data && resumen.data.length > 0 && (
-                <div className="overflow-x-auto border-t border-linea">
+                <div role="region" aria-label="Trámites por razón social (se desplaza hacia el costado)" tabIndex={0} className="overflow-x-auto border-t border-linea focus-visible:outline-2 focus-visible:outline-acento">
                   <table aria-label="Por razón social" className="w-full min-w-[520px] text-sm">
                     <thead>
                       <tr className="text-left text-[12px] text-tenue">
@@ -243,26 +259,23 @@ export function Tablero() {
                 {ESTADOS.map((e) => <Skeleton key={e.id} className="h-6" />)}
               </div>
             ) : (
-              <ul className="flex flex-col p-3">
-                {ESTADOS.map((e) => {
-                  const n = conteo.data[e.id] ?? 0
-                  const tono = TONO_ESTADO[e.id] ?? 'neutro'
-                  return (
-                    <li key={e.id}>
-                      <Link
-                        to={`/tramites?estado=${e.id}`}
-                        className={cx('grid min-h-11 grid-cols-[9.5rem_1fr_2.5rem] md:min-h-10 items-center gap-3 rounded-md px-3 hover:bg-marca-suave/50', !n && 'text-tenue')}
-                      >
-                        <span className="truncate text-sm font-semibold">{e.etiqueta}</span>{' '}
-                        <span aria-hidden className="h-2.5 overflow-hidden rounded-full bg-hundido">
-                          <span className={cx('block h-full rounded-full', BARRA[tono])} style={{ width: `${(n / maximo) * 100}%` }} />
-                        </span>{' '}
-                        <strong className="cifra text-right font-display text-base">{n}</strong>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
+              <div className="p-5">
+                {totalTramites === 0 ? (
+                  <EmptyState titulo="Todavía no hay trámites." />
+                ) : (
+                  <Suspense fallback={<div role="status" className="h-44"><span className="sr-only">Cargando gráfico…</span></div>}>
+                    <DonaConteo
+                      titulo="Trámites por estado"
+                      total={totalTramites}
+                      porciones={ESTADOS.map((e) => ({ clave: e.id, nombre: e.etiqueta, cantidad: conteo.data[e.id] ?? 0, color: COLOR_ESTADO[e.id] }))}
+                      enlace={(id) => `/tramites?estado=${id}`}
+                    />
+                  </Suspense>
+                )}
+                {sinTramites > 0 && totalTramites > 0 && (
+                  <p className="mt-3 px-3 text-[13px] text-tenue">{sinTramites === 1 ? '1 estado sin trámites' : `${sinTramites} estados sin trámites`}</p>
+                )}
+              </div>
             )}
           </Card>
         </section>

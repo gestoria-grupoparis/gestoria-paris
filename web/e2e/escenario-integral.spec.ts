@@ -33,6 +33,8 @@ function saldosFijos(st: Estado) {
     cuenta_id: CUENTA_PA.id, empresa_id: PARIS_AUTOS, empresa: 'Paris Autos',
     registrado: p.registrado_cents, comprometido: p.comprometido_cents, disponible: p.disponible_cents,
     ultima_conciliacion_fecha: null, ultima_diferencia: null,
+    // En todos los pasos el disponible es >= 0: la base da recarga 0 y ningún trámite sin fondos.
+    recarga: '0', tramites_sin_fondos: 0,
   }]
 }
 

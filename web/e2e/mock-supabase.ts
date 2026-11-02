@@ -337,6 +337,9 @@ export async function montarSupabase(page: Page, semillas: Semilla[] = [], opcio
         cuenta_id: c.id, empresa_id: c.empresa_id, empresa: nombreDe(catalogos.empresas, c.empresa_id)!.nombre,
         registrado: String(registrado), comprometido: String(comprometido), disponible: String(registrado - comprometido),
         ultima_conciliacion_fecha: ultima?.fecha_corte ?? null, ultima_diferencia: ultima ? String(ultima.diferencia) : null,
+        // Réplica de las columnas de v_saldos (migración 20261102000800).
+        recarga: String(registrado - comprometido < 0n ? comprometido - registrado : 0n),
+        tramites_sin_fondos: st.tramites.filter((t) => t.empresa_id === c.empresa_id && finanzas(t).situacion === 'sin_fondos').length,
       }
     })
   }

@@ -210,3 +210,20 @@ test('desvío porcentual extremo no rompe v_tramite_finanzas ni v_saldos', async
     .toEqual([100n, 10000000n, 9999900n, '9999900.00', 'pagado'])
   expect(await f.saldo()).toEqual([90000000n, 0n, 90000000n])
 })
+
+test('v_saldos da la necesidad de recarga y los trámites sin fondos con la misma definición que el tablero', async () => {
+  const f = await preparar()
+  await f.carga(100000000n)
+  await f.tramite(60000000n)
+  const t2 = await f.tramite(70000000n)
+  const fila = await comoUsuario(f.gerencia, async (c) =>
+    (await c.query(`select necesidad_recarga_cents, tramites_sin_fondos from public.v_saldos where empresa = 'Paris Autos'`)).rows[0])
+  expect(fila.necesidad_recarga_cents).toBe(30000000n)
+  expect(fila.tramites_sin_fondos).toBe(1)
+  expect((await f.finanzas(t2)).situacion).toBe('sin_fondos')
+
+  await f.carga(30000000n)
+  const cubierto = await comoUsuario(f.gerencia, async (c) =>
+    (await c.query(`select necesidad_recarga_cents, tramites_sin_fondos from public.v_saldos where empresa = 'Paris Autos'`)).rows[0])
+  expect([cubierto.necesidad_recarga_cents, cubierto.tramites_sin_fondos]).toEqual([0n, 0])
+})

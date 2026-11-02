@@ -10,6 +10,10 @@ export interface Saldo {
   disponible: string
   ultima_conciliacion_fecha: string | null
   ultima_diferencia: string | null
+  /** Faltante para cubrir lo comprometido (centavos), calculado en v_saldos. */
+  recarga: string
+  /** Trámites de la cuenta con situación "sin fondos" (misma definición que el tablero). */
+  tramites_sin_fondos: number
 }
 
 export interface Movimiento {
@@ -53,7 +57,8 @@ export async function listarSaldos(): Promise<Saldo[]> {
     .from('v_saldos')
     .select(
       'cuenta_id,empresa_id,empresa,registrado:registrado_cents::text,comprometido:comprometido_cents::text,' +
-        'disponible:disponible_cents::text,ultima_conciliacion_fecha,ultima_diferencia:ultima_diferencia_cents::text',
+        'disponible:disponible_cents::text,ultima_conciliacion_fecha,ultima_diferencia:ultima_diferencia_cents::text,' +
+        'recarga:necesidad_recarga_cents::text,tramites_sin_fondos',
     )
     .order('empresa')
   if (error) throw error
