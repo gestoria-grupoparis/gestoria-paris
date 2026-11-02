@@ -250,3 +250,13 @@ test.describe('celular (375 px)', () => {
     expect(await sinScrollHorizontal(page)).toBe(true)
   })
 })
+
+test('planilla: el pago se ve completo y sin cambios avisa por qué no se puede guardar', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await abrir(page, CONTABLE, conPlanilla(), `/rendiciones?r=${REND}&vista=planilla`)
+  const pago = page.getByLabel('Pago fila 1')
+  await expect(pago).toHaveValue(/940\.153,98/)
+  expect(await pago.evaluate((el: HTMLInputElement) => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await expect(page.getByText('No hay cambios para guardar.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Guardar planilla' })).toBeDisabled()
+})

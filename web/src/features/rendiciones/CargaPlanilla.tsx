@@ -189,7 +189,7 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
       ) : (
         <DataTable
           aria-label="Filas de la planilla"
-          className="min-w-[980px]"
+          className="min-w-[1080px]"
           pie={
             <span className="flex flex-wrap justify-between gap-2">
               <span>{filas.length} {filas.length === 1 ? 'fila' : 'filas'}</span>
@@ -225,10 +225,10 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
                   ) : f.dominio || '—'}
                 </td>
                 <td className="text-right">
-                  {editable ? <CampoPesos aria-label={`Pago fila ${i + 1}`} value={f.pago} onValor={(v) => cambiar(f.key, { pago: v })} className="h-9 w-40 text-right" /> : <span className="cifra">$ {f.pago}</span>}
+                  {editable ? <CampoPesos aria-label={`Pago fila ${i + 1}`} value={f.pago} onValor={(v) => cambiar(f.key, { pago: v })} className="h-9 w-48 min-w-44 text-right" /> : <span className="cifra">$ {f.pago}</span>}
                 </td>
                 <td className="text-right">
-                  {editable ? <CampoPesos aria-label={`Honorarios fila ${i + 1}`} value={f.honorarios} onValor={(v) => cambiar(f.key, { honorarios: v })} className="h-9 w-32 text-right" /> : <span className="cifra">$ {f.honorarios}</span>}
+                  {editable ? <CampoPesos aria-label={`Honorarios fila ${i + 1}`} value={f.honorarios} onValor={(v) => cambiar(f.key, { honorarios: v })} className="h-9 w-36 min-w-36 text-right" /> : <span className="cifra">$ {f.honorarios}</span>}
                 </td>
                 <td><Vinculo fila={f} n={i + 1} editable={editable} porId={porId} todos={candidatos.data ?? []} onCambiar={(c) => cambiar(f.key, c)} /></td>
                 {editable && (
@@ -245,7 +245,8 @@ export function CargaPlanilla({ rendicion, editable }: { rendicion: RendicionDet
       {editable && filas.length > 0 && (
         <div className="flex flex-col gap-2">
           {guardar.isError && <p role="alert" className="rounded-md bg-sinfondos-suave px-4 py-3 text-sm font-medium text-sinfondos">{mensajeError(guardar.error)}</p>}
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {!sucio && !guardar.isPending && <span className="mr-auto text-[13px] text-tenue sm:mr-2">No hay cambios para guardar.</span>}
             <Button variante="secundario" onClick={() => { setFilas((fs) => [...fs, { key: clave(), nombre: '', dominio: '', pago: '', honorarios: sinSigno(rendicion.honorario), tramite_id: null, vinculo: 'sin_vincular', candidatos: [] }]); setSucio(true) }}>Agregar fila</Button>
             <Button onClick={enviar} cargando={guardar.isPending} disabled={!sucio}>Guardar planilla</Button>
           </div>
@@ -268,7 +269,7 @@ function Vinculo({ fila, n, editable, porId, todos, onCambiar }: {
   const elegir = (id: string) =>
     onCambiar(id ? { tramite_id: id, vinculo: 'manual' } : { tramite_id: null, vinculo: fila.candidatos.length > 1 ? 'ambiguo' : 'sin_vincular' })
   return (
-    <div className="flex min-w-60 flex-col gap-1">
+    <div className="flex min-w-72 flex-col gap-1">
       {fila.tramite_id ? (
         <Chip tono="disponible">Vinculado{t ? ` · ${t.numero}` : ''}</Chip>
       ) : fila.vinculo === 'ambiguo' ? (
@@ -278,7 +279,7 @@ function Vinculo({ fila, n, editable, porId, todos, onCambiar }: {
       )}
       {t && !t.autorizado && <span className="text-[12px] text-sinfondos">El trámite no está autorizado.</span>}
       {editable && (
-        <select aria-label={`Trámite fila ${n}`} value={fila.tramite_id ?? ''} onChange={(e) => elegir(e.target.value)} className={cx(claseControl, 'h-9 text-[13px]')}>
+        <select aria-label={`Trámite fila ${n}`} title={t ? `${t.numero} · ${t.cliente}` : undefined} value={fila.tramite_id ?? ''} onChange={(e) => elegir(e.target.value)} className={cx(claseControl, 'h-9 text-[13px]')}>
           <option value="">{fila.vinculo === 'ambiguo' ? 'Elegí entre los posibles…' : 'Buscar trámite…'}</option>
           {(fila.tramite_id && !opciones.some((o) => o.id === fila.tramite_id) && t ? [t, ...opciones] : opciones).map((c) => (
             <option key={c.id} value={c.id}>{c.numero} · {c.cliente}{c.dominio ? ` · ${c.dominio}` : ''}</option>
