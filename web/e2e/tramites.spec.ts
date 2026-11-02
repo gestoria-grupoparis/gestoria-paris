@@ -170,7 +170,8 @@ test('alta: envío vacío marca los campos, dominio en mayúsculas y formato val
   await page.getByRole('button', { name: 'Nuevo trámite' }).click()
   const form = page.getByRole('dialog', { name: 'Nuevo trámite' })
   await form.getByRole('button', { name: 'Guardar trámite' }).click()
-  await expect(form.getByLabel('Cliente')).toBeFocused()
+  // El alta empieza por la operación: el primer campo marcado es la razón social.
+  await expect(form.getByLabel('Razón social')).toBeFocused()
   await expect(form.getByLabel('Cliente')).toHaveAttribute('aria-invalid', 'true')
   await completarAlta(page)
   await form.getByLabel('Dominio').fill('ab12c')

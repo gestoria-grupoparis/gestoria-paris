@@ -66,7 +66,8 @@ export function FiltrosTramites({ filtros, catalogos, onCambiar }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+      <div className="relative -mx-4 md:mx-0">
+      <div className="overflow-x-auto px-4 pr-10 md:px-0 md:pr-0">
         <div className="inline-flex gap-1 rounded-lg bg-hundido p-1" role="group" aria-label="Vistas guardadas">
           {VISTAS.map((v) => {
             const activa = filtros.vista === v.id
@@ -88,6 +89,9 @@ export function FiltrosTramites({ filtros, catalogos, onCambiar }: Props) {
           })}
         </div>
       </div>
+      {/* En el celular las vistas no entran: el degradé avisa que hay más hacia el costado. */}
+      <span aria-hidden data-testid="mas-vistas" className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-fondo to-transparent md:hidden" />
+      </div>
 
       <div className="flex gap-2">
         <label className="relative min-w-0 flex-1">
@@ -96,7 +100,7 @@ export function FiltrosTramites({ filtros, catalogos, onCambiar }: Props) {
           <input
             type="search"
             aria-label="Buscar"
-            placeholder="Buscar por cliente, cuenta, oferta o dominio"
+            placeholder="Cliente, cuenta, oferta o dominio"
             className={cx(claseControl, 'h-12 pl-10 text-[14px] shadow-tarjeta')}
             value={filtros.q ?? ''}
             onChange={(e) => set({ q: e.target.value })}

@@ -22,12 +22,12 @@ const ULTIMA = 'alta-ultima-empresa-sucursal'
 export const DOMINIO_VALIDO = /^([A-Z]{2}\d{3}[A-Z]{2}|[A-Z]{3}\d{3})$/
 
 const OBLIGATORIOS: [Clave, string][] = [
-  ['cliente', 'Indicá el cliente.'],
-  ['cuentaPersonal', 'Indicá la cuenta personal.'],
   ['empresa', 'Elegí la razón social.'],
   ['sucursal', 'Elegí la sucursal.'],
-  ['oferta', 'Indicá la oferta.'],
   ['tipo', 'Elegí el tipo.'],
+  ['oferta', 'Indicá la oferta.'],
+  ['cliente', 'Indicá el cliente.'],
+  ['cuentaPersonal', 'Indicá la cuenta personal.'],
   ['vehiculo', 'Indicá el vehículo.'],
 ]
 
@@ -38,8 +38,9 @@ export function validarAlta(d: typeof VACIO): Partial<Record<Clave, string>> {
   return e
 }
 
-function inicial(catalogos: Props['catalogos']): typeof VACIO {
-  let ultima: { empresa?: string; sucursal?: string } = {}
+/** Valores al abrir el alta: razón social, sucursal y tipo del último alta (si siguen existiendo). */
+export function inicial(catalogos: Pick<Props['catalogos'], 'empresas' | 'sucursales' | 'tipos'>): typeof VACIO {
+  let ultima: { empresa?: string; sucursal?: string; tipo?: string } = {}
   try {
     ultima = JSON.parse(localStorage.getItem(ULTIMA) ?? '{}')
   } catch {
@@ -47,7 +48,8 @@ function inicial(catalogos: Props['catalogos']): typeof VACIO {
   }
   const unica = <T extends { id: string }>(xs: T[], previa?: string) =>
     xs.length === 1 ? xs[0].id : xs.some((x) => x.id === previa) ? previa! : ''
-  return { ...VACIO, empresa: unica(catalogos.empresas, ultima.empresa), sucursal: unica(catalogos.sucursales, ultima.sucursal) }
+  const tipo = catalogos.tipos.some((t) => t.codigo === ultima.tipo) ? ultima.tipo! : ''
+  return { ...VACIO, empresa: unica(catalogos.empresas, ultima.empresa), sucursal: unica(catalogos.sucursales, ultima.sucursal), tipo }
 }
 
 export function FormAlta({ catalogos, onCerrar, onCreado }: Props) {
@@ -78,7 +80,7 @@ export function FormAlta({ catalogos, onCerrar, onCreado }: Props) {
       return
     }
     try {
-      localStorage.setItem(ULTIMA, JSON.stringify({ empresa: d.empresa, sucursal: d.sucursal }))
+      localStorage.setItem(ULTIMA, JSON.stringify({ empresa: d.empresa, sucursal: d.sucursal, tipo: d.tipo }))
     } catch {
       /* sin storage */
     }
@@ -106,13 +108,7 @@ export function FormAlta({ catalogos, onCerrar, onCreado }: Props) {
     <Dialogo titulo="Nuevo trámite" rotulo="Alta" onCerrar={onCerrar} ancho="md:max-w-2xl">
       <form noValidate onSubmit={guardar} className="space-y-6">
         <fieldset className="grid grid-cols-2 gap-x-4 gap-y-4">
-          <legend className="rotulo col-span-2 mb-3">Cliente y operación</legend>
-          <Campo label="Cliente" error={errores.cliente} className="col-span-2 sm:col-span-1">
-            <input required className={sel} placeholder="Nombre y apellido" {...campo('cliente')} />
-          </Campo>
-          <Campo label="Cuenta personal" error={errores.cuentaPersonal} className="col-span-2 sm:col-span-1">
-            <input required className={sel} placeholder="CP-0000" {...campo('cuentaPersonal')} />
-          </Campo>
+          <legend className="rotulo col-span-2 mb-3">Operación</legend>
           <Campo label="Razón social" error={errores.empresa}>
             <select required className={sel} {...campo('empresa')}>
               <option value="">Elegí</option>
@@ -133,9 +129,6 @@ export function FormAlta({ catalogos, onCerrar, onCreado }: Props) {
               ))}
             </select>
           </Campo>
-          <Campo label="Oferta" error={errores.oferta}>
-            <input required className={sel} placeholder="OF-0000" {...campo('oferta')} />
-          </Campo>
           <Campo label="Tipo" error={errores.tipo}>
             <select required className={sel} {...campo('tipo')}>
               <option value="">Elegí el tipo</option>
@@ -145,6 +138,19 @@ export function FormAlta({ catalogos, onCerrar, onCreado }: Props) {
                 </option>
               ))}
             </select>
+          </Campo>
+          <Campo label="Oferta" error={errores.oferta}>
+            <input required className={sel} placeholder="OF-0000" {...campo('oferta')} />
+          </Campo>
+        </fieldset>
+
+        <fieldset className="grid grid-cols-2 gap-x-4 gap-y-4">
+          <legend className="rotulo col-span-2 mb-3">Cliente</legend>
+          <Campo label="Cliente" error={errores.cliente} className="col-span-2 sm:col-span-1">
+            <input required className={sel} placeholder="Nombre y apellido" {...campo('cliente')} />
+          </Campo>
+          <Campo label="Cuenta personal" error={errores.cuentaPersonal} className="col-span-2 sm:col-span-1">
+            <input required className={sel} placeholder="CP-0000" {...campo('cuentaPersonal')} />
           </Campo>
         </fieldset>
 
@@ -179,7 +185,8 @@ export function FormAlta({ catalogos, onCerrar, onCreado }: Props) {
             {error}
           </p>
         )}
-        <div className="flex flex-col-reverse gap-2 border-t border-linea pt-4 sm:flex-row sm:justify-end">
+        {/* En el celular los botones quedan fijos al pie del diálogo, siempre a la vista. */}
+        <div data-testid="pie-alta" className="sticky bottom-0 z-10 -mx-5 flex flex-col-reverse gap-2 border-t border-linea bg-superficie px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
           <Button variante="secundario" onClick={onCerrar}>
             Cancelar
           </Button>
