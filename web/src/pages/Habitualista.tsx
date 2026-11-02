@@ -113,7 +113,7 @@ export function Habitualista() {
           <Skeleton className="h-32 rounded-lg sm:col-span-2 lg:col-span-1" />
         </div>
       ) : !saldo ? (
-        <EmptyState
+        <EmptyState nivel={2}
           titulo="No tenés alcance sobre ninguna razón social completa."
           descripcion="Pedile a gerencia que te asigne una razón social para ver sus fondos."
         />

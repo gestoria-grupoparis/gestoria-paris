@@ -51,7 +51,7 @@ export function TablaCompromisos({ filas, esGerencia, onCambio }: {
   const [excepcion, setExcepcion] = useState<Compromiso | null>(null)
   if (!filas.length)
     return (
-      <EmptyState
+      <EmptyState nivel={2}
         icono={<IconoCheck className="size-6" />}
         titulo="No hay trámites con fondos comprometidos"
         descripcion="Cuando una gestora cargue un presupuesto, el trámite aparece acá hasta que se registre el pago final."

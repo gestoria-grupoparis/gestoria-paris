@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react'
 import { cx } from './cx'
 
-export function EmptyState({ titulo, descripcion, accion, icono }: { titulo: string; descripcion?: ReactNode; accion?: ReactNode; icono?: ReactNode }) {
+/** `nivel`: 2 cuando el estado vacío cuelga directo del título de la página (sin saltar de h1 a h3). */
+export function EmptyState({ titulo, descripcion, accion, icono, nivel = 3 }: { titulo: string; descripcion?: ReactNode; accion?: ReactNode; icono?: ReactNode; nivel?: 2 | 3 }) {
+  const Titulo = nivel === 2 ? 'h2' : 'h3'
   return (
     <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-linea-fuerte bg-superficie px-6 py-12 text-center">
       <span aria-hidden className="grid size-11 place-items-center rounded-lg bg-hundido text-tenue ring-1 ring-linea">
         {icono ?? <IconoVacio />}
       </span>
-      <h3 className="text-[14px] font-semibold">{titulo}</h3>
+      <Titulo className="text-[14px] font-semibold">{titulo}</Titulo>
       {descripcion && <p className="max-w-sm text-sm text-tenue">{descripcion}</p>}
       {accion}
     </div>

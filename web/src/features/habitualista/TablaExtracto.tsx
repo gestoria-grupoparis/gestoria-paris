@@ -30,7 +30,7 @@ export function TablaExtracto({
 }) {
   if (!filas.length)
     return (
-      <EmptyState
+      <EmptyState nivel={2}
         icono={<IconoDoc className="size-6" />}
         titulo="Todavía no hay movimientos"
         descripcion="Registrá la primera carga de fondos y el extracto empieza a armarse acá, con el saldo después de cada movimiento."

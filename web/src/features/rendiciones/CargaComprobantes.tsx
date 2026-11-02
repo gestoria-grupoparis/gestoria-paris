@@ -153,7 +153,7 @@ export function CargaComprobantes({ rendicion, editable, filaFoco }: { rendicion
       {dups.isError && <ErrorState titulo="No se pudo revisar si hay duplicados." descripcion={mensajeError(dups.error)} />}
 
       {visibles.length === 0 ? (
-        <EmptyState titulo="Todavía no hay comprobantes." descripcion={editable ? 'Subí los recibos, retenciones y facturas del mes.' : 'Esta rendición no tiene comprobantes.'} />
+        <EmptyState nivel={2} titulo="Todavía no hay comprobantes." descripcion={editable ? 'Subí los recibos, retenciones y facturas del mes.' : 'Esta rendición no tiene comprobantes.'} />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
           <ul aria-label="Lista de comprobantes" className="flex max-h-[70dvh] flex-col gap-1.5 overflow-auto">

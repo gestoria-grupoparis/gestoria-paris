@@ -17,7 +17,12 @@ const ESTILO_TABLA = [
 export function DataTable({ className, children, pie, ...p }: TableHTMLAttributes<HTMLTableElement> & { pie?: ReactNode }) {
   return (
     <div className="overflow-hidden rounded-lg bg-superficie ring-1 ring-linea">
-      <div className="max-h-[70dvh] overflow-auto">
+      {/* Contenedor con scroll alcanzable con el teclado (axe: scrollable-region-focusable). */}
+      <div
+        className="max-h-[70dvh] overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acento"
+        tabIndex={0}
+        {...(p['aria-label'] ? { role: 'region', 'aria-label': `${p['aria-label']} (tabla desplazable)` } : {})}
+      >
         <table className={cx(ESTILO_TABLA, className)} {...p}>
           {children}
         </table>
